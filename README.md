@@ -373,11 +373,12 @@ paper's observation (see note below).
 > that mono never sees. RPE (local drift) is a more reliable indicator of
 > systematic performance.
 
-**RPE — average across 5 Vicon sequences (Table III: all-dataset average)**
+**RPE — average across 5 Vicon sequences (Table III)**
 
+The paper only benchmarks on the 5 Vicon room sequences (not Machine Hall).
 V2_01_easy has no 40 m or 48 m segment (trajectory too short); excluded from
-those averages. No Vicon sequence reaches 48 m — the paper's 48 m RPE comes
-from the Machine Hall sequences which are not part of Table II.
+those averages. The 48 m segment requires patching `error_singlerun` to accept
+custom segment lengths (included in our fork).
 
 *Stereo:*
 
@@ -388,7 +389,7 @@ from the Machine Hall sequences which are not part of Table II.
 | 24 m | **0.972 / 0.086** | 1.089 / 0.087 |
 | 32 m | **1.009 / 0.091** | 1.218 / 0.088 |
 | 40 m | **1.116 / 0.087** | 1.342 / 0.101 |
-| 48 m | — | 1.489 / 0.106 |
+| 48 m | **1.223 / 0.092** | 1.489 / 0.106 |
 
 *Mono:*
 
@@ -399,7 +400,7 @@ from the Machine Hall sequences which are not part of Table II.
 | 24 m | 1.301 / 0.150 | **1.215 / 0.111** |
 | 32 m | 1.346 / 0.188 | **1.283 / 0.132** |
 | 40 m | **1.116 / 0.135** | 1.342 / 0.151 |
-| 48 m | — | 1.425 / 0.184 |
+| 48 m | **1.224 / 0.120** | 1.425 / 0.184 |
 
 <details>
 <summary>RPE per sequence (click to expand)</summary>
@@ -413,6 +414,7 @@ from the Machine Hall sequences which are not part of Table II.
 | 24 m | 0.467 / 0.047 | 0.799 / 0.089 |
 | 32 m | 0.565 / 0.051 | 0.742 / 0.131 |
 | 40 m | 0.600 / 0.038 | 0.811 / 0.136 |
+| 48 m | 0.670 / 0.050 | 0.658 / 0.130 |
 
 *V1_02_medium:*
 
@@ -423,6 +425,7 @@ from the Machine Hall sequences which are not part of Table II.
 | 24 m | 0.605 / 0.094 | 0.462 / 0.102 |
 | 32 m | 0.847 / 0.076 | 0.637 / 0.100 |
 | 40 m | 1.262 / 0.122 | 0.678 / 0.132 |
+| 48 m | 1.204 / 0.124 | 0.704 / 0.103 |
 
 *V1_03_difficult:*
 
@@ -433,6 +436,7 @@ from the Machine Hall sequences which are not part of Table II.
 | 24 m | 1.306 / 0.114 | 1.414 / 0.120 |
 | 32 m | 1.175 / 0.125 | 1.345 / 0.147 |
 | 40 m | 1.202 / 0.123 | 1.235 / 0.156 |
+| 48 m | 1.486 / 0.105 | 1.399 / 0.136 |
 
 *V2_01_easy:*
 
@@ -443,6 +447,7 @@ from the Machine Hall sequences which are not part of Table II.
 | 24 m | 1.154 / 0.106 | 2.329 / 0.351 |
 | 32 m | 1.039 / 0.138 | 2.392 / 0.452 |
 | 40 m | — | — |
+| 48 m | — | — |
 
 *V2_02_medium:*
 
@@ -453,13 +458,104 @@ from the Machine Hall sequences which are not part of Table II.
 | 24 m | 1.329 / 0.068 | 1.502 / 0.090 |
 | 32 m | 1.418 / 0.065 | 1.615 / 0.109 |
 | 40 m | 1.399 / 0.064 | 1.740 / 0.115 |
+| 48 m | 1.531 / 0.091 | 2.133 / 0.111 |
+
+</details>
+
+#### Supplementary: Machine Hall sequences
+
+These sequences are not part of the paper's benchmark but are included for
+completeness. MH_04_difficult diverged in both stereo and mono modes and is
+excluded.
+
+**ATE RMSE — Machine Hall**
+
+| Sequence | Stereo — deg / m | Mono — deg / m |
+|---|---|---|
+| MH_01_easy | 1.394 / 0.091 | 1.136 / 0.105 |
+| MH_02_easy | 1.103 / 0.156 | 1.197 / 0.176 |
+| MH_03_medium | 1.170 / 0.115 | 1.329 / 0.175 |
+| MH_04_difficult | diverged | diverged |
+| MH_05_difficult | 0.858 / 0.213 | 0.873 / 0.496 |
+
+**RPE — Machine Hall average (excluding MH_04)**
+
+*Stereo:*
+
+| Segment | deg / m |
+|---|---|
+| 8 m | 0.524 / 0.132 |
+| 16 m | 0.779 / 0.157 |
+| 24 m | 0.940 / 0.195 |
+| 32 m | 1.220 / 0.228 |
+| 40 m | 1.469 / 0.258 |
+| 48 m | 1.651 / 0.287 |
+
+*Mono:*
+
+| Segment | deg / m |
+|---|---|
+| 8 m | 0.578 / 0.140 |
+| 16 m | 0.857 / 0.173 |
+| 24 m | 0.980 / 0.232 |
+| 32 m | 1.165 / 0.314 |
+| 40 m | 1.370 / 0.373 |
+| 48 m | 1.435 / 0.426 |
+
+<details>
+<summary>RPE per MH sequence (click to expand)</summary>
+
+*MH_01_easy:*
+
+| Segment | Stereo — deg / m | Mono — deg / m |
+|---|---|---|
+| 8 m | 0.735 / 0.094 | 0.798 / 0.092 |
+| 16 m | 1.154 / 0.128 | 0.925 / 0.111 |
+| 24 m | 1.488 / 0.158 | 1.194 / 0.125 |
+| 32 m | 2.067 / 0.180 | 1.382 / 0.148 |
+| 40 m | 2.568 / 0.217 | 1.717 / 0.123 |
+| 48 m | 2.928 / 0.239 | 1.990 / 0.148 |
+
+*MH_02_easy:*
+
+| Segment | Stereo — deg / m | Mono — deg / m |
+|---|---|---|
+| 8 m | 0.569 / 0.135 | 0.652 / 0.136 |
+| 16 m | 0.853 / 0.155 | 1.147 / 0.141 |
+| 24 m | 1.034 / 0.193 | 1.324 / 0.174 |
+| 32 m | 1.192 / 0.264 | 1.744 / 0.164 |
+| 40 m | 1.345 / 0.303 | 2.186 / 0.284 |
+| 48 m | 1.450 / 0.360 | 2.225 / 0.281 |
+
+*MH_03_medium:*
+
+| Segment | Stereo — deg / m | Mono — deg / m |
+|---|---|---|
+| 8 m | 0.313 / 0.152 | 0.386 / 0.138 |
+| 16 m | 0.449 / 0.104 | 0.623 / 0.148 |
+| 24 m | 0.563 / 0.115 | 0.554 / 0.180 |
+| 32 m | 0.762 / 0.130 | 0.551 / 0.219 |
+| 40 m | 0.926 / 0.153 | 0.670 / 0.206 |
+| 48 m | 1.044 / 0.199 | 0.781 / 0.270 |
+
+*MH_05_difficult:*
+
+| Segment | Stereo — deg / m | Mono — deg / m |
+|---|---|---|
+| 8 m | 0.479 / 0.146 | 0.474 / 0.193 |
+| 16 m | 0.661 / 0.240 | 0.731 / 0.291 |
+| 24 m | 0.676 / 0.315 | 0.846 / 0.451 |
+| 32 m | 0.858 / 0.336 | 0.984 / 0.724 |
+| 40 m | 1.037 / 0.360 | 0.906 / 0.881 |
+| 48 m | 1.182 / 0.351 | 0.744 / 1.005 |
 
 </details>
 
 ### Reproducing the paper benchmark
 
-The paper reports ATE (Table II) over 5 Vicon room sequences and RPE (Table III)
-over all EuRoC datasets. Download all bags:
+The paper benchmarks on the 5 Vicon room sequences only (V2_03 excluded due to
+some algorithms failing on it). The Machine Hall sequences are included here as
+supplementary. Download all bags:
 
 ```bash
 mkdir -p ~/datasets/euroc && cd ~/datasets/euroc
