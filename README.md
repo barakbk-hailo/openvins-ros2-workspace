@@ -101,6 +101,8 @@ Install `gdown` to download from Google Drive:
 
 ```bash
 pip install gdown
+# In Docker (where pip packages may not persist), use pipx instead:
+#   sudo apt install -y pipx && pipx ensurepath && pipx install gdown
 ```
 
 Download and extract the EuRoC V1_01_easy ROS 2 bag (~900 MB, already converted):
@@ -193,16 +195,7 @@ message regardless of CPU speed, and is the recommended way to run benchmarks.
 
 #### Option A — Serial node (recommended)
 
-```bash
-# Terminal 1 — run OpenVINS directly from the bag (no bag play needed)
-cd ~/workspace/catkin_ws_ov
-source /opt/ros/humble/setup.bash && source install/setup.bash
-ros2 launch ov_msckf serial.launch.py \
-    config:=euroc_mav \
-    path_bag:=$HOME/datasets/euroc/V1_01_easy
-```
-
-Then in a second terminal, start `record_poses.py` immediately after launching:
+**Terminal 1 — start the recorder first** (so no poses are missed):
 
 ```bash
 source /opt/ros/humble/setup.bash
@@ -210,15 +203,46 @@ mkdir -p ~/results && cd ~/results
 python3 ~/workspace/catkin_ws_ov/record_poses.py
 ```
 
-Press Ctrl+C in the record terminal after OpenVINS finishes (it will exit on its own).
+**Terminal 2 — run OpenVINS** (reads the bag directly, no `ros2 bag play` needed):
+
+```bash
+cd ~/workspace/catkin_ws_ov
+source /opt/ros/humble/setup.bash && source install/setup.bash
+ros2 launch ov_msckf serial.launch.py \
+    config:=euroc_mav \
+    path_bag:=$HOME/datasets/euroc/V1_01_easy
+```
+
+Press Ctrl+C in Terminal 1 after OpenVINS finishes (it exits on its own).
+This saves `state_estimate.txt` and `state_groundtruth.txt` in `~/results`.
 
 #### Option B — Subscribe node with reduced rate (legacy)
 
-To minimise drops under the subscribe node, **play the bag at a reduced rate**:
+**Terminal 1 — start the recorder first:**
 
 ```bash
+source /opt/ros/humble/setup.bash
+mkdir -p ~/results && cd ~/results
+python3 ~/workspace/catkin_ws_ov/record_poses.py
+```
+
+**Terminal 2 — launch OpenVINS:**
+
+```bash
+cd ~/workspace/catkin_ws_ov
+source /opt/ros/humble/setup.bash && source install/setup.bash
+ros2 launch ov_msckf subscribe.launch.py config:=euroc_mav
+```
+
+**Terminal 3 — play the bag at reduced rate** (minimises message drops):
+
+```bash
+source /opt/ros/humble/setup.bash
+cd ~/datasets/euroc
 ros2 bag play V1_01_easy --rate 0.1   # 10× slower than real-time
 ```
+
+Press Ctrl+C in Terminal 1 after the bag finishes.
 
 To check for timestamp gaps in a recorded estimate (which would indicate dropped
 messages), skip the comment header line:
@@ -229,52 +253,16 @@ awk '!/^#/{if(prev && $1-prev>0.1) print NR, $1-prev"s gap"; prev=$1}' state_est
 
 No output means no gaps.
 
-### 1. Record poses during a run
+### 2. Compute ATE and RPE
 
-**Serial node (Option A):** run `record_poses.py` in a second terminal immediately after
-launching `serial.launch.py` as shown above.
-
-**Subscribe node (Option B):** run the demo as normal (Terminal 1 + Terminal 2 with
-`--rate 0.1`), then in a third terminal:
-
-```bash
-source /opt/ros/humble/setup.bash
-mkdir -p ~/results && cd ~/results
-python3 ~/workspace/catkin_ws_ov/record_poses.py
-```
-
-Press Ctrl+C after the bag finishes. This saves `state_estimate.txt` and `state_groundtruth.txt`.
-
-### 2. Convert the bundled ground truth CSV
-
-The repo includes the EuRoC ground truth in ASL format. Convert it to the space-separated format
-expected by `error_singlerun`:
-
-```bash
-python3 - << 'EOF'
-import csv
-with open('/home/user/workspace/catkin_ws_ov/src/open_vins/ov_data/euroc_mav/V1_01_easy.csv') as f_in, \
-     open('/home/user/results/gt_V1_01_easy.txt', 'w') as f_out:
-    f_out.write('# timestamp(s) tx ty tz qx qy qz qw\n')
-    reader = csv.DictReader(f_in, fieldnames=[
-        'time_ns','px','py','pz','qw','qx','qy','qz',
-        'vx','vy','vz','bwx','bwy','bwz','bax','bay','baz'])
-    next(reader)  # skip header
-    for row in reader:
-        t = float(row['time_ns']) * 1e-9
-        f_out.write(f"{t:.9f} {row['px']} {row['py']} {row['pz']} "
-                    f"{row['qx']} {row['qy']} {row['qz']} {row['qw']}\n")
-EOF
-```
-
-### 3. Compute ATE and RPE
-
-Pass the six segment lengths from the paper's Table III explicitly:
+The fork ships pre-formatted ground truth `.txt` files in `ov_data/euroc_mav/`
+(no conversion needed). Pass the six segment lengths from the paper's Table III:
 
 ```bash
 source ~/workspace/catkin_ws_ov/install/setup.bash
 cd ~/results
-ros2 run ov_eval error_singlerun posyaw gt_V1_01_easy.txt state_estimate.txt 8 16 24 32 40 48
+GT_DIR=~/workspace/catkin_ws_ov/src/open_vins/ov_data/euroc_mav
+ros2 run ov_eval error_singlerun posyaw $GT_DIR/V1_01_easy.txt state_estimate.txt 8 16 24 32 40 48
 ```
 
 ### Reference results (V1_01_easy, stereo, Intel Iris Xe)
@@ -358,8 +346,12 @@ residual message drops accumulate into larger drift errors.
 
 ### Reproducing the 10-run mean
 
-Run the serial node ten times (RANSAC randomness means each run differs slightly),
-saving the estimate under a different name each time:
+> **Note:** the serial node is deterministic — it produces bit-identical results
+> across runs (see note above). The 10-run average is only meaningful when using
+> the subscribe node (Option B), where RANSAC timing jitter causes run-to-run variance.
+
+Run the subscribe node ten times, saving the estimate under a different name each time.
+Restart OpenVINS between each run:
 
 ```bash
 source /opt/ros/humble/setup.bash && source ~/workspace/catkin_ws_ov/install/setup.bash
@@ -371,13 +363,16 @@ for i in $(seq -w 1 10); do
   python3 ~/workspace/catkin_ws_ov/record_poses.py &
   RECORD_PID=$!
 
-  # Run OpenVINS serially over the bag
-  ros2 launch ov_msckf serial.launch.py \
-      config:=euroc_mav \
-      path_bag:=$HOME/datasets/euroc/V1_01_easy
+  # Launch OpenVINS subscribe node in the background
+  ros2 launch ov_msckf subscribe.launch.py config:=euroc_mav &
+  OV_PID=$!
 
-  # Stop the recorder and save
-  kill $RECORD_PID 2>/dev/null
+  # Play the bag at reduced rate
+  cd ~/datasets/euroc
+  ros2 bag play V1_01_easy --rate 0.1
+
+  # Stop recorder and OpenVINS
+  kill $RECORD_PID $OV_PID 2>/dev/null; wait $RECORD_PID $OV_PID 2>/dev/null
   mv ~/results/state_estimate.txt ~/results/state_estimate_run${i}.txt
 done
 ```
@@ -385,15 +380,73 @@ done
 Then compute the ATE scalar for each run and average:
 
 ```bash
-source ~/workspace/catkin_ws_ov/install/setup.bash
+GT_DIR=~/workspace/catkin_ws_ov/src/open_vins/ov_data/euroc_mav
 cd ~/results
 for i in $(seq -w 1 10); do
-  ros2 run ov_eval error_singlerun posyaw gt_V1_01_easy.txt state_estimate_run${i}.txt \
+  ros2 run ov_eval error_singlerun posyaw $GT_DIR/V1_01_easy.txt state_estimate_run${i}.txt \
     | grep rmse_pos
 done
 ```
 
 The mean of the ten `rmse_pos` values is the number comparable to Table II of the paper.
+
+### Full EuRoC benchmark (all sequences)
+
+The paper reports ATE over all 11 EuRoC sequences. Download all bags:
+
+```bash
+mkdir -p ~/datasets/euroc && cd ~/datasets/euroc
+pip install gdown   # or: sudo apt install pipx && pipx install gdown
+
+# EuRoC MAV ROS 2 bags (pre-converted)
+gdown 1LFrdiMU6UBjtFfXPHzjJ4L7iDIXcdhvh -O V1_01_easy.zip
+gdown 1GrCw1VCIEmIBPRVPCblFPNRrmGS8Uhis1 -O V1_02_medium.zip
+gdown 1usD6VEmerCX1FObFHkrUaq97IU5NQBfi4 -O V1_03_difficult.zip
+gdown 1JGJjME6Ug42PnRV--EHLmyFz1gVBDzGN9 -O V2_01_easy.zip
+gdown 1O6Rwl5DnVRAxWKcdkfNVRs0ySwSxKhQQ3 -O V2_02_medium.zip
+gdown 1VCT27fBmDer3dGQhciDiIaAFiXodrDen3 -O V2_03_difficult.zip
+gdown 1LFZPBH1FBVsx30c6TFl0aBoVMTEoR2xm0 -O MH_01_easy.zip
+gdown 1PoJA-BXtCGnCHNLedLAEjL3ELQV-HU11w -O MH_02_easy.zip
+gdown 1c4fV_sXDPRnSjtSSn5LfhZRE6w7WFcRfe -O MH_03_medium.zip
+gdown 1nRsTQFDpN4JYS6HpqY00qNANBk_NWEBfZ -O MH_04_difficult.zip
+gdown 1DMMU1UEFhwzShC18YuUx7fH-cPLYDPE6G -O MH_05_difficult.zip
+
+for f in *.zip; do unzip -o "$f"; done
+```
+
+Run the serial node over every sequence and compute ATE:
+
+```bash
+source /opt/ros/humble/setup.bash && source ~/workspace/catkin_ws_ov/install/setup.bash
+GT_DIR=~/workspace/catkin_ws_ov/src/open_vins/ov_data/euroc_mav
+mkdir -p ~/results
+
+SEQUENCES=(V1_01_easy V1_02_medium V1_03_difficult V2_01_easy V2_02_medium V2_03_difficult \
+           MH_01_easy MH_02_easy MH_03_medium MH_04_difficult MH_05_difficult)
+
+for seq in "${SEQUENCES[@]}"; do
+  echo "=== $seq ==="
+
+  # Start recorder
+  cd ~/results
+  python3 ~/workspace/catkin_ws_ov/record_poses.py &
+  RECORD_PID=$!
+  sleep 1
+
+  # Run serial node
+  ros2 launch ov_msckf serial.launch.py \
+      config:=euroc_mav \
+      path_bag:=$HOME/datasets/euroc/$seq
+
+  kill $RECORD_PID 2>/dev/null; wait $RECORD_PID 2>/dev/null
+  mv ~/results/state_estimate.txt ~/results/estimate_${seq}.txt
+
+  # Evaluate
+  ros2 run ov_eval error_singlerun posyaw $GT_DIR/${seq}.txt ~/results/estimate_${seq}.txt \
+    | grep rmse
+  echo ""
+done
+```
 
 ## Notes
 
@@ -405,6 +458,65 @@ The mean of the ten `rmse_pos` values is the number comparable to Table II of th
 - The `display.rviz` config has been updated from ROS 1 to ROS 2 plugin names (`rviz_default_plugins/`
   and `rviz_common/` namespaces) and simplified — this was the main fix for rviz2 crashes on Intel
   integrated graphics.
+
+---
+
+## Docker installation (RPi5 / Debian Trixie)
+
+For Raspberry Pi 5 running Debian 13 (Trixie), the easiest path is Docker with
+the pre-built ROS 2 Humble image. A `Dockerfile_ros2_humble_jammy` is included in
+the fork.
+
+### 1. Install Docker on RPi5
+
+```bash
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER   # re-login after this
+```
+
+### 2. Build the image
+
+```bash
+cd ~/workspace
+git clone git@github.com:barakbk-hailo/open_vins.git
+cd open_vins
+docker build -t openvins-humble -f Dockerfile_ros2_humble_jammy .
+```
+
+### 3. Run the container
+
+```bash
+docker run -it --rm \
+  --network host --privileged \
+  -v /dev:/dev \
+  -v ~/workspace:/workspace \
+  -v ~/datasets:/datasets \
+  openvins-humble
+```
+
+Inside the container, ROS 2 and the workspace are already sourced.
+
+### 4. Download datasets inside the container
+
+`gdown` is not baked into the image (to keep it small). Install it with `pipx`:
+
+```bash
+sudo apt update && sudo apt install -y pipx
+pipx ensurepath
+source ~/.bashrc   # pick up the new PATH
+pipx install gdown
+
+mkdir -p /datasets/euroc && cd /datasets/euroc
+gdown 1LFrdiMU6UBjtFfXPHzjJ4L7iDIXcdhvh -O V1_01_easy.zip && unzip V1_01_easy.zip
+```
+
+> **Note:** `pipx` packages are installed per-container and do not persist across
+> `docker run` invocations unless you mount or commit the container. For a persistent
+> setup, add the `pipx install gdown` step to the Dockerfile or use a named container
+> (`docker run --name openvins ...` instead of `--rm`).
+
+A `Dockerfile_ros2_jazzy_noble` also exists in the fork but is **WIP** — it requires
+upstream OpenVINS code changes for the ROS 2 Jazzy migration that are not yet complete.
 
 ---
 
@@ -478,7 +590,7 @@ source ~/ros2_jazzy/install/setup.bash
 Then clone and build OpenVINS against this ROS 2:
 ```bash
 mkdir -p ~/workspace/catkin_ws_ov/src && cd ~/workspace/catkin_ws_ov/src
-git clone https://github.com/rpng/open_vins/
+git clone https://github.com/barakbk-hailo/open_vins/
 cd ~/workspace/catkin_ws_ov
 source ~/ros2_jazzy/install/setup.bash
 colcon build --symlink-install
@@ -514,7 +626,7 @@ apt update && apt install -y \
   libgoogle-glog-dev libgflags-dev libatlas-base-dev libsuitesparse-dev libceres-dev \
   python3-dev python3-numpy build-essential gcc g++
 mkdir -p /workspace/catkin_ws_ov/src && cd /workspace/catkin_ws_ov/src
-git clone https://github.com/rpng/open_vins/
+git clone https://github.com/barakbk-hailo/open_vins/
 cd /workspace/catkin_ws_ov
 source /opt/ros/jazzy/setup.bash
 colcon build --symlink-install
