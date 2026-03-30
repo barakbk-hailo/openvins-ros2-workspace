@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 # One-shot setup for the OpenVINS ROS 2 workspace.
 # Run from the repo root after cloning:
-#   git clone git@github.com:barakbk-hailo/openvins-ros2-workspace.git ~/workspace/catkin_ws_ov
+#   git clone --recursive git@github.com:barakbk-hailo/openvins-ros2-workspace.git ~/workspace/catkin_ws_ov
 #   cd ~/workspace/catkin_ws_ov && bash install.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Ensure submodule is initialised (in case cloned without --recursive)
+if [ ! -f "$SCRIPT_DIR/src/open_vins/CMakeLists.txt" ]; then
+  echo "=== [0/4] Initialising open_vins submodule ==="
+  git -C "$SCRIPT_DIR" submodule update --init --recursive
+fi
 
 echo "=== [1/4] Adding ROS 2 Humble apt repository ==="
 sudo apt install -y software-properties-common curl
@@ -24,15 +30,7 @@ sudo apt install -y \
   python3-dev python3-matplotlib python3-numpy python3-psutil python3-tk \
   build-essential gcc g++ gdb clang
 
-echo "=== [3/4] Cloning OpenVINS fork ==="
-mkdir -p "$SCRIPT_DIR/src"
-if [ ! -d "$SCRIPT_DIR/src/open_vins" ]; then
-  git clone git@github.com:barakbk-hailo/open_vins.git "$SCRIPT_DIR/src/open_vins"
-else
-  echo "src/open_vins already exists, skipping clone."
-fi
-
-echo "=== [4/4] Building the workspace ==="
+echo "=== [3/4] Building the workspace ==="
 source /opt/ros/humble/setup.bash
 cd "$SCRIPT_DIR"
 colcon build --symlink-install

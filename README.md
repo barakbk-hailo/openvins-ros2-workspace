@@ -22,20 +22,26 @@ For a one-command setup see [`install.sh`](#quick-install) below.
 
 ## Quick install
 
-Clone this repo, then run the install script — it handles everything below automatically:
+Clone this repo (with the `open_vins` submodule), then run the install script:
 
 ```bash
-git clone git@github.com:barakbk-hailo/openvins-ros2-workspace.git ~/workspace/catkin_ws_ov
+git clone --recursive git@github.com:barakbk-hailo/openvins-ros2-workspace.git ~/workspace/catkin_ws_ov
 cd ~/workspace/catkin_ws_ov
 bash install.sh
 ```
 
 ## Manual steps
 
-### 0. Clone this workspace repo
+### 0. Clone this workspace repo (with submodule)
 
 ```bash
-git clone git@github.com:barakbk-hailo/openvins-ros2-workspace.git ~/workspace/catkin_ws_ov
+git clone --recursive git@github.com:barakbk-hailo/openvins-ros2-workspace.git ~/workspace/catkin_ws_ov
+```
+
+If you already cloned without `--recursive`:
+```bash
+cd ~/workspace/catkin_ws_ov
+git submodule update --init --recursive
 ```
 
 ### 1. Add ROS 2 Humble apt repository
@@ -62,15 +68,7 @@ sudo apt install -y \
   build-essential gcc g++ gdb clang
 ```
 
-### 3. Clone OpenVINS (our fork)
-
-```bash
-mkdir -p ~/workspace/catkin_ws_ov/src/
-cd ~/workspace/catkin_ws_ov/src/
-git clone git@github.com:barakbk-hailo/open_vins.git
-```
-
-### 4. Build the workspace
+### 3. Build the workspace
 
 ```bash
 cd ~/workspace/catkin_ws_ov
@@ -84,7 +82,7 @@ Summary: 5 packages finished [~5min]
   2 packages had stderr output: ov_core ov_msckf
 ```
 
-### 5. Source the workspace (every new terminal)
+### 4. Source the workspace (every new terminal)
 
 ```bash
 source /opt/ros/humble/setup.bash
