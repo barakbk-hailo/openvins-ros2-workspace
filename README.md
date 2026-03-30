@@ -452,55 +452,9 @@ V2_01_easy has no 40 m segment (trajectory too short); its 40 m is excluded from
 
 </details>
 
-### Reproducing the 10-run mean
+### Reproducing the paper benchmark (5 Vicon sequences)
 
-> **Note:** the serial node is deterministic — it produces bit-identical results
-> across runs (see note above). The 10-run average is only meaningful when using
-> the subscribe node (Option B), where RANSAC timing jitter causes run-to-run variance.
-
-Run the subscribe node ten times, saving the estimate under a different name each time.
-Restart OpenVINS between each run:
-
-```bash
-source /opt/ros/humble/setup.bash && source ~/workspace/catkin_ws_ov/install/setup.bash
-mkdir -p ~/results
-
-for i in $(seq -w 1 10); do
-  # Start recording in the background
-  cd ~/results
-  python3 ~/workspace/catkin_ws_ov/record_poses.py &
-  RECORD_PID=$!
-
-  # Launch OpenVINS subscribe node in the background
-  ros2 launch ov_msckf subscribe.launch.py config:=euroc_mav &
-  OV_PID=$!
-
-  # Play the bag at reduced rate
-  cd ~/datasets/euroc
-  ros2 bag play V1_01_easy --rate 0.1
-
-  # Stop recorder and OpenVINS
-  kill $RECORD_PID $OV_PID 2>/dev/null; wait $RECORD_PID $OV_PID 2>/dev/null
-  mv ~/results/state_estimate.txt ~/results/state_estimate_run${i}.txt
-done
-```
-
-Then compute the ATE scalar for each run and average:
-
-```bash
-GT_DIR=~/workspace/catkin_ws_ov/src/open_vins/ov_data/euroc_mav
-cd ~/results
-for i in $(seq -w 1 10); do
-  ros2 run ov_eval error_singlerun posyaw $GT_DIR/V1_01_easy.txt state_estimate_run${i}.txt \
-    | grep rmse_pos
-done
-```
-
-The mean of the ten `rmse_pos` values is the number comparable to Table II of the paper.
-
-### Full EuRoC benchmark (all sequences)
-
-The paper (Table II) reports ATE over the 5 Vicon room sequences (V2_03 excluded
+The paper (Table II) reports ATE over 5 Vicon room sequences (V2_03 excluded
 due to some algorithms failing on it). Download all Vicon bags:
 
 ```bash
