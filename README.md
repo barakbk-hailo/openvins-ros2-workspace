@@ -504,6 +504,11 @@ for mode in stereo mono; do
 
   echo "======== $mode mode ========"
   for seq in "${SEQUENCES[@]}"; do
+    OUT=~/results/estimate_${seq}${SUFFIX}.txt
+    if [ -f "$OUT" ]; then
+      echo "=== $seq ($mode) === SKIP (exists: $OUT)"
+      continue
+    fi
     echo "=== $seq ($mode) ==="
 
     # Start recorder in the background
