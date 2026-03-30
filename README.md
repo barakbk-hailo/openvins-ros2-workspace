@@ -425,6 +425,7 @@ Run the serial node over every sequence and compute ATE:
 
 ```bash
 source /opt/ros/humble/setup.bash && source ~/workspace/catkin_ws_ov/install/setup.bash
+export MPLBACKEND=Agg   # prevent error_singlerun from blocking on plt.show()
 GT_DIR=~/workspace/catkin_ws_ov/src/open_vins/ov_data/euroc_mav
 mkdir -p ~/results
 
