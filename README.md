@@ -404,24 +404,19 @@ The mean of the ten `rmse_pos` values is the number comparable to Table II of th
 
 ### Full EuRoC benchmark (all sequences)
 
-The paper reports ATE over all 11 EuRoC sequences. Download all bags:
+The paper (Table II) reports ATE over the 5 Vicon room sequences (V2_03 excluded
+due to some algorithms failing on it). Download all Vicon bags:
 
 ```bash
 mkdir -p ~/datasets/euroc && cd ~/datasets/euroc
 pip install gdown   # or: sudo apt install pipx && pipx install gdown
 
-# EuRoC MAV ROS 2 bags (pre-converted)
+# EuRoC MAV ROS 2 bags from the OpenVINS docs (Google Drive)
 gdown 1LFrdiMU6UBjtFfXPHzjJ4L7iDIXcdhvh -O V1_01_easy.zip
-gdown 1GrCw1VCIEmIBPRVPCblFPNRrmGS8Uhis1 -O V1_02_medium.zip
-gdown 1usD6VEmerCX1FObFHkrUaq97IU5NQBfi4 -O V1_03_difficult.zip
-gdown 1JGJjME6Ug42PnRV--EHLmyFz1gVBDzGN9 -O V2_01_easy.zip
-gdown 1O6Rwl5DnVRAxWKcdkfNVRs0ySwSxKhQQ3 -O V2_02_medium.zip
-gdown 1VCT27fBmDer3dGQhciDiIaAFiXodrDen3 -O V2_03_difficult.zip
-gdown 1LFZPBH1FBVsx30c6TFl0aBoVMTEoR2xm0 -O MH_01_easy.zip
-gdown 1PoJA-BXtCGnCHNLedLAEjL3ELQV-HU11w -O MH_02_easy.zip
-gdown 1c4fV_sXDPRnSjtSSn5LfhZRE6w7WFcRfe -O MH_03_medium.zip
-gdown 1nRsTQFDpN4JYS6HpqY00qNANBk_NWEBfZ -O MH_04_difficult.zip
-gdown 1DMMU1UEFhwzShC18YuUx7fH-cPLYDPE6G -O MH_05_difficult.zip
+gdown 1rlGSy7h38ucm8jr8ssH-sJPX84JfkBtX -O V1_02_medium.zip
+gdown 1Gy1zc4LaMlwsLpXBqOIci6Y3cV_5r-0k -O V1_03_difficult.zip
+gdown 1KAkE8Ptq3eSQlXMozJgzNIAVUBH3h0FP -O V2_01_easy.zip
+gdown 1Gj4psmvcAwYwCp4T4CQH-d2ZVJ09d3x2 -O V2_02_medium.zip
 
 for f in *.zip; do unzip -o "$f"; done
 ```
@@ -433,8 +428,7 @@ source /opt/ros/humble/setup.bash && source ~/workspace/catkin_ws_ov/install/set
 GT_DIR=~/workspace/catkin_ws_ov/src/open_vins/ov_data/euroc_mav
 mkdir -p ~/results
 
-SEQUENCES=(V1_01_easy V1_02_medium V1_03_difficult V2_01_easy V2_02_medium V2_03_difficult \
-           MH_01_easy MH_02_easy MH_03_medium MH_04_difficult MH_05_difficult)
+SEQUENCES=(V1_01_easy V1_02_medium V1_03_difficult V2_01_easy V2_02_medium)
 
 for seq in "${SEQUENCES[@]}"; do
   echo "=== $seq ==="
