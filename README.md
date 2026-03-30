@@ -325,6 +325,9 @@ The paper (Table II) reports the mean ATE RMSE over 10 runs; our results are
 single deterministic runs from the serial node (`cv::setRNGSeed(0)` makes
 results bit-identical across runs — see [reproducibility note](#real-time-dependency-and-reproducibility)).
 
+The trajectory estimates used to produce these tables are committed in
+`results/stereo/` and `results/mono/` so they can be independently verified.
+
 **ATE RMSE — stereo (Table II: `stereo_ov_vio`)**
 
 | Sequence | Ours — deg / m | Paper — deg / m |
@@ -340,12 +343,12 @@ results bit-identical across runs — see [reproducibility note](#real-time-depe
 
 | Sequence | Ours — deg / m | Paper — deg / m |
 |---|---|---|
-| V1_01_easy | **0.645 / 0.062** | 0.642 / 0.076 |
+| V1_01_easy | 0.645 / **0.062** | **0.642** / 0.076 |
 | V1_02_medium | **1.655 / 0.060** | 1.766 / 0.096 |
-| V1_03_difficult | 2.673 / 0.073 | **2.391 / 0.344** |
-| V2_01_easy | 1.314 / 0.163 | **0.773 / 0.124** |
-| V2_02_medium | **1.477 / 0.078** | 1.538 / 0.074 |
-| **Average** | **1.553 / 0.087** | **1.422 / 0.143** |
+| V1_03_difficult | 2.673 / **0.073** | **2.391** / 0.344 |
+| V2_01_easy | 1.314 / 0.163 | **1.164 / 0.121** |
+| V2_02_medium | 1.477 / **0.078** | **1.248** / 0.106 |
+| **Average** | 1.553 / **0.087** | **1.442** / 0.149 |
 
 **Stereo vs mono — our results:**
 
