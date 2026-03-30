@@ -321,10 +321,11 @@ seg 40 - median_ori = 0.847 | median_pos = 0.086 (1087 samples)
 
 #### Comparison with the paper (Geneva et al. ICRA 2020)
 
-**ATE RMSE — stereo_ov_vio, all Vicon sequences (Table II)**
+The paper (Table II) reports the mean ATE RMSE over 10 runs; our results are
+single deterministic runs from the serial node (`cv::setRNGSeed(0)` makes
+results bit-identical across runs — see [reproducibility note](#real-time-dependency-and-reproducibility)).
 
-The paper reports the mean over 10 runs; our results are single deterministic runs
-from the serial node (`cv::setRNGSeed(0)` makes results bit-identical across runs).
+**ATE RMSE — stereo (Table II: `stereo_ov_vio`)**
 
 | Sequence | Ours — deg / m | Paper — deg / m |
 |---|---|---|
@@ -335,66 +336,99 @@ from the serial node (`cv::setRNGSeed(0)` makes results bit-identical across run
 | V2_02_medium | 1.212 / 0.051 | **1.151 / 0.048** |
 | **Average** | **1.303 / 0.053** | **1.454 / 0.055** |
 
-Position ATE is comparable across all sequences. Orientation ATE is better on
-easy/medium sequences but worse on V1_03_difficult and V2 — the paper's 10-run
-averaging smooths out unlucky RANSAC draws that our single deterministic run
-may hit. Overall average position (0.053 m vs 0.055 m) is within noise.
+**ATE RMSE — mono (Table II: `mono_ov_vio`)**
 
-**RPE — per-sequence (serial node)**
+| Sequence | Ours — deg / m | Paper — deg / m |
+|---|---|---|
+| V1_01_easy | **0.645 / 0.062** | 0.642 / 0.076 |
+| V1_02_medium | **1.655 / 0.060** | 1.766 / 0.096 |
+| V1_03_difficult | 2.673 / 0.073 | **2.391 / 0.344** |
+| V2_01_easy | 1.314 / 0.163 | **0.773 / 0.124** |
+| V2_02_medium | **1.477 / 0.078** | 1.538 / 0.074 |
+| **Average** | **1.553 / 0.087** | **1.422 / 0.143** |
+
+**Stereo vs mono — our results:**
+
+| Sequence | Stereo — deg / m | Mono — deg / m |
+|---|---|---|
+| V1_01_easy | **0.569 / 0.038** | 0.645 / 0.062 |
+| V1_02_medium | **1.622 / 0.053** | 1.655 / 0.060 |
+| V1_03_difficult | 2.861 / 0.058 | **2.673 / 0.073** |
+| V2_01_easy | **1.250 / 0.063** | 1.314 / 0.163 |
+| V2_02_medium | **1.212 / 0.051** | 1.477 / 0.078 |
+| **Average** | **1.303 / 0.053** | 1.553 / 0.087 |
+
+Stereo wins on position in every sequence (0.053 m vs 0.087 m average), as
+expected from the fixed stereo baseline providing direct scale observability.
+Mono orientation is slightly better on V1_03_difficult — consistent with the
+paper's observation (see note below).
+
+> **Note on mono vs stereo orientation ATE:** the paper also shows mono with lower
+> orientation ATE than stereo on some sequences. This is because the stereo
+> baseline primarily constrains translation (scale), not orientation. Stereo's
+> additional extrinsic calibration state can inject small orientation errors
+> that mono never sees. RPE (local drift) is a more reliable indicator of
+> systematic performance.
+
+**RPE — per-sequence, stereo (serial node)**
 
 Paper Table III reports RPE averaged over **all datasets**, not per-sequence.
-Our per-sequence results are listed here for reference (not directly comparable
-to Table III).
+Our per-sequence results are listed here for reference.
 
 *V1_01_easy:*
 
-| Segment | Ours — deg / m | Paper (all-dataset avg) — deg / m |
-|---|---|---|
-| 8 m | 0.528 / 0.057 | 0.722 / 0.068 |
-| 16 m | 0.368 / 0.051 | 0.892 / 0.077 |
-| 24 m | 0.467 / 0.047 | 1.089 / 0.087 |
-| 32 m | 0.565 / 0.051 | 1.218 / 0.088 |
-| 40 m | 0.600 / 0.038 | 1.342 / 0.101 |
+| Segment | Stereo — deg / m | Mono — deg / m | Paper stereo (all-dataset avg) — deg / m |
+|---|---|---|---|
+| 8 m | 0.528 / 0.057 | 0.658 / 0.061 | 0.722 / 0.068 |
+| 16 m | 0.368 / 0.051 | 0.531 / 0.079 | 0.892 / 0.077 |
+| 24 m | 0.467 / 0.047 | 0.799 / 0.089 | 1.089 / 0.087 |
+| 32 m | 0.565 / 0.051 | 0.742 / 0.131 | 1.218 / 0.088 |
+| 40 m | 0.600 / 0.038 | 0.811 / 0.136 | 1.342 / 0.101 |
+
+<details>
+<summary>RPE for remaining sequences (click to expand)</summary>
 
 *V1_02_medium:*
 
-| Segment | deg / m |
-|---|---|
-| 8 m | 0.497 / 0.101 |
-| 16 m | 0.675 / 0.105 |
-| 24 m | 0.605 / 0.094 |
-| 32 m | 0.847 / 0.076 |
-| 40 m | 1.262 / 0.122 |
+| Segment | Stereo — deg / m | Mono — deg / m |
+|---|---|---|
+| 8 m | 0.497 / 0.101 | 0.412 / 0.101 |
+| 16 m | 0.675 / 0.105 | 0.491 / 0.100 |
+| 24 m | 0.605 / 0.094 | 0.462 / 0.102 |
+| 32 m | 0.847 / 0.076 | 0.637 / 0.100 |
+| 40 m | 1.262 / 0.122 | 0.678 / 0.132 |
 
 *V1_03_difficult:*
 
-| Segment | deg / m |
-|---|---|
-| 8 m | 0.894 / 0.081 |
-| 16 m | 1.068 / 0.102 |
-| 24 m | 1.306 / 0.114 |
-| 32 m | 1.175 / 0.125 |
-| 40 m | 1.202 / 0.123 |
+| Segment | Stereo — deg / m | Mono — deg / m |
+|---|---|---|
+| 8 m | 0.894 / 0.081 | 0.895 / 0.097 |
+| 16 m | 1.068 / 0.102 | 1.242 / 0.119 |
+| 24 m | 1.306 / 0.114 | 1.414 / 0.120 |
+| 32 m | 1.175 / 0.125 | 1.345 / 0.147 |
+| 40 m | 1.202 / 0.123 | 1.235 / 0.156 |
 
 *V2_01_easy:*
 
-| Segment | deg / m |
-|---|---|
-| 8 m | 0.605 / 0.086 |
-| 16 m | 0.924 / 0.136 |
-| 24 m | 1.154 / 0.106 |
-| 32 m | 1.039 / 0.138 |
-| 40 m | — (trajectory too short) |
+| Segment | Stereo — deg / m | Mono — deg / m |
+|---|---|---|
+| 8 m | 0.605 / 0.086 | 0.901 / 0.090 |
+| 16 m | 0.924 / 0.136 | 1.669 / 0.248 |
+| 24 m | 1.154 / 0.106 | 2.329 / 0.351 |
+| 32 m | 1.039 / 0.138 | 2.392 / 0.452 |
+| 40 m | — | — |
 
 *V2_02_medium:*
 
-| Segment | deg / m |
-|---|---|
-| 8 m | 1.192 / 0.047 |
-| 16 m | 1.247 / 0.068 |
-| 24 m | 1.329 / 0.068 |
-| 32 m | 1.418 / 0.065 |
-| 40 m | 1.399 / 0.064 |
+| Segment | Stereo — deg / m | Mono — deg / m |
+|---|---|---|
+| 8 m | 1.192 / 0.047 | 1.156 / 0.060 |
+| 16 m | 1.247 / 0.068 | 1.380 / 0.089 |
+| 24 m | 1.329 / 0.068 | 1.502 / 0.090 |
+| 32 m | 1.418 / 0.065 | 1.615 / 0.109 |
+| 40 m | 1.399 / 0.064 | 1.740 / 0.115 |
+
+</details>
 
 ### Reproducing the 10-run mean
 
@@ -461,7 +495,7 @@ gdown 1Gj4psmvcAwYwCp4T4CQH-d2ZVJ09d3x2 -O V2_02_medium.zip
 for f in *.zip; do unzip -o "$f"; done
 ```
 
-Run the serial node over every sequence and compute ATE:
+Run the serial node over every sequence in both stereo and mono modes:
 
 ```bash
 source /opt/ros/humble/setup.bash && source ~/workspace/catkin_ws_ov/install/setup.bash
@@ -471,30 +505,41 @@ mkdir -p ~/results
 
 SEQUENCES=(V1_01_easy V1_02_medium V1_03_difficult V2_01_easy V2_02_medium)
 
-for seq in "${SEQUENCES[@]}"; do
-  echo "=== $seq ==="
+for mode in stereo mono; do
+  if [ "$mode" = "stereo" ]; then
+    CAM_ARGS="max_cameras:=2 use_stereo:=true"
+    SUFFIX=""
+  else
+    CAM_ARGS="max_cameras:=1 use_stereo:=false"
+    SUFFIX="_mono"
+  fi
 
-  # Start recorder in the background
-  cd ~/results
-  python3 ~/workspace/catkin_ws_ov/record_poses.py &
-  RECORD_PID=$!
-  sleep 2
+  echo "======== $mode mode ========"
+  for seq in "${SEQUENCES[@]}"; do
+    echo "=== $seq ($mode) ==="
 
-  # Run serial node (blocks until bag is fully processed)
-  ros2 launch ov_msckf serial.launch.py \
-      config:=euroc_mav \
-      path_bag:=$HOME/datasets/euroc/$seq
+    # Start recorder in the background
+    cd ~/results
+    python3 ~/workspace/catkin_ws_ov/record_poses.py &
+    RECORD_PID=$!
+    sleep 2
 
-  # Give recorder time to flush, then stop it
-  sleep 2
-  kill $RECORD_PID 2>/dev/null
-  wait $RECORD_PID 2>/dev/null
-  mv ~/results/state_estimate.txt ~/results/estimate_${seq}.txt
+    # Run serial node (blocks until bag is fully processed)
+    ros2 launch ov_msckf serial.launch.py \
+        config:=euroc_mav \
+        path_bag:=$HOME/datasets/euroc/$seq $CAM_ARGS
 
-  # Evaluate
-  ros2 run ov_eval error_singlerun posyaw $GT_DIR/${seq}.txt ~/results/estimate_${seq}.txt \
-    | grep rmse
-  echo ""
+    # Give recorder time to flush, then stop it
+    sleep 2
+    kill $RECORD_PID 2>/dev/null
+    wait $RECORD_PID 2>/dev/null
+    mv ~/results/state_estimate.txt ~/results/estimate_${seq}${SUFFIX}.txt
+
+    # Evaluate
+    ros2 run ov_eval error_singlerun posyaw $GT_DIR/${seq}.txt ~/results/estimate_${seq}${SUFFIX}.txt \
+      | grep rmse
+    echo ""
+  done
 done
 ```
 
