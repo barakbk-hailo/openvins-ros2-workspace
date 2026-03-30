@@ -321,23 +321,34 @@ seg 40 - median_ori = 0.847 | median_pos = 0.086 (1087 samples)
 
 #### Comparison with the paper (Geneva et al. ICRA 2020, Table II / III)
 
-The paper reports the **mean ATE over 10 runs**; our figures are single-run RMSEs.
-The paper's RPE (Table III) is averaged over all five V/MH sequences, not V1_01_easy
-alone, so RPE figures are not directly comparable — they are shown for orientation only.
+The paper reports the **mean ATE over 10 runs** (Table II); our figures are single-run RMSEs.
+The paper's RPE (Table III) is averaged over **all EuRoC datasets** (not V1_01_easy alone),
+so RPE figures are not directly comparable to our per-sequence results.
 
-| Metric | Serial (1 run, deterministic) | Subscribe `--rate 0.1` (1 run) | Paper `stereo_ov_vio` (10-run mean) |
+**ATE — V1_01_easy, stereo (Table II)**
+
+| Metric | Serial (1 run) | Subscribe 0.1x (1 run) | Paper (10-run mean) |
 |---|---|---|---|
-| ATE orientation | **0.569 °** | 0.731 ° | 0.905 ° |
-| ATE position | **0.038 m** | 0.051 m | 0.061 m |
-| RPE 8 m  — orientation | **0.528 °** | 0.608 ° | 0.722 ° |
-| RPE 16 m — orientation | **0.368 °** | 0.588 ° | 0.802 ° |
-| RPE 24 m — orientation | **0.467 °** | 0.623 ° | 1.089 ° |
-| RPE 32 m — orientation | **0.565 °** | 0.952 ° | 1.218 ° |
-| RPE 40 m — orientation | **0.600 °** | 0.847 ° | 1.342 ° |
+| Orientation (deg) | **0.569** | 0.731 | 0.905 |
+| Position (m) | **0.038** | 0.051 | 0.061 |
+
+**RPE — stereo_ov_vio (Table III, all-dataset average)**
+
+| Segment | Serial — deg / m | Subscribe 0.1x — deg / m | Paper — deg / m |
+|---|---|---|---|
+| 8 m | **0.528 / 0.057** | 0.608 / 0.059 | 0.722 / 0.068 |
+| 16 m | **0.368 / 0.051** | 0.588 / 0.058 | 0.892 / 0.077 |
+| 24 m | **0.467 / 0.047** | 0.623 / 0.072 | 1.089 / 0.087 |
+| 32 m | **0.565 / 0.051** | 0.952 / 0.092 | 1.218 / 0.088 |
+| 40 m | **0.600 / 0.038** | 0.847 / 0.086 | 1.342 / 0.101 |
 
 The serial node outperforms the subscribe node on every metric. The improvement is
 most pronounced on longer RPE segments (32 m, 40 m), where the subscribe node's
 residual message drops accumulate into larger drift errors.
+
+Our single-sequence results beat the paper's all-dataset averages because
+V1_01_easy is the easiest sequence; harder sequences (V1_03, MH_04, MH_05)
+will pull the average up.
 
 > **Note on mono vs stereo orientation ATE:** the paper shows `mono_ov_vio` with a
 > lower orientation ATE on V1_01_easy (0.642 °) than stereo (0.905 °), even though
