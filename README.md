@@ -186,12 +186,15 @@ It reads the bag directory directly (no `ros2 bag play` needed), processes every
 message regardless of CPU speed, and is the recommended way to run benchmarks.
 
 > **Note on reproducibility:** the serial node produces bit-identical results
-> between runs. OpenCV's global RNG starts from a fixed seed and, with single-threaded
-> subscription processing (`use_multi_threading_subs = false`), operations execute in
-> exactly the same order every time. The RANSAC randomness noted in the paper applied
-> to the real-time subscribe approach, where timing variations shifted the RNG state.
-> The 10-run averaging (see below) is therefore only needed if you use
-> Option B (`ros2 bag play`).
+> between runs. This is because (a) messages are processed in a fixed order, and
+> (b) since June 2021 (commit `fae7144`, post-paper), OpenVINS calls
+> `cv::setRNGSeed(0)` at startup, making RANSAC sampling deterministic.
+>
+> The ICRA 2020 paper predates this fix — at that time RANSAC used an unseeded
+> (time-based) RNG, so even the ROS 1 serial node produced different results on
+> each run. This is why the paper averaged over 10 runs. With the current codebase,
+> 10-run averaging is only needed if you use Option B (`ros2 bag play`), where
+> timing-induced message drops shift the RNG call sequence.
 
 #### Option A — Serial node (recommended)
 
