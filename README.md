@@ -433,18 +433,21 @@ SEQUENCES=(V1_01_easy V1_02_medium V1_03_difficult V2_01_easy V2_02_medium)
 for seq in "${SEQUENCES[@]}"; do
   echo "=== $seq ==="
 
-  # Start recorder
+  # Start recorder in the background
   cd ~/results
   python3 ~/workspace/catkin_ws_ov/record_poses.py &
   RECORD_PID=$!
-  sleep 1
+  sleep 2
 
-  # Run serial node
+  # Run serial node (blocks until bag is fully processed)
   ros2 launch ov_msckf serial.launch.py \
       config:=euroc_mav \
       path_bag:=$HOME/datasets/euroc/$seq
 
-  kill $RECORD_PID 2>/dev/null; wait $RECORD_PID 2>/dev/null
+  # Give recorder time to flush, then stop it
+  sleep 2
+  kill $RECORD_PID 2>/dev/null
+  wait $RECORD_PID 2>/dev/null
   mv ~/results/state_estimate.txt ~/results/estimate_${seq}.txt
 
   # Evaluate
