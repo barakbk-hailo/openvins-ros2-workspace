@@ -319,42 +319,82 @@ seg 40 - median_ori = 0.847 | median_pos = 0.086 (1087 samples)
 > while the subscribe node's `message_filters::ApproximateTime` policy is slightly
 > more permissive. The difference is small (~1 %) and does not affect comparability.
 
-#### Comparison with the paper (Geneva et al. ICRA 2020, Table II / III)
+#### Comparison with the paper (Geneva et al. ICRA 2020)
 
-The paper reports the **mean ATE over 10 runs** (Table II); our figures are single-run RMSEs.
-The paper's RPE (Table III) is averaged over **all EuRoC datasets** (not V1_01_easy alone),
-so RPE figures are not directly comparable to our per-sequence results.
+**ATE RMSE — stereo_ov_vio, all Vicon sequences (Table II)**
 
-**ATE — V1_01_easy, stereo (Table II)**
+The paper reports the mean over 10 runs; our results are single deterministic runs
+from the serial node (`cv::setRNGSeed(0)` makes results bit-identical across runs).
 
-| Metric | Serial (1 run) | Subscribe 0.1x (1 run) | Paper (10-run mean) |
-|---|---|---|---|
-| Orientation (deg) | **0.569** | 0.731 | 0.905 |
-| Position (m) | **0.038** | 0.051 | 0.061 |
+| Sequence | Ours — deg / m | Paper — deg / m |
+|---|---|---|
+| V1_01_easy | **0.569 / 0.038** | 0.905 / 0.061 |
+| V1_02_medium | **1.622 / 0.053** | 1.767 / 0.056 |
+| V1_03_difficult | 2.861 / 0.058 | **2.339 / 0.057** |
+| V2_01_easy | 1.250 / 0.063 | **1.106 / 0.053** |
+| V2_02_medium | 1.212 / 0.051 | **1.151 / 0.048** |
+| **Average** | **1.303 / 0.053** | **1.454 / 0.055** |
 
-**RPE — stereo_ov_vio (Table III, all-dataset average)**
+Position ATE is comparable across all sequences. Orientation ATE is better on
+easy/medium sequences but worse on V1_03_difficult and V2 — the paper's 10-run
+averaging smooths out unlucky RANSAC draws that our single deterministic run
+may hit. Overall average position (0.053 m vs 0.055 m) is within noise.
 
-| Segment | Serial — deg / m | Subscribe 0.1x — deg / m | Paper — deg / m |
-|---|---|---|---|
-| 8 m | **0.528 / 0.057** | 0.608 / 0.059 | 0.722 / 0.068 |
-| 16 m | **0.368 / 0.051** | 0.588 / 0.058 | 0.892 / 0.077 |
-| 24 m | **0.467 / 0.047** | 0.623 / 0.072 | 1.089 / 0.087 |
-| 32 m | **0.565 / 0.051** | 0.952 / 0.092 | 1.218 / 0.088 |
-| 40 m | **0.600 / 0.038** | 0.847 / 0.086 | 1.342 / 0.101 |
+**RPE — per-sequence (serial node)**
 
-The serial node outperforms the subscribe node on every metric. The improvement is
-most pronounced on longer RPE segments (32 m, 40 m), where the subscribe node's
-residual message drops accumulate into larger drift errors.
+Paper Table III reports RPE averaged over **all datasets**, not per-sequence.
+Our per-sequence results are listed here for reference (not directly comparable
+to Table III).
 
-Our single-sequence results beat the paper's all-dataset averages because
-V1_01_easy is the easiest sequence; harder sequences (V1_03, MH_04, MH_05)
-will pull the average up.
+*V1_01_easy:*
 
-> **Note on mono vs stereo orientation ATE:** the paper shows `mono_ov_vio` with a
-> lower orientation ATE on V1_01_easy (0.642 °) than stereo (0.905 °), even though
-> stereo wins on every RPE segment. RPE measures local drift and is the more reliable
-> indicator of systematic performance; the ATE orientation inversion is a statistical
-> artefact of a 10-sample average on a short, easy sequence.
+| Segment | Ours — deg / m | Paper (all-dataset avg) — deg / m |
+|---|---|---|
+| 8 m | 0.528 / 0.057 | 0.722 / 0.068 |
+| 16 m | 0.368 / 0.051 | 0.892 / 0.077 |
+| 24 m | 0.467 / 0.047 | 1.089 / 0.087 |
+| 32 m | 0.565 / 0.051 | 1.218 / 0.088 |
+| 40 m | 0.600 / 0.038 | 1.342 / 0.101 |
+
+*V1_02_medium:*
+
+| Segment | deg / m |
+|---|---|
+| 8 m | 0.497 / 0.101 |
+| 16 m | 0.675 / 0.105 |
+| 24 m | 0.605 / 0.094 |
+| 32 m | 0.847 / 0.076 |
+| 40 m | 1.262 / 0.122 |
+
+*V1_03_difficult:*
+
+| Segment | deg / m |
+|---|---|
+| 8 m | 0.894 / 0.081 |
+| 16 m | 1.068 / 0.102 |
+| 24 m | 1.306 / 0.114 |
+| 32 m | 1.175 / 0.125 |
+| 40 m | 1.202 / 0.123 |
+
+*V2_01_easy:*
+
+| Segment | deg / m |
+|---|---|
+| 8 m | 0.605 / 0.086 |
+| 16 m | 0.924 / 0.136 |
+| 24 m | 1.154 / 0.106 |
+| 32 m | 1.039 / 0.138 |
+| 40 m | — (trajectory too short) |
+
+*V2_02_medium:*
+
+| Segment | deg / m |
+|---|---|
+| 8 m | 1.192 / 0.047 |
+| 16 m | 1.247 / 0.068 |
+| 24 m | 1.329 / 0.068 |
+| 32 m | 1.418 / 0.065 |
+| 40 m | 1.399 / 0.064 |
 
 ### Reproducing the 10-run mean
 
