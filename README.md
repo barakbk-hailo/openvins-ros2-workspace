@@ -370,23 +370,42 @@ paper's observation (see note below).
 > that mono never sees. RPE (local drift) is a more reliable indicator of
 > systematic performance.
 
-**RPE — per-sequence, stereo (serial node)**
+**RPE — average across 5 Vicon sequences (Table III: all-dataset average)**
 
-Paper Table III reports RPE averaged over **all datasets**, not per-sequence.
-Our per-sequence results are listed here for reference.
+V2_01_easy has no 40 m segment (trajectory too short); its 40 m is excluded from the average.
+
+*Stereo:*
+
+| Segment | Ours — deg / m | Paper `stereo_ov_vio` — deg / m |
+|---|---|---|
+| 8 m | 0.743 / 0.074 | **0.722 / 0.068** |
+| 16 m | **0.856 / 0.092** | 0.892 / 0.077 |
+| 24 m | **0.972 / 0.086** | 1.089 / 0.087 |
+| 32 m | **1.009 / 0.091** | 1.218 / 0.088 |
+| 40 m | **1.116 / 0.087** | 1.342 / 0.101 |
+
+*Mono:*
+
+| Segment | Ours — deg / m | Paper `mono_ov_vio` — deg / m |
+|---|---|---|
+| 8 m | **0.804 / 0.082** | 0.826 / 0.094 |
+| 16 m | 1.063 / 0.127 | **1.039 / 0.106** |
+| 24 m | 1.301 / 0.150 | **1.215 / 0.111** |
+| 32 m | 1.346 / 0.188 | **1.283 / 0.132** |
+| 40 m | **1.116 / 0.135** | 1.342 / 0.151 |
+
+<details>
+<summary>RPE per sequence (click to expand)</summary>
 
 *V1_01_easy:*
 
-| Segment | Stereo — deg / m | Mono — deg / m | Paper stereo (all-dataset avg) — deg / m |
-|---|---|---|---|
-| 8 m | 0.528 / 0.057 | 0.658 / 0.061 | 0.722 / 0.068 |
-| 16 m | 0.368 / 0.051 | 0.531 / 0.079 | 0.892 / 0.077 |
-| 24 m | 0.467 / 0.047 | 0.799 / 0.089 | 1.089 / 0.087 |
-| 32 m | 0.565 / 0.051 | 0.742 / 0.131 | 1.218 / 0.088 |
-| 40 m | 0.600 / 0.038 | 0.811 / 0.136 | 1.342 / 0.101 |
-
-<details>
-<summary>RPE for remaining sequences (click to expand)</summary>
+| Segment | Stereo — deg / m | Mono — deg / m |
+|---|---|---|
+| 8 m | 0.528 / 0.057 | 0.658 / 0.061 |
+| 16 m | 0.368 / 0.051 | 0.531 / 0.079 |
+| 24 m | 0.467 / 0.047 | 0.799 / 0.089 |
+| 32 m | 0.565 / 0.051 | 0.742 / 0.131 |
+| 40 m | 0.600 / 0.038 | 0.811 / 0.136 |
 
 *V1_02_medium:*
 
