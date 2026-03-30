@@ -375,7 +375,9 @@ paper's observation (see note below).
 
 **RPE — average across 5 Vicon sequences (Table III: all-dataset average)**
 
-V2_01_easy has no 40 m segment (trajectory too short); its 40 m is excluded from the average.
+V2_01_easy has no 40 m or 48 m segment (trajectory too short); excluded from
+those averages. No Vicon sequence reaches 48 m — the paper's 48 m RPE comes
+from the Machine Hall sequences which are not part of Table II.
 
 *Stereo:*
 
@@ -386,6 +388,7 @@ V2_01_easy has no 40 m segment (trajectory too short); its 40 m is excluded from
 | 24 m | **0.972 / 0.086** | 1.089 / 0.087 |
 | 32 m | **1.009 / 0.091** | 1.218 / 0.088 |
 | 40 m | **1.116 / 0.087** | 1.342 / 0.101 |
+| 48 m | — | 1.489 / 0.106 |
 
 *Mono:*
 
@@ -396,6 +399,7 @@ V2_01_easy has no 40 m segment (trajectory too short); its 40 m is excluded from
 | 24 m | 1.301 / 0.150 | **1.215 / 0.111** |
 | 32 m | 1.346 / 0.188 | **1.283 / 0.132** |
 | 40 m | **1.116 / 0.135** | 1.342 / 0.151 |
+| 48 m | — | 1.425 / 0.184 |
 
 <details>
 <summary>RPE per sequence (click to expand)</summary>
@@ -452,21 +456,28 @@ V2_01_easy has no 40 m segment (trajectory too short); its 40 m is excluded from
 
 </details>
 
-### Reproducing the paper benchmark (5 Vicon sequences)
+### Reproducing the paper benchmark
 
-The paper (Table II) reports ATE over 5 Vicon room sequences (V2_03 excluded
-due to some algorithms failing on it). Download all Vicon bags:
+The paper reports ATE (Table II) over 5 Vicon room sequences and RPE (Table III)
+over all EuRoC datasets. Download all bags:
 
 ```bash
 mkdir -p ~/datasets/euroc && cd ~/datasets/euroc
 pip install gdown   # or: sudo apt install pipx && pipx install gdown
 
-# EuRoC MAV ROS 2 bags from the OpenVINS docs (Google Drive)
+# Vicon room sequences (Table II ATE + Table III RPE)
 gdown 1LFrdiMU6UBjtFfXPHzjJ4L7iDIXcdhvh -O V1_01_easy.zip
 gdown 1rlGSy7h38ucm8jr8ssH-sJPX84JfkBtX -O V1_02_medium.zip
 gdown 1Gy1zc4LaMlwsLpXBqOIci6Y3cV_5r-0k -O V1_03_difficult.zip
 gdown 1KAkE8Ptq3eSQlXMozJgzNIAVUBH3h0FP -O V2_01_easy.zip
 gdown 1Gj4psmvcAwYwCp4T4CQH-d2ZVJ09d3x2 -O V2_02_medium.zip
+
+# Machine Hall sequences (Table III RPE — needed for 48 m segment)
+gdown 1UP4nkuSEOQECZTswwh9BPgfMl-dnDstA -O MH_01_easy.zip
+gdown 1wWZgZCqYz6zzzTXS0iqvQCP-cWfFuGLK -O MH_02_easy.zip
+gdown 1er07gZ8rso8R3Su00hJMm_GZ4z1n9Rpq -O MH_03_medium.zip
+gdown 1eC8joRXo1rh0wzOpq3e-B4dQ8-w6wZYz -O MH_04_difficult.zip
+gdown 1zoN94K1Afrp7HXSduRLkJBiEjPKdk1UA -O MH_05_difficult.zip
 
 for f in *.zip; do unzip -o "$f"; done
 ```
@@ -479,7 +490,8 @@ export MPLBACKEND=Agg   # prevent error_singlerun from blocking on plt.show()
 GT_DIR=~/workspace/catkin_ws_ov/src/open_vins/ov_data/euroc_mav
 mkdir -p ~/results
 
-SEQUENCES=(V1_01_easy V1_02_medium V1_03_difficult V2_01_easy V2_02_medium)
+SEQUENCES=(V1_01_easy V1_02_medium V1_03_difficult V2_01_easy V2_02_medium \
+           MH_01_easy MH_02_easy MH_03_medium MH_04_difficult MH_05_difficult)
 
 for mode in stereo mono; do
   if [ "$mode" = "stereo" ]; then
