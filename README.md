@@ -462,7 +462,8 @@ custom segment lengths (included in our fork).
 
 </details>
 
-#### Supplementary: Machine Hall sequences
+<details>
+<summary>Supplementary: Machine Hall sequences (click to expand)</summary>
 
 These sequences are not part of the paper's benchmark but are included for
 completeness. MH_04_difficult diverged in both stereo and mono modes and is
@@ -548,6 +549,8 @@ excluded.
 | 32 m | 0.858 / 0.336 | 0.984 / 0.724 |
 | 40 m | 1.037 / 0.360 | 0.906 / 0.881 |
 | 48 m | 1.182 / 0.351 | 0.744 / 1.005 |
+
+</details>
 
 </details>
 
