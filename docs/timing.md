@@ -6,8 +6,31 @@
 | **Host** | Dell Latitude 5420, Intel Core i7-1185G7 (4C/8T, 3.0-4.8 GHz), Intel Iris Xe |
 | **OS** | Ubuntu 22.04, ROS 2 Humble |
 | **Build** | `colcon build --symlink-install` (compiler flags: `-O3 -fsee -fomit-frame-pointer -g3`) |
-| **Dataset** | EuRoC MAV (pre-converted ROS 2 bags in `~/datasets/euroc/`) |
+| **Dataset** | EuRoC MAV — see details below |
 | **Reference** | https://docs.openvins.com/eval-timing.html |
+
+### Dataset: EuRoC MAV
+
+The [EuRoC MAV dataset](https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets)
+was collected on an AscTec Firefly hex-rotor MAV in two indoor environments (Vicon
+room and machine hall) at ETH Zurich. It is the standard benchmark for visual-inertial
+odometry research, used in the original OpenVINS ICRA 2020 paper.
+
+| Sensor | Details |
+|--------|---------|
+| **Cameras** | 2x MT9V034 global-shutter, grayscale, 752x480 px, 20 Hz, hardware-synced stereo pair (~11 cm baseline) |
+| **IMU** | ADIS16448, 6-axis (3 gyro + 3 accel), 200 Hz |
+| **Ground truth** | Vicon motion capture at 100 Hz (Vicon room sequences) or Leica MS50 laser tracker (machine hall sequences) |
+
+11 sequences total, split into two environments:
+
+| Environment | Sequences | Difficulty levels |
+|-------------|-----------|-------------------|
+| Vicon room (V1/V2) | 5 sequences | easy, medium, difficult |
+| Machine hall (MH) | 6 sequences | easy (x2), medium, difficult (x2) |
+
+Pre-converted ROS 2 bags are stored in `~/datasets/euroc/` (see
+[evaluation](evaluation.md) for download instructions).
 
 ## Goal
 
