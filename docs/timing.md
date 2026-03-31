@@ -61,11 +61,14 @@ Camera frame arrives
     |
     v
 [3. MSCKF UPDATE]  rT3 -> rT4
-    The core MSCKF step. Takes features that have been LOST (no longer tracked)
-    and uses their multi-view observations to update the EKF state. These features
-    are used once and discarded — they never enter the state vector. Cost scales
-    with the number of lost features (capped at max_msckf_in_update=40). Involves
-    triangulation, Jacobian computation, and the EKF update (dense matrix math).
+    Includes feature classification (sorting lost/marginalized/max-track features
+    into MSCKF vs SLAM sets, SLAM landmark marginalization) AND the core MSCKF
+    EKF update. The MSCKF update takes features that have been LOST (no longer
+    tracked) plus features at the marginalization boundary, and uses their
+    multi-view observations to update the EKF state. These features are used once
+    and discarded — they never enter the state vector. Cost scales with the number
+    of lost features (capped at max_msckf_in_update=40). Involves triangulation,
+    Jacobian computation, and the EKF update (dense matrix math).
     Highly variable — near zero on some frames, up to 15ms on feature-loss spikes.
     |
     v
@@ -89,7 +92,9 @@ Camera frame arrives
     Two sub-steps combined:
     - Re-triangulate all active tracks in the current frame (for visualization)
     - Marginalize the oldest clone from the sliding window when it exceeds
-      max_clones=11 (EKF state compression via Schur complement)
+      max_clones=11 (removes the clone's rows/columns from the covariance matrix
+      and re-indexes remaining variables)
+    Also includes feature database cleanup and SLAM anchor changes.
     Relatively stable cost since the sliding window size is fixed.
 ```
 
@@ -163,13 +168,13 @@ re-run).
 
 | Component | V1_01_easy | MH_03_medium | V1_03_difficult |
 |-----------|-----------|-------------|----------------|
-| tracking | 2.6 (p99: 3.6, max: 10.1) | 2.7 (p99: 3.6, max: 6.4) | 3.0 (p99: 5.4, max: 14.1) |
-| propagation | 0.2 (p99: 0.3) | 0.2 (p99: 0.3) | 0.2 (p99: 0.2) |
-| msckf update | 1.6 (p99: 7.5, max: 15.5) | 1.2 (p99: 6.0, max: 17.2) | 1.2 (p99: 4.7, max: 14.9) |
-| slam update | 4.5 (p99: 6.7, max: 9.3) | 3.6 (p99: 6.5, max: 7.6) | 2.1 (p99: 5.8, max: 7.3) |
-| slam delayed | 0.9 (p99: 5.0, max: 16.5) | 1.3 (p99: 6.3, max: 23.4) | 1.5 (p99: 6.4, max: 14.2) |
-| re-tri & marg | 1.5 (p99: 1.8, max: 2.7) | 1.5 (p99: 1.9, max: 2.8) | 1.5 (p99: 1.7, max: 2.5) |
-| **total** | **11.3** (p99: 19.2, max: 30.2) | **10.5** (p99: 18.5, max: 30.9) | **9.5** (p99: 17.2, max: 26.0) |
+| tracking | 2.6 (p99: 4.1, max: 10.1) | 2.7 (p99: 4.1, max: 6.4) | 3.0 (p99: 7.0, max: 14.1) |
+| propagation | 0.2 (p99: 0.3) | 0.2 (p99: 0.3) | 0.2 (p99: 0.3) |
+| msckf update | 1.6 (p99: 11.0, max: 15.5) | 1.2 (p99: 9.8, max: 17.2) | 1.2 (p99: 7.8, max: 14.9) |
+| slam update | 4.5 (p99: 6.3, max: 9.3) | 3.6 (p99: 5.8, max: 7.6) | 2.1 (p99: 5.9, max: 7.3) |
+| slam delayed | 0.9 (p99: 8.0, max: 16.5) | 1.3 (p99: 10.7, max: 23.4) | 1.5 (p99: 10.0, max: 14.2) |
+| re-tri & marg | 1.5 (p99: 1.9, max: 2.7) | 1.5 (p99: 2.1, max: 2.8) | 1.5 (p99: 1.9, max: 2.5) |
+| **total** | **11.3** (p99: 22.7, max: 30.2) | **10.5** (p99: 22.5, max: 30.9) | **9.5** (p99: 20.5, max: 26.0) |
 
 Frames processed: V1_01=2776, MH_03=2302, V1_03=1990 (out of 2912 in each bag;
 the difference is from the initialization period where no timing is recorded, plus
@@ -179,20 +184,20 @@ stereo sync misses where no matching pair was found within ±20ms)
 
 | Component | V1_01_easy | MH_03_medium | V1_03_difficult |
 |-----------|-----------|-------------|----------------|
-| tracking | 1.8 (p99: 2.5, max: 6.4) | 1.8 (p99: 2.5, max: 4.2) | 2.2 (p99: 5.1, max: 19.5) |
-| propagation | 0.2 (p99: 0.2) | 0.2 (p99: 0.3) | 0.2 (p99: 0.2) |
-| msckf update | 2.0 (p99: 5.6, max: 8.5) | 1.6 (p99: 4.8, max: 8.1) | 1.2 (p99: 4.0, max: 7.9) |
-| slam update | 2.6 (p99: 3.7, max: 7.9) | 2.3 (p99: 3.8, max: 5.6) | 1.3 (p99: 3.4, max: 6.6) |
-| slam delayed | 0.6 (p99: 2.5, max: 6.7) | 0.8 (p99: 3.1, max: 9.8) | 1.1 (p99: 4.0, max: 13.8) |
-| re-tri & marg | 1.0 (p99: 1.4, max: 4.4) | 1.0 (p99: 1.4, max: 2.0) | 0.9 (p99: 1.3, max: 3.8) |
-| **total** | **8.2** (p99: 12.5, max: 16.8) | **7.7** (p99: 12.3, max: 16.0) | **6.9** (p99: 12.7, max: 24.0) |
+| tracking | 1.8 (p99: 2.7, max: 6.4) | 1.8 (p99: 2.9, max: 4.2) | 2.2 (p99: 7.6, max: 19.5) |
+| propagation | 0.2 (p99: 0.3) | 0.2 (p99: 0.3) | 0.2 (p99: 0.2) |
+| msckf update | 2.0 (p99: 6.2, max: 8.5) | 1.6 (p99: 5.5, max: 8.1) | 1.2 (p99: 5.2, max: 7.9) |
+| slam update | 2.6 (p99: 3.5, max: 7.9) | 2.3 (p99: 3.2, max: 5.6) | 1.3 (p99: 3.0, max: 6.6) |
+| slam delayed | 0.6 (p99: 3.4, max: 6.7) | 0.8 (p99: 4.2, max: 9.8) | 1.1 (p99: 5.7, max: 13.8) |
+| re-tri & marg | 1.0 (p99: 1.5, max: 4.4) | 1.0 (p99: 1.5, max: 2.0) | 0.9 (p99: 1.3, max: 3.8) |
+| **total** | **8.2** (p99: 13.1, max: 16.8) | **7.7** (p99: 12.8, max: 16.0) | **6.9** (p99: 13.6, max: 24.0) |
 
 Frames processed: V1_01=2799, MH_03=2310, V1_03=2004
 
 ### Phase 1 findings
 
-1. **Comfortably within realtime on x86.** Stereo p99 is ~19ms vs 50ms budget at
-   20Hz — roughly 2.5x headroom.
+1. **Comfortably within realtime on x86.** Stereo p99 is ~23ms vs 50ms budget at
+   20Hz — roughly 2x headroom.
 
 2. **SLAM update is the dominant component** on easy/medium sequences (up to 4.5ms
    mean, 40% of total). This was surprising — one might expect tracking (the OpenCV
@@ -200,7 +205,7 @@ Frames processed: V1_01=2799, MH_03=2310, V1_03=2004
    expensive.
 
 3. **Tracking scales with difficulty.** On V1_03_difficult (fast motion, blur),
-   tracking mean increases from 2.6ms to 3.0ms and p99 from 3.6ms to 5.4ms. KLT
+   tracking mean increases from 2.6ms to 3.0ms and p99 from 4.1ms to 7.0ms. KLT
    has to work harder to track through motion blur.
 
 4. **MSCKF update and SLAM delayed are spiky.** These components have high variance
