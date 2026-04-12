@@ -504,6 +504,279 @@ Total: 11.3ms per frame
 
 ---
 
+## Phase 4: RPi5 measurements (actual hardware)
+
+| | |
+|---|---|
+| **Date** | 2026-04-12 |
+| **Host** | Raspberry Pi 5 (BCM2712, 4x Cortex-A76 @ 2.4 GHz, 8 GB RAM) |
+| **OS** | Debian 13 (Trixie), Docker container running Ubuntu 22.04 / ROS 2 Humble |
+| **Build** | `colcon build --symlink-install` inside Docker (same source as x86) |
+| **Dataset** | EuRoC MAV — same 3 sequences as x86 baseline |
+| **Config** | Default: 200 features, full resolution, 4 OpenCV threads, 50 SLAM landmarks |
+
+### Stereo timing results (mean total time in ms)
+
+| Component | V1_01_easy | MH_03_medium | V1_03_difficult |
+|-----------|-----------|-------------|----------------|
+| tracking | 6.9 (p99: 10.4, max: 25.4) | 6.6 (p99: 9.6, max: 24.2) | 8.0 (p99: 13.6, max: 29.2) |
+| propagation | 0.4 (p99: 0.8) | 0.4 (p99: 0.6) | 0.4 (p99: 0.6) |
+| msckf update | 2.8 (p99: 13.0, max: 41.0) | 2.0 (p99: 9.9, max: 29.2) | 2.0 (p99: 8.0, max: 27.5) |
+| slam update | 7.3 (p99: 11.4, max: 17.7) | 5.9 (p99: 10.9, max: 20.3) | 3.4 (p99: 9.0, max: 15.2) |
+| slam delayed | 1.6 (p99: 8.5, max: 30.6) | 2.2 (p99: 11.0, max: 37.7) | 2.6 (p99: 10.9, max: 23.6) |
+| re-tri & marg | 5.1 (p99: 6.5, max: 20.3) | 4.9 (p99: 6.1, max: 12.4) | 5.2 (p99: 6.5, max: 11.2) |
+| **total** | **24.2** (p99: 38.8, max: 64.5) | **22.0** (p99: 36.4, max: 59.3) | **21.6** (p99: 35.4, max: 61.4) |
+
+Frames processed: V1_01=2776, MH_03=2302, V1_03=1990 (same as x86)
+
+**Note on MH_03:** The default run (`bag_start=0`) causes the stereo filter to
+diverge on RPi5 (see [accuracy section](#accuracy-rpi5-vs-x86) below). The timing
+numbers above are from `bag_start:=5.0` which produces a healthy filter. The
+diverged run (`MH_03_medium.txt` in the results directory) shows artificially low
+times (14.5ms total) because the filter runs idle with near-zero SLAM/MSCKF updates.
+
+### Mono timing results (mean total time in ms)
+
+| Component | V1_01_easy | MH_03_medium | V1_03_difficult |
+|-----------|-----------|-------------|----------------|
+| tracking | 4.7 (p99: 7.1, max: 16.7) | 4.6 (p99: 7.1, max: 20.1) | 5.5 (p99: 10.9, max: 30.8) |
+| propagation | 0.5 (p99: 0.6) | 0.4 (p99: 0.6) | 0.4 (p99: 0.6) |
+| msckf update | 3.3 (p99: 9.3, max: 16.4) | 2.6 (p99: 8.0, max: 14.0) | 2.0 (p99: 6.7, max: 13.0) |
+| slam update | 4.2 (p99: 6.2, max: 14.8) | 3.5 (p99: 6.2, max: 17.4) | 2.2 (p99: 5.5, max: 8.3) |
+| slam delayed | 1.1 (p99: 4.7, max: 11.2) | 1.6 (p99: 6.0, max: 14.1) | 2.0 (p99: 7.2, max: 27.1) |
+| re-tri & marg | 3.2 (p99: 4.1, max: 10.1) | 3.1 (p99: 4.0, max: 8.7) | 2.9 (p99: 4.1, max: 20.8) |
+| **total** | **17.1** (p99: 25.3, max: 51.8) | **15.8** (p99: 24.9, max: 51.0) | **15.0** (p99: 25.4, max: 44.5) |
+
+Frames processed: V1_01=2799, MH_03=2310, V1_03=2004
+
+### Phase 4 timing findings: x86 vs RPi5
+
+#### Overall slowdown
+
+| Mode | Sequence | x86 (ms) | RPi5 (ms) | Ratio |
+|------|----------|---------|----------|-------|
+| Stereo | V1_01_easy | 11.3 | 24.2 | 2.1x |
+| Stereo | MH_03_medium | 10.5 | 22.0 | 2.1x |
+| Stereo | V1_03_difficult | 9.5 | 21.6 | 2.3x |
+| Mono | V1_01_easy | 8.2 | 17.1 | 2.1x |
+| Mono | MH_03_medium | 7.7 | 15.8 | 2.1x |
+| Mono | V1_03_difficult | 6.9 | 15.0 | 2.2x |
+
+**Actual slowdown: 2.1-2.3x** — significantly better than the 3.5x projection from
+Phase 3. The Cortex-A76 cores are more capable than estimated, especially for the
+matrix-heavy EKF updates.
+
+#### Per-component slowdown (RPi5 / x86, stereo, averaged across sequences)
+
+| Component | Slowdown | Likely cause |
+|-----------|----------|-------------|
+| tracking | 2.6x | NEON (128-bit) vs AVX2 (256-bit) for KLT optical flow |
+| propagation | 2.0x | Lightweight scalar math, stable across platforms |
+| msckf update | 1.7x | Dense matrix ops, better than expected |
+| slam update | 1.6x | Dense matrix ops, Eigen NEON is well-optimized |
+| slam delayed | 1.8x | Triangulation + state augmentation |
+| re-tri & marg | **3.4x** | Cache-bound: 2MB L2 (RPi5) vs 12MB L3 (x86) |
+
+The re-triangulation & marginalization component scales worst (3.4x). This step
+iterates over all active features and the full covariance matrix, making it sensitive
+to cache size. The SLAM and MSCKF EKF updates (dense matrix math) scale best at
+1.6-1.7x — Eigen's NEON backend is effective for these operations.
+
+#### Realtime feasibility (serial mode)
+
+| Scenario | RPi5 mean (ms) | RPi5 p99 (ms) | Budget 20Hz (50ms) | Budget 30Hz (33ms) |
+|----------|---------------|---------------|--------------------|--------------------|
+| Stereo baseline | 24.2 | 38.8 | OK | p99 exceeds |
+| Mono baseline | 17.1 | 25.3 | OK | OK |
+
+Serial mode is comfortably within the 20Hz budget. Mono at 30Hz has ~8ms headroom
+at p99. Subscribe mode (not yet measured on RPi5) will add ROS2 middleware overhead —
+on x86 this was 1.85x, which would put stereo at ~45ms mean and ~72ms p99 (above
+budget). Subscribe mode measurements are needed to confirm.
+
+### Accuracy: RPi5 vs x86 {#accuracy-rpi5-vs-x86}
+
+All runs are stereo, serial mode, default config (200 features, max_slam=50).
+
+#### Absolute Trajectory Error
+
+| Sequence | x86 rmse_ori (deg) | RPi5 rmse_ori (deg) | x86 rmse_pos (m) | RPi5 rmse_pos (m) |
+|----------|--------------------|---------------------|-------------------|-------------------|
+| V1_01_easy | 0.569 | 0.686 | 0.038 | 0.044 |
+| MH_03_medium (bag_start=0) | 1.170 | **diverged** | 0.115 | **diverged** |
+| MH_03_medium (bag_start=5) | 1.164 | 1.031 | 0.089 | 0.116 |
+| V1_03_difficult | 2.861 | 2.818 | 0.058 | 0.063 |
+
+#### Relative Pose Error (median orientation / median position)
+
+| Segment | V1_01 x86 | V1_01 RPi5 | MH_03 x86 (skip5) | MH_03 RPi5 (skip5) | V1_03 x86 | V1_03 RPi5 |
+|---------|-----------|------------|--------------------|--------------------|-----------|------------|
+| seg 8 | 0.528 / 0.057 | 0.546 / 0.055 | 0.373 / 0.133 | 0.295 / 0.147 | 0.894 / 0.081 | 0.892 / 0.083 |
+| seg 16 | 0.368 / 0.051 | 0.589 / 0.054 | 0.514 / 0.117 | 0.437 / 0.123 | 1.068 / 0.102 | 1.136 / 0.104 |
+| seg 24 | 0.467 / 0.047 | 0.564 / 0.062 | 0.494 / 0.121 | 0.527 / 0.144 | 1.306 / 0.114 | 1.109 / 0.117 |
+| seg 32 | 0.565 / 0.051 | 0.702 / 0.067 | 0.709 / 0.140 | 0.604 / 0.158 | — | 1.116 / 0.135 |
+| seg 40 | 0.600 / 0.038 | 0.495 / 0.068 | 0.761 / 0.138 | 0.678 / 0.184 | — | 1.100 / 0.132 |
+
+#### Accuracy findings
+
+1. **V1_03_difficult is nearly identical** across platforms — rmse_ori differs by
+   only 0.04 deg. This is the best evidence that the algorithm runs correctly on ARM.
+
+2. **V1_01_easy and MH_03 show chaotic divergence** — RPi5 wins some RPE segments,
+   loses others. Neither platform is consistently worse. This is expected for a
+   nonlinear EKF with different floating-point backends (NEON vs SSE/AVX).
+
+3. **MH_03 stereo diverges on RPi5 without `bag_start:=5.0`.** The MAV is picked up
+   and carried at the start of this sequence, creating a marginal initialization
+   scenario. The x86 filter survives this section; the RPi5 filter does not.
+   This is a known class of issue — see [rpng/open_vins#435](https://github.com/rpng/open_vins/issues/435)
+   (pose divergence on RPi4) and [rpng/open_vins#141](https://github.com/rpng/open_vins/issues/141)
+   (MH_03 initialization issues). Skipping 5 seconds fully resolves it.
+
+4. **Mono mode is unaffected** — MH_03 mono works correctly on RPi5 even without
+   `bag_start` (rmse_ori=1.306, rmse_pos=0.145 at bag_start=0 vs rmse_ori=1.334,
+   rmse_pos=0.117 at bag_start=5 — both healthy). This confirms the divergence is
+   specific to the stereo codepath during marginal initialization.
+
+5. **Determinism:** Results are deterministic within the same platform in serial mode
+   (same binary + same data = same output). `num_opencv_threads` does not affect
+   results (verified with threads=1 vs threads=4). Cross-platform exact reproducibility
+   is not achievable due to NEON vs SSE/AVX floating-point differences.
+
+---
+
+## Phase 4b: RPi5 config sensitivity sweeps
+
+Same 5 config variants as Phase 2, run on V1_01_easy (stereo, serial mode) on RPi5.
+
+### Results (all times in ms, V1_01_easy stereo)
+
+| Variant | Tracking | Propagation | MSCKF upd | SLAM upd | SLAM delay | Re-tri/marg | **Total** | **p99** | **max** |
+|---------|----------|-------------|-----------|----------|------------|-------------|-----------|---------|---------|
+| **Baseline** (200pts, full-res, 4 thr) | 6.9 | 0.4 | 2.8 | 7.3 | 1.6 | 5.1 | **24.2** | **38.8** | **64.5** |
+| **A: Downsample** | 4.6 | 0.5 | 2.6 | 7.5 | 1.8 | 1.9 | **18.8** | **29.1** | **48.0** |
+| **B: 100 features** | 5.9 | 0.4 | 0.3 | 4.4 | 1.0 | 5.6 | **17.6** | **28.4** | **61.5** |
+| **C: 300 features** | 10.1 | 0.5 | 6.2 | 7.9 | 2.0 | 6.4 | **33.1** | **48.5** | **68.4** |
+| **D: No SLAM** | 8.2 | 0.2 | 5.3 | — | — | 5.3 | **19.1** | **32.3** | **53.8** |
+| **E: 1 OpenCV thread** | 10.6 | 0.5 | 2.9 | 7.4 | 1.7 | 5.6 | **28.6** | **43.1** | **64.8** |
+
+### RPi5 sweep findings vs x86
+
+| Variant | x86 total (ms) | RPi5 total (ms) | x86 savings | RPi5 savings | Ratio |
+|---------|----------------|-----------------|-------------|--------------|-------|
+| Baseline | 11.3 | 24.2 | — | — | 2.1x |
+| A: Downsample | 9.5 (-16%) | 18.8 (**-22%**) | -16% | **-22%** | 2.0x |
+| B: 100 features | 6.8 (-40%) | 17.6 (**-27%**) | -40% | **-27%** | 2.6x |
+| C: 300 features | 14.3 (+27%) | 33.1 (**+37%**) | +27% | **+37%** | 2.3x |
+| D: No SLAM | 7.4 (-35%) | 19.1 (**-21%**) | -35% | **-21%** | 2.6x |
+| E: 1 OpenCV thread | 12.3 (+9%) | 28.6 (**+18%**) | +9% | **+18%** | 2.3x |
+
+Key differences vs x86:
+
+1. **Downsample is more effective on RPi5** (-22% vs -16%). The re-tri & marg
+   component drops from 5.1ms to 1.9ms (-63%) — much larger than on x86 (-60%).
+   Since this is the most cache-bound component (3.4x slowdown), halving the image
+   resolution significantly reduces the feature data that must be re-triangulated.
+   **Downsample is the best bang-for-buck optimization on RPi5.**
+
+2. **100 features is less effective on RPi5** (-27% vs -40%). On x86, MSCKF update
+   nearly vanished (1.6ms -> 0.1ms); on RPi5 it also drops (2.8ms -> 0.3ms) but the
+   re-tri & marg component barely changes (5.1ms -> 5.6ms), eating into the savings.
+
+3. **No SLAM is less effective on RPi5** (-21% vs -35%). SLAM update is eliminated
+   but MSCKF update nearly doubles (2.8ms -> 5.3ms) as features are rerouted, and
+   re-tri & marg stays constant at 5.3ms.
+
+4. **1 OpenCV thread hurts more on RPi5** (+18% vs +9%). Tracking jumps from 6.9ms
+   to 10.6ms (+54%). On ARM, the OpenCV NEON KLT benefits more from parallelism than
+   on x86 with AVX2. **Keep 4 OpenCV threads on RPi5.**
+
+5. **300 features is more dangerous on RPi5** (+37% vs +27%). At 33.1ms mean and
+   48.5ms p99, this nearly exceeds the 50ms budget at 20Hz. Avoid.
+
+### RPi5 optimization ranking (by absolute savings)
+
+| Optimization | RPi5 savings | RPi5 total | p99 | 20Hz budget |
+|-------------|-------------|-----------|-----|-------------|
+| Downsample | -5.4ms (-22%) | 18.8ms | 29.1ms | comfortable |
+| 100 features | -6.6ms (-27%) | 17.6ms | 28.4ms | comfortable |
+| No SLAM | -5.1ms (-21%) | 19.1ms | 32.3ms | OK |
+| Combined (downsample + 100pts) | est. -10ms | ~14ms | ~22ms | comfortable at 30Hz |
+
+---
+
+## Phase 4c: RPi5 subscribe mode
+
+Subscribe mode (`run_subscribe_msckf`) with bag playback at 1x, 2x, and 5x rate
+on V1_01_easy (stereo).
+
+### Frame drop analysis
+
+| Playback rate | Processed frames | "Dropped" | Drop % | Notes |
+|---------------|-----------------|-----------|--------|-------|
+| 1.0x (realtime) | 2800 | 112 | 3.8% | Same as x86 — init/sync, not perf |
+| 2.0x | 2800 | 112 | 3.8% | No real drops |
+| 5.0x | **1369** | **1543** | **53.0%** | **Real performance drops** |
+
+On x86, all three rates processed ~2800 frames (zero real drops even at 5x). On
+RPi5, 1x and 2x are fine but **5x causes 53% frame loss** — the VIO pipeline
+cannot keep up at 100Hz effective camera rate.
+
+### Per-component timing: subscribe vs serial
+
+| Component | Serial (ms) | Subscribe 1x (ms) | Subscribe 2x (ms) | Subscribe 5x (ms) |
+|-----------|------------|-------------------|-------------------|-------------------|
+| tracking | 6.9 | 7.3 | 7.7 | 11.8 |
+| propagation | 0.4 | 0.4 | 0.2 | 0.2 |
+| msckf update | 2.8 | 2.8 | 0.3 | 0.3 |
+| slam update | 7.3 | 7.0 | 0.3 | 0.0 |
+| slam delayed | 1.6 | 1.7 | 0.9 | 0.6 |
+| re-tri & marg | 5.1 | 4.9 | 5.0 | 6.3 |
+| **total** | **24.2** | **24.1** | **14.5** | **19.3** |
+
+### Phase 4c findings
+
+1. **Subscribe 1x overhead is negligible on RPi5** (24.1ms vs 24.2ms serial). This
+   is a major surprise — on x86, subscribe 1x was 1.85x slower than serial (20.9ms
+   vs 11.3ms). On RPi5 there is effectively **no ROS2 middleware penalty**. Possible
+   explanation: at 24ms per frame on RPi5 vs 11ms on x86, the VIO thread occupies the
+   CPU more continuously, keeping caches warm and reducing the idle-time context
+   switching that inflated x86 subscribe times.
+
+2. **Subscribe 2x shows degraded filter** (14.5ms total). SLAM update drops to 0.3ms
+   and MSCKF to 0.3ms — the same pattern as the diverged MH_03 run. At 2x rate, the
+   RPi5 can't fully keep up, leading to a lighter (degraded) filter state. x86 at 2x
+   was 13.9ms but still processed the same frame count — RPi5 also processes 2800
+   frames but the filter is clearly running in a compromised mode.
+
+3. **Subscribe 5x drops 53% of frames.** x86 dropped ~4% at 5x. This confirms the
+   RPi5 breaking point is between 2x and 5x realtime for stereo with default config.
+
+4. **Realtime verdict for RPi5 subscribe mode:**
+
+   | Scenario | Mean (ms) | p99 (ms) | Budget 20Hz | Budget 30Hz |
+   |----------|-----------|----------|-------------|-------------|
+   | Stereo baseline | 24.1 | 39.4 | **OK** | p99 exceeds |
+   | Stereo + downsample (est.) | ~19 | ~29 | OK | **OK** |
+   | Mono baseline (est.) | ~17 | ~25 | OK | OK |
+
+   **Stereo at 20Hz is realtime-feasible on RPi5** — subscribe mode adds negligible
+   overhead unlike on x86. For 30Hz (live USB camera), downsample or mono is needed.
+
+### x86 vs RPi5 subscribe comparison
+
+| Metric | x86 1x | RPi5 1x | Ratio |
+|--------|--------|---------|-------|
+| Total (ms) | 20.9 | 24.1 | 1.15x |
+| Subscribe overhead vs serial | **1.85x** | **1.00x** | — |
+| Frames at 5x | 2799 | 1369 | 2.0x drop |
+
+The subscribe overhead disappearing on RPi5 means the **serial timing numbers are
+directly representative of realtime performance** — a major simplification for
+planning.
+
+---
+
 ## Raw timing data
 
 All CSV timing files are committed in `results/timing/`:
@@ -525,10 +798,38 @@ results/timing/x86/
 │       ├── C_num_pts_300.txt  (2776 frames)
 │       ├── D_no_slam.txt      (2776 frames)
 │       └── E_opencv_1thread.txt (2776 frames)
+├── subscribe/
+│   ├── V1_01_easy_rate1.0.txt (2800 frames)
+│   ├── V1_01_easy_rate2.0.txt (2800 frames)
+│   └── V1_01_easy_rate5.0.txt (2799 frames)
+│
+results/timing/rpi5/
+├── serial/
+│   ├── stereo/
+│   │   ├── V1_01_easy.txt              (2776 frames)
+│   │   ├── MH_03_medium.txt            (2302 frames, diverged — see note)
+│   │   ├── MH_03_medium_bagstart5.txt  (2302 frames, healthy filter)
+│   │   └── V1_03_difficult.txt         (1990 frames)
+│   ├── mono/
+│   │   ├── V1_01_easy.txt     (2799 frames)
+│   │   ├── MH_03_medium.txt   (2310 frames)
+│   │   └── V1_03_difficult.txt (2004 frames)
+│   └── sweep/
+│       ├── A_downsample.txt   (2774 frames)
+│       ├── B_num_pts_100.txt  (2776 frames)
+│       ├── C_num_pts_300.txt  (2776 frames)
+│       ├── D_no_slam.txt      (2776 frames)
+│       └── E_opencv_1thread.txt (2776 frames)
 └── subscribe/
     ├── V1_01_easy_rate1.0.txt (2800 frames)
     ├── V1_01_easy_rate2.0.txt (2800 frames)
-    └── V1_01_easy_rate5.0.txt (2799 frames)
+    └── V1_01_easy_rate5.0.txt (1369 frames, 53% dropped)
+
+results/rpi5/stereo/
+├── estimate_V1_01_easy.txt
+├── estimate_MH_03_medium_diverged.txt  (bag_start=0, diverged)
+├── estimate_MH_03_medium_bagstart5.txt (bag_start=5, healthy)
+└── estimate_V1_03_difficult.txt
 ```
 
 ## Scripts
@@ -555,11 +856,13 @@ All scripts are in the workspace root. They skip runs whose output already exist
 
 ## Next steps
 
-- **Phase 4:** Run the same benchmarks on RPi5 hardware to replace the projections
-  with real measurements. The scripts are ready to reuse.
+- **Thermal throttling:** Run sustained benchmarks (all 3 sequences back-to-back)
+  while monitoring `scaling_cur_freq` to quantify throttling impact.
+- **CPU utilization profiling:** Monitor `htop` during subscribe mode to see core
+  distribution between VIO thread, ROS2 executor, and OpenCV workers.
 - **Accuracy impact:** Run `error_singlerun` on the optimized configs (100pts,
   downsample, no SLAM) to measure the accuracy tradeoff on EuRoC V1_01.
 - **Deep profiling:** If a specific component needs sub-function analysis, use
   `perf record -g -F 999` to identify hot functions within tracking or SLAM update.
 - **Live camera:** Test with RPi5 + Raspicam2 at 30Hz to validate the 33ms budget
-  projections under real sensor conditions.
+  under real sensor conditions.
