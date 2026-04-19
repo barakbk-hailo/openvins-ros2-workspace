@@ -31,8 +31,7 @@ bash install.sh
 | [Installation](docs/installation.md) | Native build on Ubuntu 22.04 (ROS 2 Humble) |
 | [Running EuRoC](docs/running-euroc.md) | Download dataset, launch OpenVINS, visualize in RViz |
 | [Evaluation](docs/evaluation.md) | ATE/RPE benchmarks, paper comparison, reproduction script |
-| [Persistent Worker](docs/persistent-worker.md) | Subscribe-mode root-cause fix: architecture, paper comparison, benchmark results |
-| [Subscribe Reliability](docs/subscribe-reliability.md) | SLAM recovery mechanism, subscribe-mode non-determinism analysis, fork changes |
+| [Determinism](docs/determinism.md) | Subscribe-mode determinism: persistent worker thread root-cause fix + SLAM recovery safety net + other fork changes |
 | [Benchmark Analysis](docs/benchmark-analysis.md) | Paper comparison, 3-clock timing, accuracy, consistency, RPi5 projections (latest data) |
 | [Timing](docs/timing.md) | Per-component timing breakdown, config sensitivity, realtime feasibility, RPi5 projections |
 | [Docker (RPi5)](docs/docker.md) | Containerized build for Raspberry Pi 5 / Debian Trixie |

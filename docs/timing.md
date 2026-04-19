@@ -428,8 +428,8 @@ The full analysis is split across two dedicated documents:
 
 - **[Benchmark Analysis](benchmark-analysis.md)** — paper comparison (30 runs),
   3-clock timing breakdown, accuracy and consistency results, RPi5 projections
-- **[Subscribe Reliability](subscribe-reliability.md)** — root cause analysis
-  of subscribe-mode non-determinism, SLAM recovery mechanism, fork changes
+- **[Determinism](determinism.md)** — root cause analysis of subscribe-mode
+  non-determinism, persistent worker thread fix, SLAM recovery safety net
 
 ---
 

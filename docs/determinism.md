@@ -1,19 +1,125 @@
-# Persistent Worker Thread: Subscribe-Mode Root-Cause Fix
+# Subscribe-Mode Determinism
 
-## Summary
+OpenVINS has two ways to run the VIO pipeline on ROS 2: a **serial** node that
+reads a bag file sequentially (deterministic, reproduces runs bit-for-bit) and
+a **subscribe** node that receives messages over DDS (what real hardware
+deployments use). Upstream, subscribe mode was non-deterministic in ways that
+could cascade into catastrophic SLAM failure.
 
-We replaced the per-frame `std::thread` + `detach()` VIO dispatch pattern in
-`ROS2Visualizer::callback_inertial` with a single persistent worker thread that
-processes camera frames in timestamp order. This eliminates four bugs in the
-upstream code and reduces subscribe-mode wall-clock overhead from **2.0x serial**
-to **1.0x serial** (i.e., subscribe now runs at serial speed).
+This doc describes the two fork changes that fix it:
+
+1. **Persistent worker thread** — architectural root-cause fix. Replaces the
+   per-frame `std::thread` + `detach()` dispatch with a single long-lived
+   worker. Eliminates a TOCTOU race, a dangling-reference UB, and
+   non-deterministic IMU triggering. Reduces subscribe-mode overhead from
+   2× serial to 1× serial.
+2. **SLAM recovery mechanism** — defense-in-depth safety net. When the SLAM
+   feature count dips below 25% of `max_slam`, the chi-squared gate for
+   `delayed_init` is relaxed 3× so the state can recover. Rarely activates
+   with the persistent worker in place, but protects against edge cases.
+
+Both changes are on by default in this fork.
+
+---
+
+## 1. Problem: SLAM feature state collapse
+
+When running OpenVINS in subscribe mode (`run_subscribe_msckf`) **without the
+fixes described below**, the SLAM feature state can collapse to zero within
+the first ~50 frames and never recover.
+
+### What "SLAM feature state collapse" means
+
+OpenVINS maintains two types of visual features in its EKF state:
+
+- **MSCKF features**: one-shot features that are tracked across several frames, used
+  for a single EKF update when they are lost, then discarded. These provide
+  frame-to-frame motion estimates but don't persist.
+
+- **SLAM features** (up to `max_slam=50` by default): long-lived features that are
+  added to the EKF state vector as persistent landmarks. These are tracked
+  continuously and updated every frame. They anchor the trajectory over time and
+  reduce long-term drift.
+
+A feature becomes a SLAM candidate when it has been tracked for `max_clone_size`
+(11) consecutive frames, proving it is stable. The candidate is then triangulated
+and must pass a **chi-squared consistency test** in `UpdaterSLAM::delayed_init()`
+before being admitted to the state. This test checks whether the feature's
+measurements are consistent with the current state estimate — if the residuals are
+too large (indicating the state or feature position is inaccurate), the feature is
+rejected.
+
+**The collapse happens in this sequence:**
+
+1. The SLAM state fills to 50 features within the first ~15 frames (normal).
+2. Around frames 24-35, some SLAM features lose tracking and are marginalized
+   (removed from state). This is normal churn.
+3. New candidate features that would replace them **fail the chi-squared test**.
+   The residuals are slightly elevated due to the non-deterministic state drift
+   from subscribe-mode scheduling (see Root Cause below). In serial mode, these
+   same candidates would pass — the difference is within the test's margin.
+4. With features being marginalized faster than they are replaced, the SLAM state
+   empties.
+5. **The empty state is irrecoverable**: new candidates need 11 frames to mature,
+   but during that time the estimator runs on MSCKF-only mode, which drifts.
+   The increased drift makes future chi-squared tests even more likely to reject,
+   creating a feedback loop.
+6. The system runs in MSCKF-only mode for the remainder of the sequence,
+   accumulating unbounded drift — diverging by **hundreds of meters** on sequences
+   like EuRoC V2_02_medium (an 85-meter trajectory).
+
+In our pre-fix testing on V2_02, this happened in **~30% of subscribe runs** on x86
+(i7-1185G7, Ubuntu 22.04), despite the hardware easily sustaining 20 fps with
+ample headroom (20ms per frame vs 50ms budget, zero frame drops). It is a
+correctness issue, not a performance issue.
+
+Serial mode (`ros2_serial_msckf`) is unaffected — it produces identical results
+every run because it reads messages in strict timestamp order with no middleware
+non-determinism.
+
+## 2. Root cause: ROS 2 middleware non-determinism
+
+Subscribe mode introduces non-determinism through the ROS 2 middleware:
+
+1. **Variable starting frames.** The `ApproximateTime` stereo sync policy and DDS
+   publisher discovery timing cause the subscriber to receive its first frames at
+   slightly different points in the sequence across runs (up to ~50ms spread even
+   with a 5-second bag play delay).
+
+2. **IMU-triggered VIO dispatch.** The VIO update is triggered by IMU callbacks
+   (200 Hz), which check an atomic flag (`thread_update_running`) and spawn a
+   detached thread to process queued camera frames. Which specific IMU callback
+   triggers each update depends on when the previous update finished — introducing
+   per-frame variability in IMU integration boundaries.
+
+These produce small numerical differences in the state estimate. In most runs, the
+differences are harmless. But occasionally, during a critical window in the first
+~25 frames after SLAM features start being promoted, enough features fail the
+chi-squared consistency test in `UpdaterSLAM::delayed_init()` to trigger an
+irrecoverable cascade:
+
+1. SLAM features that lose tracking are marginalized
+2. New candidates that would replace them also fail the chi-squared test
+   (residuals are slightly elevated due to the state drift from fewer features)
+3. With no features entering the SLAM state, the system runs in MSCKF-only mode
+4. Without persistent SLAM landmarks to anchor the trajectory, drift accumulates
+
+---
+
+## 3. Root-cause fix: Persistent worker thread
 
 **Branch:** `persistent-worker-thread`
 **Files changed:** `ov_msckf/src/ros/ROS2Visualizer.{h,cpp}` (+86/−51 lines)
 
-## What changed architecturally
+We replaced the per-frame `std::thread` + `detach()` VIO dispatch pattern in
+`ROS2Visualizer::callback_inertial` with a single persistent worker thread that
+processes camera frames in timestamp order. This eliminates four bugs in the
+upstream code and reduces subscribe-mode wall-clock overhead from **2.0× serial**
+to **1.0× serial** (i.e., subscribe now runs at serial speed).
 
-### Before (upstream `detach()` pattern)
+### What changed architecturally
+
+#### Before (upstream `detach()` pattern)
 
 ```
   IMU callback (200 Hz, on executor thread):
@@ -36,7 +142,7 @@ to **1.0x serial** (i.e., subscribe now runs at serial speed).
     2. push frame to queue, sort
 ```
 
-### After (persistent worker thread)
+#### After (persistent worker thread)
 
 ```
   IMU callback (200 Hz, on executor thread):
@@ -74,11 +180,11 @@ Two mutexes, each protecting a distinct resource:
 Lock ordering is always A then B (worker locks `worker_mtx` first, then
 `camera_queue_mtx`), so no deadlock is possible.
 
-### Architecture diagram
+#### Architecture diagram
 
 ![Persistent worker thread architecture](persistent-worker-architecture.svg)
 
-## Bugs fixed
+### Bugs fixed
 
 | Bug | Before | After |
 |-----|--------|-------|
@@ -87,14 +193,14 @@ Lock ordering is always A then B (worker locks `worker_mtx` first, then
 | **Non-deterministic trigger** | Which IMU callback spawns the update depends on when the previous thread finished | Worker always uses the latest IMU timestamp |
 | **Thread churn** | ~20 `std::thread` create/destroy per second, each with cold cache | One persistent thread with warm cache across all frames |
 
-## Benchmark results
+### Benchmark results
 
-### Hardware
+#### Hardware
 
 - **Our system:** Intel i7-1185G7 (Tiger Lake, 4C/8T, 4.8 GHz boost), 16 GB, Ubuntu 22.04
 - **Paper (Semenova et al. 2024):** Intel i7-7500U (Kaby Lake, 2C/4T, 3.5 GHz boost), 32 GB, Ubuntu 18.04
 
-### Subscribe-mode wall-clock total (ms): old dispatch vs persistent worker
+#### Subscribe-mode wall-clock total (ms): old dispatch vs persistent worker
 
 | Sequence | Old dispatch (5 reps) | Persistent worker (5 reps) | Serial |
 |----------|----------------------|---------------------------|--------|
@@ -106,9 +212,9 @@ Lock ordering is always A then B (worker locks `worker_mtx` first, then
 
 *Source: Old dispatch from `results/timing/x86/subscribe/bench_5rep_3clock/*_{1,4}thr_run{1..5}_wall.txt`; persistent worker from `results/timing/x86/subscribe/bench_persistent_worker/*_{1,4}thr_run{1..5}_wall.txt`; serial reference from `results/timing/x86/serial/bench_persistent_worker/*_{1,4}thr_wall.txt`*
 
-Subscribe/serial ratio: **2.0x → 1.0x** (eliminated entirely).
+Subscribe/serial ratio: **2.0× → 1.0×** (eliminated entirely).
 
-### Per-component comparison with paper: V2_02, 4 OpenCV threads (ms)
+#### Per-component comparison with paper: V2_02, 4 OpenCV threads (ms)
 
 | Component | Paper¹ (sub, wall) | Old dispatch (sub, wall) | **Worker (sub, wall)** | Serial (wall) | Serial (proc CPU) |
 |-----------|-------------------|-------------------------|----------------------|--------------|-------------------|
@@ -124,7 +230,7 @@ Subscribe/serial ratio: **2.0x → 1.0x** (eliminated entirely).
 ¹ Semenova et al. 2024, Table 4 — subscribe mode, wall clock
 ² Paper combines SLAM Update + SLAM Delayed; our values shown combined for comparison
 
-### Per-component comparison with paper: V2_02, 1 OpenCV thread (ms)
+#### Per-component comparison with paper: V2_02, 1 OpenCV thread (ms)
 
 | Component | Paper¹ (sub, wall) | Old dispatch (sub, wall) | **Worker (sub, wall)** | Serial (wall) |
 |-----------|-------------------|-------------------------|----------------------|--------------|
@@ -137,7 +243,7 @@ Subscribe/serial ratio: **2.0x → 1.0x** (eliminated entirely).
 
 *Source: Paper column from Semenova et al. 2024 Table 4; Old dispatch from `results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_1thr_run*_wall.txt`; Worker from `results/timing/x86/subscribe/bench_persistent_worker/V2_02_medium_1thr_run*_wall.txt`; Serial from `results/timing/x86/serial/bench_persistent_worker/V2_02_medium_1thr_wall.txt`*
 
-### Cross-run variability (subscribe, wall clock, 5 repetitions)
+#### Cross-run variability (subscribe, wall clock, 5 repetitions)
 
 | Sequence | Config | Mean (ms) | Std (ms) | CV | Range (ms) |
 |----------|--------|----------|---------|-----|-----------|
@@ -152,7 +258,7 @@ Subscribe/serial ratio: **2.0x → 1.0x** (eliminated entirely).
 
 All configurations have CV < 1.3%. The old dispatch had CV up to 5% on MH_03.
 
-### SLAM feature health (avg features in state, max_slam=50)
+#### SLAM feature health (avg features in state, max_slam=50)
 
 | Sequence | Serial | Worker subscribe (5 reps) | Old dispatch subscribe (5 reps) |
 |----------|--------|--------------------------|-------------------------------|
@@ -165,7 +271,7 @@ All configurations have CV < 1.3%. The old dispatch had CV up to 5% on MH_03.
 Subscribe SLAM health now matches serial within <1 feature. The old dispatch had
 a worst case of 26.0 on MH_03 (partial SLAM dip).
 
-### ATE — Absolute Trajectory Error (posyaw alignment)
+#### ATE — Absolute Trajectory Error (posyaw alignment)
 
 **Position RMSE (meters) across all runs:**
 
@@ -200,7 +306,7 @@ final position is correct).
 
 *Source: derived from the Position RMSE table above — same `*_est.txt` files under `results/timing/x86/{serial,subscribe}/bench_persistent_worker/`.*
 
-### RPE — Relative Pose Error (median position, meters)
+#### RPE — Relative Pose Error (median position, meters)
 
 RPE measures local consistency over trajectory segments. Serial vs subscribe
 run 1 comparison (4-thread):
@@ -244,21 +350,21 @@ run 1 comparison (4-thread):
 RPE deltas are <0.05m across all segments and sequences — subscribe local
 consistency matches serial.
 
-### Process CPU reveals OpenCV parallelism cost (V2_02, 4-thr)
+#### Process CPU reveals OpenCV parallelism cost (V2_02, 4-thr)
 
 | Mode | Wall | Proc CPU | Thread | CPU/Wall |
 |------|------|----------|--------|----------|
-| Serial | 11.2 | **17.8** | 11.1 | **1.59x** |
-| Subscribe (worker) | 10.4 | **16.6** | 10.4 | **1.60x** |
-| Subscribe (old dispatch) | 20.8 | **37.0** | 20.6 | **1.78x** |
+| Serial | 11.2 | **17.8** | 11.1 | **1.59×** |
+| Subscribe (worker) | 10.4 | **16.6** | 10.4 | **1.60×** |
+| Subscribe (old dispatch) | 20.8 | **37.0** | 20.6 | **1.78×** |
 
 *Source: Serial from `results/timing/x86/serial/bench_persistent_worker/V2_02_medium_4thr_{wall,cpu,thread}.txt`; Subscribe worker from `results/timing/x86/subscribe/bench_persistent_worker/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`; Subscribe old-dispatch from `results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`*
 
-CPU/Wall is now identical between serial and subscribe (1.59–1.60x) — purely the
-OpenCV KLT thread pool. The old dispatch had 1.78x because executor threads burned
+CPU/Wall is now identical between serial and subscribe (1.59–1.60×) — purely the
+OpenCV KLT thread pool. The old dispatch had 1.78× because executor threads burned
 extra CPU during per-frame thread churn.
 
-### RPi5 projections
+#### RPi5 projections
 
 | Sequence | x86 serial | x86 subscribe (worker) | RPi5 serial (×3.5) | Budget (20 Hz) |
 |----------|-----------|----------------------|-------------------|---------------|
@@ -269,6 +375,131 @@ extra CPU during per-frame thread churn.
 *Source: x86 serial from `results/timing/x86/serial/bench_persistent_worker/*_4thr_wall.txt`; x86 subscribe (worker) from `results/timing/x86/subscribe/bench_persistent_worker/*_4thr_run{1..5}_wall.txt`; RPi5 column is a ×3.5 projection, not measured.*
 
 Since subscribe now matches serial, the RPi5 projection for subscribe mode is the
-same as serial: **~40ms, within the 50ms budget**. Previously, the 2x subscribe
+same as serial: **~40ms, within the 50ms budget**. Previously, the 2× subscribe
 overhead projected to ~74ms (over budget), requiring aggressive config optimization.
 With the persistent worker, the default config may work on RPi5 without changes.
+
+Actual RPi5 measurements confirming this projection are in
+[rpi5-benchmarking.md](rpi5-benchmarking.md).
+
+---
+
+## 4. Defense-in-depth: SLAM recovery mechanism
+
+The persistent worker thread removes the architectural cause of the SLAM
+collapse. The SLAM recovery mechanism below remains as a safety net. With the
+persistent worker in place, it rarely activates — but it protects against edge
+cases where SLAM features might dip due to other factors (difficult sequences,
+sensor noise, real hardware timing).
+
+**File:** `ov_msckf/src/core/VioManager.cpp` (before the `updaterSLAM->delayed_init()` call)
+
+When the SLAM feature count drops below `max_slam / 4` (default: 12 out of 50),
+the chi-squared multiplier for `delayed_init` is temporarily increased by 3×. This
+relaxes the consistency gate, allowing features to enter the SLAM state even if
+their residuals are slightly elevated from drift during the low-feature period.
+Once the SLAM state recovers above the threshold, the gate returns to the
+configured value.
+
+```cpp
+// SLAM recovery: relax chi-squared gate when SLAM state is critically low
+double original_chi2 = updaterSLAM->_options_slam.chi2_multipler;
+int slam_recovery_threshold = state->_options.max_slam_features / 4;
+if (state->_options.max_slam_features > 0 &&
+    (int)state->_features_SLAM.size() < slam_recovery_threshold) {
+  updaterSLAM->_options_slam.chi2_multipler = original_chi2 * 3.0;
+}
+updaterSLAM->delayed_init(state, feats_slam_DELAYED);
+updaterSLAM->_options_slam.chi2_multipler = original_chi2;
+```
+
+This is a conservative change:
+- Only activates when the SLAM state is critically low (<25% of max)
+- Only affects the `delayed_init` gate, not the SLAM update itself
+- Automatically deactivates once features recover
+- Does not change behavior in serial mode (SLAM state never drops that low)
+
+### Validation
+
+#### Initial validation (V2_02_medium, 10 runs)
+
+Tested on V2_02_medium, stereo, 10 subscribe runs (5 × 4-thread + 5 × 1-thread),
+compared against a clean baseline without the recovery mechanism:
+
+| Metric | Without recovery | With recovery |
+|--------|-----------------|---------------|
+| Degradation rate | 3/10 (30%) | **0/10 (0%)** |
+| ATE failures (diverged) | 1/10 | **0/10** |
+| Avg SLAM feature range | 2.3 - 36.2 | **34.0 - 36.0** |
+| ATE position RMSE range | 2.088m - FAILED | **2.089 - 2.102m** |
+| Serial ATE reference | 2.101m | 2.099m |
+
+*Source: ad-hoc 10-run V2_02_medium baseline (pre-recovery debugging); the numbers are preserved here for the regression comparison but the raw CSVs were superseded by `results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_*_run{1..5}_{est,feats}.txt` (with recovery enabled).*
+
+#### Full benchmark (3 sequences × 5 reps, 30 runs total)
+
+Validated across V1_01_easy, MH_03_medium, and V2_02_medium with 5 repetitions
+per configuration (see [benchmark-analysis.md](benchmark-analysis.md) for details):
+
+| Metric | Result |
+|--------|--------|
+| Total subscribe runs | 30 |
+| SLAM collapses | **0** |
+| ATE within 0.02m of serial | **All runs** (where ov_eval didn't crash) |
+| RPE (8m) within 0.07m of serial | **All runs** |
+| Worst-case SLAM dip | MH_03 avg SLAM = 26.0 (still produced ATE within 0.004m and RPE within 0.13m of serial) |
+
+*Source: `results/timing/x86/subscribe/bench_5rep_3clock/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_{est,feats}.txt` vs `results/timing/x86/serial/bench_5rep_3clock/*_{1,4}thr_{est,feats}.txt`; see [benchmark-analysis.md](benchmark-analysis.md) for per-run numbers.*
+
+The recovery mechanism maintains accuracy identical to serial mode as measured by
+both global trajectory error (ATE) and local consistency (RPE at 8-40m segments).
+
+---
+
+## 5. Other fork changes
+
+These changes were made alongside the determinism work:
+
+### Configurable `multi_threading_subs`
+
+**File:** `ov_msckf/src/run_subscribe_msckf.cpp`
+
+The upstream code hardcodes `params.use_multi_threading_subs = true` after loading
+the config, making it impossible to change via YAML. We removed this override so
+the value can be set in `estimator_config.yaml` via the `multi_threading_subs` key
+(default: `true`, preserving the original behavior).
+
+### Trajectory output launch arguments
+
+**Files:** `ov_msckf/launch/subscribe.launch.py`, `ov_msckf/launch/serial.launch.py`
+
+Added `filepath_est` and `filepath_std` as declared launch arguments (defaulting
+to `/tmp/ov_estimate.txt` and `/tmp/ov_estimate_std.txt`). The upstream launch
+files declare `save_total_state` but not the file paths, causing
+`boost::filesystem::create_directories` to fail on the default relative path.
+
+### Timing and diagnostic instrumentation
+
+**Files:** `VioManager.cpp`, `VioManager.h`, `VioManagerOptions.h`, `estimator_config.yaml`
+
+Added optional per-frame recording of:
+- Process CPU time (`CLOCK_PROCESS_CPUTIME_ID`)
+- Thread CPU time (`CLOCK_THREAD_CPUTIME_ID`)
+- Feature counts (SLAM features in state, MSCKF features used, delayed-init
+  candidates, clone count)
+
+All disabled by default. Enable via YAML:
+```yaml
+record_timing_cpu_time: true
+record_timing_thread_time: true
+record_feature_counts: true
+```
+
+### Script zombie cleanup
+
+**File:** `run_full_benchmark.sh`, `run_timing_subscribe.sh`
+
+Subscribe test scripts now kill any stale `run_subscribe_msckf` processes before
+and after each run. Stale nodes on the same DDS domain steal messages from active
+subscribers, causing non-deterministic data loss — a critical issue we discovered
+during testing that invalidated several earlier measurement batches.
