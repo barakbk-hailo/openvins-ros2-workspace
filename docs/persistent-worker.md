@@ -155,13 +155,72 @@ All configurations have CV < 1.3%. The old dispatch had CV up to 5% on MH_03.
 Subscribe SLAM health now matches serial within <1 feature. The old dispatch had
 a worst case of 26.0 on MH_03 (partial SLAM dip).
 
-### ATE accuracy (meters, posyaw alignment)
+### ATE — Absolute Trajectory Error (posyaw alignment)
 
-| Sequence | Serial | Worker subscribe (5 reps) | Max deviation from serial |
-|----------|--------|--------------------------|--------------------------|
-| V1_01_easy | 1.946 | 1.943, 1.943, 1.944, 1.945, 1.946 | **0.003m** |
-| MH_03_medium | 3.450 | 3.440, 3.441, 3.441, 3.441, 3.445 | **0.010m** |
-| V2_02_medium | 2.099 | 2.091, 2.094, 2.097, 2.101, 2.102 | **0.008m** |
+**Position RMSE (meters) across all runs:**
+
+| Sequence | Serial | Sub 4-thr run 1 | run 2 | run 3 | run 4 | run 5 | Sub 1-thr run 1 | run 2 | run 3 | run 4 | run 5 |
+|----------|--------|-----------------|-------|-------|-------|-------|-----------------|-------|-------|-------|-------|
+| V1_01_easy | 1.946 | 1.943 | 1.944 | 1.945 | 1.943 | 1.945 | 1.945 | 1.946 | 1.945 | 1.945 | 1.946 |
+| MH_03_medium | 3.450 | 3.441 | 3.442 | 3.441 | 3.441 | 3.445 | 3.441 | 3.441 | 3.440 | 3.441 | 3.441 |
+| V2_02_medium | 2.099 | 2.101 | 2.098 | 2.094 | ov_eval¹ | 2.102 | 2.091 | 2.091 | 2.092 | 2.102 | 2.097 |
+
+¹ ov_eval NaN assertion crash on a healthy trajectory (tool bug, not a divergence —
+final position is correct).
+
+**Orientation RMSE (millidegrees) across all runs:**
+
+| Sequence | Serial | Sub 4-thr (5 reps) | Sub 1-thr (5 reps) |
+|----------|--------|-------------------|-------------------|
+| V1_01_easy | 134.6 | 134.9, 134.9, 134.6, 134.8, 134.9 | 134.6, 134.9, 134.7, 135.5, 134.9 |
+| MH_03_medium | 147.2 | 146.0, 148.9, 146.8, 145.3, 145.7 | 147.1, 146.5, 146.8, 145.9, 146.6 |
+| V2_02_medium | 122.4 | 122.6, 122.9, 122.3, —¹, 122.5 | 123.1, 122.9, 122.9, 122.7, 122.7 |
+
+**Cross-run variability summary:**
+
+| Sequence | Serial ATE pos | Subscribe ATE pos range | Max deviation | Subscribe ATE pos std |
+|----------|---------------|------------------------|---------------|----------------------|
+| V1_01_easy | 1.946m | 1.943 – 1.946m | **0.003m** | **0.001m** |
+| MH_03_medium | 3.450m | 3.440 – 3.445m | **0.010m** | **0.002m** |
+| V2_02_medium | 2.099m | 2.091 – 2.102m | **0.008m** | **0.004m** |
+
+### RPE — Relative Pose Error (median position, meters)
+
+RPE measures local consistency over trajectory segments. Serial vs subscribe
+run 1 comparison (4-thread):
+
+**V1_01_easy:**
+
+| Segment | Serial | Subscribe | Delta |
+|---------|--------|-----------|-------|
+| 8m | 3.222 | 3.202 | 0.020 |
+| 16m | 2.832 | 2.826 | 0.006 |
+| 24m | 2.874 | 2.873 | 0.001 |
+| 32m | 2.458 | 2.434 | 0.024 |
+| 40m | 2.378 | 2.363 | 0.015 |
+
+**MH_03_medium:**
+
+| Segment | Serial | Subscribe | Delta |
+|---------|--------|-----------|-------|
+| 8m | 5.675 | 5.663 | 0.012 |
+| 16m | 3.531 | 3.534 | 0.003 |
+| 24m | 4.884 | 4.893 | 0.009 |
+| 32m | 5.362 | 5.391 | 0.029 |
+| 40m | 3.442 | 3.438 | 0.004 |
+
+**V2_02_medium:**
+
+| Segment | Serial | Subscribe | Delta |
+|---------|--------|-----------|-------|
+| 8m | 2.861 | 2.870 | 0.009 |
+| 16m | 3.234 | 3.230 | 0.004 |
+| 24m | 2.710 | 2.682 | 0.028 |
+| 32m | 3.215 | 3.171 | 0.044 |
+| 40m | 3.032 | 3.029 | 0.003 |
+
+RPE deltas are <0.05m across all segments and sequences — subscribe local
+consistency matches serial.
 
 ### Process CPU reveals OpenCV parallelism cost (V2_02, 4-thr)
 
