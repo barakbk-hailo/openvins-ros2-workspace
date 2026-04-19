@@ -199,6 +199,8 @@ re-run).
 | re-tri & marg | 1.5 (p99: 1.9, max: 2.7) | 1.5 (p99: 2.1, max: 2.8) | 1.5 (p99: 1.9, max: 2.5) |
 | **total** | **11.3** (p99: 22.7, max: 30.2) | **10.5** (p99: 22.5, max: 30.9) | **9.5** (p99: 20.5, max: 26.0) |
 
+*Source: `results/timing/x86/serial/stereo/{V1_01_easy,MH_03_medium,V1_03_difficult}.txt`*
+
 Frames processed: V1_01=2776, MH_03=2302, V1_03=1990 (out of 2912 in each bag;
 the difference is from the initialization period where no timing is recorded, plus
 stereo sync misses where no matching pair was found within ±20ms)
@@ -214,6 +216,8 @@ stereo sync misses where no matching pair was found within ±20ms)
 | slam delayed | 0.6 (p99: 3.4, max: 6.7) | 0.8 (p99: 4.2, max: 9.8) | 1.1 (p99: 5.7, max: 13.8) |
 | re-tri & marg | 1.0 (p99: 1.5, max: 4.4) | 1.0 (p99: 1.5, max: 2.0) | 0.9 (p99: 1.3, max: 3.8) |
 | **total** | **8.2** (p99: 13.1, max: 16.8) | **7.7** (p99: 12.8, max: 16.0) | **6.9** (p99: 13.6, max: 24.0) |
+
+*Source: `results/timing/x86/serial/mono/{V1_01_easy,MH_03_medium,V1_03_difficult}.txt`*
 
 Frames processed: V1_01=2799, MH_03=2310, V1_03=2004
 
@@ -279,6 +283,8 @@ Cleans up the temp file after all runs.
 | **C: 300 features** | 3.3 | 0.2 | 3.5 | 4.6 | 1.0 | 1.8 | **14.3** | **22.6** | **33.4** |
 | **D: No SLAM** | 2.5 | 0.1 | 3.2 | — | — | 1.5 | **7.4** | **14.6** | **20.7** |
 | **E: 1 OpenCV thread** | 3.7 | 0.2 | 1.6 | 4.5 | 0.9 | 1.4 | **12.3** | **20.5** | **34.7** |
+
+*Source: `results/timing/x86/serial/sweep/{A_downsample,B_num_pts_100,C_num_pts_300,D_no_slam,E_opencv_1thread}.txt`; baseline row from `results/timing/x86/serial/stereo/V1_01_easy.txt`*
 
 ### Phase 2 findings — impact ranking
 
@@ -356,6 +362,8 @@ frames.
 | 5.0x | 2799 | 113 | 3.9% |
 | Serial (reference) | 2776 | 136 | 4.7% |
 
+*Source: `results/timing/x86/subscribe/V1_01_easy_rate{1.0,2.0,5.0}.txt`; serial reference from `results/timing/x86/serial/stereo/V1_01_easy.txt`*
+
 The ~112-136 "missing" frames are **NOT performance-related drops**. They come from:
 1. The initialization period (first ~2s before VIO converges, no timing is recorded)
 2. Stereo sync misses (serial uses a strict +/-20ms window; subscribe uses ROS2's
@@ -379,6 +387,8 @@ performance-related. **x86 has zero real frame drops even at 5x realtime.**
 | slam delayed | 0.9 | 1.2 | 1.3 | 0.5 |
 | re-tri & marg | 1.5 | 1.8 | 1.7 | 1.6 |
 | **total** | **11.3** | **20.9** | **13.9** | **5.7** |
+
+*Source: `results/timing/x86/subscribe/V1_01_easy_rate{1.0,2.0,5.0}.txt`; serial column from `results/timing/x86/serial/stereo/V1_01_easy.txt`*
 
 ### Phase 3 findings
 
@@ -513,6 +523,8 @@ Total: 11.3ms per frame
 | Reduce OpenCV threads | +9% | Modest. Not worth worrying about. |
 | Increase features to 300 | +27% | Diminishing returns. Avoid. |
 
+*Source: derived from `results/timing/x86/serial/{stereo/V1_01_easy.txt,mono/V1_01_easy.txt,sweep/*.txt}`*
+
 ### Recommended RPi5 starting configs (to be validated in Phase 4)
 
 1. **Conservative:** Mono, downsample, 100 features, no SLAM -> est. ~26ms subscribe
@@ -544,6 +556,8 @@ Total: 11.3ms per frame
 | re-tri & marg | 5.1 (p99: 6.5, max: 20.3) | 4.9 (p99: 6.1, max: 12.4) | 5.2 (p99: 6.5, max: 11.2) |
 | **total** | **24.2** (p99: 38.8, max: 64.5) | **22.0** (p99: 36.4, max: 59.3) | **21.6** (p99: 35.4, max: 61.4) |
 
+*Source: `results/timing/rpi5/serial/stereo/{V1_01_easy,MH_03_medium_bagstart5,V1_03_difficult}.txt`*
+
 Frames processed: V1_01=2776, MH_03=2302, V1_03=1990 (same as x86)
 
 **Note on MH_03:** The default run (`bag_start=0`) causes the stereo filter to
@@ -564,6 +578,8 @@ times (14.5ms total) because the filter runs idle with near-zero SLAM/MSCKF upda
 | re-tri & marg | 3.2 (p99: 4.1, max: 10.1) | 3.1 (p99: 4.0, max: 8.7) | 2.9 (p99: 4.1, max: 20.8) |
 | **total** | **17.1** (p99: 25.3, max: 51.8) | **15.8** (p99: 24.9, max: 51.0) | **15.0** (p99: 25.4, max: 44.5) |
 
+*Source: `results/timing/rpi5/serial/mono/{V1_01_easy,MH_03_medium,V1_03_difficult}.txt`*
+
 Frames processed: V1_01=2799, MH_03=2310, V1_03=2004
 
 ### Phase 4 timing findings: x86 vs RPi5
@@ -578,6 +594,8 @@ Frames processed: V1_01=2799, MH_03=2310, V1_03=2004
 | Mono | V1_01_easy | 8.2 | 17.1 | 2.1x |
 | Mono | MH_03_medium | 7.7 | 15.8 | 2.1x |
 | Mono | V1_03_difficult | 6.9 | 15.0 | 2.2x |
+
+*Source: derived from `results/timing/{x86,rpi5}/serial/{stereo,mono}/*.txt`*
 
 **Actual slowdown: 2.1-2.3x** — significantly better than the 3.5x projection from
 Phase 3. The Cortex-A76 cores are more capable than estimated, especially for the
@@ -594,6 +612,8 @@ matrix-heavy EKF updates.
 | slam delayed | 1.8x | Triangulation + state augmentation |
 | re-tri & marg | **3.4x** | Cache-bound: 2MB L2 (RPi5) vs 12MB L3 (x86) |
 
+*Source: derived from `results/timing/{x86,rpi5}/serial/stereo/*.txt` (averaged across sequences)*
+
 The re-triangulation & marginalization component scales worst (3.4x). This step
 iterates over all active features and the full covariance matrix, making it sensitive
 to cache size. The SLAM and MSCKF EKF updates (dense matrix math) scale best at
@@ -605,6 +625,8 @@ to cache size. The SLAM and MSCKF EKF updates (dense matrix math) scale best at
 |----------|---------------|---------------|--------------------|--------------------|
 | Stereo baseline | 24.2 | 38.8 | OK | p99 exceeds |
 | Mono baseline | 17.1 | 25.3 | OK | OK |
+
+*Source: `results/timing/rpi5/serial/{stereo,mono}/V1_01_easy.txt`*
 
 Serial mode is comfortably within the 20Hz budget. Mono at 30Hz has ~8ms headroom
 at p99. Subscribe mode (not yet measured on RPi5) will add ROS2 middleware overhead —
@@ -624,6 +646,8 @@ All runs are stereo, serial mode, default config (200 features, max_slam=50).
 | MH_03_medium (bag_start=5) | 1.164 | 1.031 | 0.089 | 0.116 |
 | V1_03_difficult | 2.861 | 2.818 | 0.058 | 0.063 |
 
+*Source: x86 from `results/stereo/estimate_{V1_01_easy,MH_03_medium,MH_03_medium_bagstart5,V1_03_difficult}.txt`; RPi5 from `results/rpi5/stereo/estimate_{V1_01_easy,MH_03_medium_diverged,MH_03_medium_bagstart5,V1_03_difficult}.txt`*
+
 #### Relative Pose Error (median orientation / median position)
 
 | Segment | V1_01 x86 | V1_01 RPi5 | MH_03 x86 (skip5) | MH_03 RPi5 (skip5) | V1_03 x86 | V1_03 RPi5 |
@@ -633,6 +657,8 @@ All runs are stereo, serial mode, default config (200 features, max_slam=50).
 | seg 24 | 0.467 / 0.047 | 0.564 / 0.062 | 0.494 / 0.121 | 0.527 / 0.144 | 1.306 / 0.114 | 1.109 / 0.117 |
 | seg 32 | 0.565 / 0.051 | 0.702 / 0.067 | 0.709 / 0.140 | 0.604 / 0.158 | — | 1.116 / 0.135 |
 | seg 40 | 0.600 / 0.038 | 0.495 / 0.068 | 0.761 / 0.138 | 0.678 / 0.184 | — | 1.100 / 0.132 |
+
+*Source: x86 from `results/stereo/estimate_{V1_01_easy,MH_03_medium_bagstart5,V1_03_difficult}.txt`; RPi5 from `results/rpi5/stereo/estimate_{V1_01_easy,MH_03_medium_bagstart5,V1_03_difficult}.txt`*
 
 #### Accuracy findings
 
@@ -677,6 +703,8 @@ Same 5 config variants as Phase 2, run on V1_01_easy (stereo, serial mode) on RP
 | **D: No SLAM** | 8.2 | 0.2 | 5.3 | — | — | 5.3 | **19.1** | **32.3** | **53.8** |
 | **E: 1 OpenCV thread** | 10.6 | 0.5 | 2.9 | 7.4 | 1.7 | 5.6 | **28.6** | **43.1** | **64.8** |
 
+*Source: `results/timing/rpi5/serial/sweep/{A_downsample,B_num_pts_100,C_num_pts_300,D_no_slam,E_opencv_1thread}.txt`; baseline row from `results/timing/rpi5/serial/stereo/V1_01_easy.txt`*
+
 ### RPi5 sweep findings vs x86
 
 | Variant | x86 total (ms) | RPi5 total (ms) | x86 savings | RPi5 savings | Ratio |
@@ -687,6 +715,8 @@ Same 5 config variants as Phase 2, run on V1_01_easy (stereo, serial mode) on RP
 | C: 300 features | 14.3 (+27%) | 33.1 (**+37%**) | +27% | **+37%** | 2.3x |
 | D: No SLAM | 7.4 (-35%) | 19.1 (**-21%**) | -35% | **-21%** | 2.6x |
 | E: 1 OpenCV thread | 12.3 (+9%) | 28.6 (**+18%**) | +9% | **+18%** | 2.3x |
+
+*Source: derived from `results/timing/{x86,rpi5}/serial/sweep/*.txt` + `results/timing/{x86,rpi5}/serial/stereo/V1_01_easy.txt`*
 
 Key differences vs x86:
 
@@ -720,6 +750,8 @@ Key differences vs x86:
 | No SLAM | -5.1ms (-21%) | 19.1ms | 32.3ms | OK |
 | Combined (downsample + 100pts) | est. -10ms | ~14ms | ~22ms | comfortable at 30Hz |
 
+*Source: `results/timing/rpi5/serial/sweep/{A_downsample,B_num_pts_100,D_no_slam}.txt` (combined row is estimated, not measured)*
+
 ---
 
 ## Phase 4c: RPi5 subscribe mode
@@ -734,6 +766,8 @@ on V1_01_easy (stereo).
 | 1.0x (realtime) | 2800 | 112 | 3.8% | Same as x86 — init/sync, not perf |
 | 2.0x | 2800 | 112 | 3.8% | No real drops |
 | 5.0x | **1369** | **1543** | **53.0%** | **Real performance drops** |
+
+*Source: `results/timing/rpi5/subscribe/V1_01_easy_rate{1.0,2.0,5.0}.txt`*
 
 On x86, all three rates processed ~2800 frames (zero real drops even at 5x). On
 RPi5, 1x and 2x are fine but **5x causes 53% frame loss** — the VIO pipeline
@@ -750,6 +784,8 @@ cannot keep up at 100Hz effective camera rate.
 | slam delayed | 1.6 | 1.7 | 0.9 | 0.6 |
 | re-tri & marg | 5.1 | 4.9 | 5.0 | 6.3 |
 | **total** | **24.2** | **24.1** | **14.5** | **19.3** |
+
+*Source: `results/timing/rpi5/subscribe/V1_01_easy_rate{1.0,2.0,5.0}.txt`; serial column from `results/timing/rpi5/serial/stereo/V1_01_easy.txt`*
 
 ### Phase 4c findings
 
@@ -777,6 +813,8 @@ cannot keep up at 100Hz effective camera rate.
    | Stereo + downsample (est.) | ~19 | ~29 | OK | **OK** |
    | Mono baseline (est.) | ~17 | ~25 | OK | OK |
 
+   *Source: `results/timing/rpi5/subscribe/V1_01_easy_rate1.0.txt`; downsample/mono rows projected from `results/timing/rpi5/serial/{sweep/A_downsample.txt,mono/V1_01_easy.txt}`*
+
    **Stereo at 20Hz is realtime-feasible on RPi5** — subscribe mode adds negligible
    overhead unlike on x86. For 30Hz (live USB camera), downsample or mono is needed.
 
@@ -787,6 +825,8 @@ cannot keep up at 100Hz effective camera rate.
 | Total (ms) | 20.9 | 24.1 | 1.15x |
 | Subscribe overhead vs serial | **1.85x** | **1.00x** | — |
 | Frames at 5x | 2799 | 1369 | 2.0x drop |
+
+*Source: `results/timing/{x86,rpi5}/subscribe/V1_01_easy_rate{1.0,5.0}.txt` + `results/timing/{x86,rpi5}/serial/stereo/V1_01_easy.txt`*
 
 The subscribe overhead disappearing on RPi5 means the **serial timing numbers are
 directly representative of realtime performance** — a major simplification for

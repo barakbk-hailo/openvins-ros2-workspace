@@ -168,6 +168,8 @@ The trajectory estimates used to produce these tables are committed in
 | V2_02_medium | 1.212 / 0.051 | **1.151 / 0.048** |
 | **Average** | **1.303 / 0.053** | **1.454 / 0.055** |
 
+*Source: `results/stereo/estimate_{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}.txt` vs ground truth in `src/open_vins/ov_data/euroc_mav/*.txt`; paper column from Geneva et al. ICRA 2020 Table II (`stereo_ov_vio`).*
+
 **ATE RMSE — mono (Table II: `mono_ov_vio`)**
 
 | Sequence | Ours — deg / m | Paper — deg / m |
@@ -179,6 +181,8 @@ The trajectory estimates used to produce these tables are committed in
 | V2_02_medium | 1.477 / **0.078** | **1.248** / 0.106 |
 | **Average** | 1.553 / **0.087** | **1.442** / 0.149 |
 
+*Source: `results/mono/estimate_{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}_mono.txt` vs ground truth in `src/open_vins/ov_data/euroc_mav/*.txt`; paper column from Geneva et al. ICRA 2020 Table II (`mono_ov_vio`).*
+
 **Stereo vs mono — our results:**
 
 | Sequence | Stereo — deg / m | Mono — deg / m |
@@ -189,6 +193,8 @@ The trajectory estimates used to produce these tables are committed in
 | V2_01_easy | **1.250 / 0.063** | 1.314 / 0.163 |
 | V2_02_medium | **1.212 / 0.051** | 1.477 / 0.078 |
 | **Average** | **1.303 / 0.053** | 1.553 / 0.087 |
+
+*Source: derived from `results/stereo/estimate_{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}.txt` and `results/mono/estimate_*_mono.txt`.*
 
 Stereo wins on position in every sequence (0.053 m vs 0.087 m average), as
 expected from the fixed stereo baseline providing direct scale observability.
@@ -220,6 +226,8 @@ custom segment lengths (included in our fork).
 | 40 m | **1.116 / 0.087** | 1.342 / 0.101 |
 | 48 m | **1.223 / 0.092** | 1.489 / 0.106 |
 
+*Source: `results/stereo/estimate_{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}.txt` (averaged across the 5 Vicon sequences, excluding V2_01 for 40m/48m); paper column from Geneva et al. ICRA 2020 Table III (`stereo_ov_vio`).*
+
 *Mono:*
 
 | Segment | Ours — deg / m | Paper `mono_ov_vio` — deg / m |
@@ -230,6 +238,8 @@ custom segment lengths (included in our fork).
 | 32 m | 1.346 / 0.188 | **1.283 / 0.132** |
 | 40 m | **1.116 / 0.135** | 1.342 / 0.151 |
 | 48 m | **1.224 / 0.120** | 1.425 / 0.184 |
+
+*Source: `results/mono/estimate_{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}_mono.txt` (averaged across the 5 Vicon sequences, excluding V2_01 for 40m/48m); paper column from Geneva et al. ICRA 2020 Table III (`mono_ov_vio`).*
 
 <details>
 <summary>RPE per sequence (click to expand)</summary>
@@ -245,6 +255,8 @@ custom segment lengths (included in our fork).
 | 40 m | 0.600 / 0.038 | 0.811 / 0.136 |
 | 48 m | 0.670 / 0.050 | 0.658 / 0.130 |
 
+*Source: `results/stereo/estimate_V1_01_easy.txt`, `results/mono/estimate_V1_01_easy_mono.txt`.*
+
 *V1_02_medium:*
 
 | Segment | Stereo — deg / m | Mono — deg / m |
@@ -255,6 +267,8 @@ custom segment lengths (included in our fork).
 | 32 m | 0.847 / 0.076 | 0.637 / 0.100 |
 | 40 m | 1.262 / 0.122 | 0.678 / 0.132 |
 | 48 m | 1.204 / 0.124 | 0.704 / 0.103 |
+
+*Source: `results/stereo/estimate_V1_02_medium.txt`, `results/mono/estimate_V1_02_medium_mono.txt`.*
 
 *V1_03_difficult:*
 
@@ -267,6 +281,8 @@ custom segment lengths (included in our fork).
 | 40 m | 1.202 / 0.123 | 1.235 / 0.156 |
 | 48 m | 1.486 / 0.105 | 1.399 / 0.136 |
 
+*Source: `results/stereo/estimate_V1_03_difficult.txt`, `results/mono/estimate_V1_03_difficult_mono.txt`.*
+
 *V2_01_easy:*
 
 | Segment | Stereo — deg / m | Mono — deg / m |
@@ -278,6 +294,8 @@ custom segment lengths (included in our fork).
 | 40 m | — | — |
 | 48 m | — | — |
 
+*Source: `results/stereo/estimate_V2_01_easy.txt`, `results/mono/estimate_V2_01_easy_mono.txt` (trajectory too short for 40 m / 48 m segments).*
+
 *V2_02_medium:*
 
 | Segment | Stereo — deg / m | Mono — deg / m |
@@ -288,6 +306,8 @@ custom segment lengths (included in our fork).
 | 32 m | 1.418 / 0.065 | 1.615 / 0.109 |
 | 40 m | 1.399 / 0.064 | 1.740 / 0.115 |
 | 48 m | 1.531 / 0.091 | 2.133 / 0.111 |
+
+*Source: `results/stereo/estimate_V2_02_medium.txt`, `results/mono/estimate_V2_02_medium_mono.txt`.*
 
 </details>
 
@@ -308,6 +328,8 @@ excluded.
 | MH_04_difficult | diverged | diverged |
 | MH_05_difficult | 0.858 / 0.213 | 0.873 / 0.496 |
 
+*Source: `results/stereo/estimate_MH_{01,02,03,04,05}_*.txt` and `results/mono/estimate_MH_{01,02,03,04,05}_*_mono.txt` vs `src/open_vins/ov_data/euroc_mav/MH_*.txt`.*
+
 **RPE — Machine Hall average (excluding MH_04)**
 
 *Stereo:*
@@ -321,6 +343,8 @@ excluded.
 | 40 m | 1.469 / 0.258 |
 | 48 m | 1.651 / 0.287 |
 
+*Source: `results/stereo/estimate_MH_{01_easy,02_easy,03_medium,05_difficult}.txt` (MH_04 excluded — diverged).*
+
 *Mono:*
 
 | Segment | deg / m |
@@ -331,6 +355,8 @@ excluded.
 | 32 m | 1.165 / 0.314 |
 | 40 m | 1.370 / 0.373 |
 | 48 m | 1.435 / 0.426 |
+
+*Source: `results/mono/estimate_MH_{01_easy,02_easy,03_medium,05_difficult}_mono.txt` (MH_04 excluded — diverged).*
 
 <details>
 <summary>RPE per MH sequence (click to expand)</summary>
@@ -346,6 +372,8 @@ excluded.
 | 40 m | 2.568 / 0.217 | 1.717 / 0.123 |
 | 48 m | 2.928 / 0.239 | 1.990 / 0.148 |
 
+*Source: `results/stereo/estimate_MH_01_easy.txt`, `results/mono/estimate_MH_01_easy_mono.txt`.*
+
 *MH_02_easy:*
 
 | Segment | Stereo — deg / m | Mono — deg / m |
@@ -356,6 +384,8 @@ excluded.
 | 32 m | 1.192 / 0.264 | 1.744 / 0.164 |
 | 40 m | 1.345 / 0.303 | 2.186 / 0.284 |
 | 48 m | 1.450 / 0.360 | 2.225 / 0.281 |
+
+*Source: `results/stereo/estimate_MH_02_easy.txt`, `results/mono/estimate_MH_02_easy_mono.txt`.*
 
 *MH_03_medium:*
 
@@ -368,6 +398,8 @@ excluded.
 | 40 m | 0.926 / 0.153 | 0.670 / 0.206 |
 | 48 m | 1.044 / 0.199 | 0.781 / 0.270 |
 
+*Source: `results/stereo/estimate_MH_03_medium.txt`, `results/mono/estimate_MH_03_medium_mono.txt`.*
+
 *MH_05_difficult:*
 
 | Segment | Stereo — deg / m | Mono — deg / m |
@@ -378,6 +410,8 @@ excluded.
 | 32 m | 0.858 / 0.336 | 0.984 / 0.724 |
 | 40 m | 1.037 / 0.360 | 0.906 / 0.881 |
 | 48 m | 1.182 / 0.351 | 0.744 / 1.005 |
+
+*Source: `results/stereo/estimate_MH_05_difficult.txt`, `results/mono/estimate_MH_05_difficult_mono.txt`.*
 
 </details>
 

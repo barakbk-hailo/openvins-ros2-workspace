@@ -104,6 +104,8 @@ Lock ordering is always A then B (worker locks `worker_mtx` first, then
 | V2_02_medium 4-thr | 20.8, 20.7, 20.6, 20.7, 20.7 | **10.4, 10.5, 10.6, 10.7, 10.7** | 11.2 |
 | V2_02_medium 1-thr | 21.3, 21.4, 21.1, 21.0, 21.1 | **11.2, 11.2, 11.2, 11.3, 11.3** | 11.5 |
 
+*Source: Old dispatch from `results/timing/x86/subscribe/bench_5rep_3clock/*_{1,4}thr_run{1..5}_wall.txt`; persistent worker from `results/timing/x86/subscribe/bench_persistent_worker/*_{1,4}thr_run{1..5}_wall.txt`; serial reference from `results/timing/x86/serial/bench_persistent_worker/*_{1,4}thr_wall.txt`*
+
 Subscribe/serial ratio: **2.0x → 1.0x** (eliminated entirely).
 
 ### Per-component comparison with paper: V2_02, 4 OpenCV threads (ms)
@@ -116,6 +118,8 @@ Subscribe/serial ratio: **2.0x → 1.0x** (eliminated entirely).
 | SLAM Update² | 6.56 ± 3.84 | 7.4 ± 3.7 | **4.5 ± 2.2** | 5.0 ± 2.6 | 5.0 ± 2.6 |
 | Re-tri & Marg | 2.24 ± 0.20 | 2.0 ± 0.7 | **1.5 ± 0.2** | 1.6 ± 0.1 | 2.2 ± 0.2 |
 | **Total** | **16.43 ± 4.53** | **20.8 ± 4.5** | **10.4 ± 2.9** | **11.2 ± 3.3** | **17.8 ± 3.5** |
+
+*Source: Paper column from Semenova et al. 2024 Table 4; Old dispatch from `results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`; Worker from `results/timing/x86/subscribe/bench_persistent_worker/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`; Serial from `results/timing/x86/serial/bench_persistent_worker/V2_02_medium_4thr_{wall,cpu,thread}.txt`*
 
 ¹ Semenova et al. 2024, Table 4 — subscribe mode, wall clock
 ² Paper combines SLAM Update + SLAM Delayed; our values shown combined for comparison
@@ -131,6 +135,8 @@ Subscribe/serial ratio: **2.0x → 1.0x** (eliminated entirely).
 | Re-tri & Marg | 2.52 ± 0.21 | 1.7 ± 0.4 | **1.4 ± 0.2** | 1.5 ± 0.2 |
 | **Total** | **21.25 ± 5.57** | **21.3 ± 4.2** | **11.2 ± 2.9** | **11.5 ± 3.1** |
 
+*Source: Paper column from Semenova et al. 2024 Table 4; Old dispatch from `results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_1thr_run*_wall.txt`; Worker from `results/timing/x86/subscribe/bench_persistent_worker/V2_02_medium_1thr_run*_wall.txt`; Serial from `results/timing/x86/serial/bench_persistent_worker/V2_02_medium_1thr_wall.txt`*
+
 ### Cross-run variability (subscribe, wall clock, 5 repetitions)
 
 | Sequence | Config | Mean (ms) | Std (ms) | CV | Range (ms) |
@@ -142,6 +148,8 @@ Subscribe/serial ratio: **2.0x → 1.0x** (eliminated entirely).
 | V2_02_medium | 4-thr | 10.6 | 0.13 | **1.2%** | 10.4 – 10.7 |
 | V2_02_medium | 1-thr | 11.2 | 0.05 | **0.5%** | 11.2 – 11.3 |
 
+*Source: `results/timing/x86/subscribe/bench_persistent_worker/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_wall.txt`*
+
 All configurations have CV < 1.3%. The old dispatch had CV up to 5% on MH_03.
 
 ### SLAM feature health (avg features in state, max_slam=50)
@@ -151,6 +159,8 @@ All configurations have CV < 1.3%. The old dispatch had CV up to 5% on MH_03.
 | V1_01_easy | 46.3 | 46.1, 46.1, 46.3, 46.1, 46.4 | 43.8 – 44.7 |
 | MH_03_medium | 41.0 | 41.1, 41.2, 41.1, 41.3, 41.4 | **26.0** – 40.2 |
 | V2_02_medium | 39.1 | 38.2, 38.3, 38.6, 38.7, 38.9 | 34.5 – 35.8 |
+
+*Source: Serial from `results/timing/x86/serial/bench_persistent_worker/*_4thr_feats.txt`; Worker subscribe from `results/timing/x86/subscribe/bench_persistent_worker/*_4thr_run{1..5}_feats.txt`; Old dispatch from `results/timing/x86/subscribe/bench_5rep_3clock/*_4thr_run{1..5}_feats.txt`*
 
 Subscribe SLAM health now matches serial within <1 feature. The old dispatch had
 a worst case of 26.0 on MH_03 (partial SLAM dip).
@@ -163,6 +173,8 @@ a worst case of 26.0 on MH_03 (partial SLAM dip).
 | MH_03_medium | 3.450 | 3.440, 3.441, 3.441, 3.441, 3.445 | **0.010m** |
 | V2_02_medium | 2.099 | 2.091, 2.094, 2.097, 2.101, 2.102 | **0.008m** |
 
+*Source: Serial from `results/timing/x86/serial/bench_persistent_worker/*_4thr_est.txt`; Worker subscribe from `results/timing/x86/subscribe/bench_persistent_worker/*_4thr_run{1..5}_est.txt`; compared against `src/open_vins/ov_data/euroc_mav/{V1_01_easy,MH_03_medium,V2_02_medium}.txt`*
+
 ### Process CPU reveals OpenCV parallelism cost (V2_02, 4-thr)
 
 | Mode | Wall | Proc CPU | Thread | CPU/Wall |
@@ -170,6 +182,8 @@ a worst case of 26.0 on MH_03 (partial SLAM dip).
 | Serial | 11.2 | **17.8** | 11.1 | **1.59x** |
 | Subscribe (worker) | 10.4 | **16.6** | 10.4 | **1.60x** |
 | Subscribe (old dispatch) | 20.8 | **37.0** | 20.6 | **1.78x** |
+
+*Source: Serial from `results/timing/x86/serial/bench_persistent_worker/V2_02_medium_4thr_{wall,cpu,thread}.txt`; Subscribe worker from `results/timing/x86/subscribe/bench_persistent_worker/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`; Subscribe old-dispatch from `results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`*
 
 CPU/Wall is now identical between serial and subscribe (1.59–1.60x) — purely the
 OpenCV KLT thread pool. The old dispatch had 1.78x because executor threads burned
@@ -182,6 +196,8 @@ extra CPU during per-frame thread churn.
 | V1_01_easy | 11.5ms | 11.9ms | ~40ms | 50ms |
 | MH_03_medium | 11.5ms | 10.8ms | ~40ms | 50ms |
 | V2_02_medium | 11.2ms | 10.6ms | ~39ms | 50ms |
+
+*Source: x86 serial from `results/timing/x86/serial/bench_persistent_worker/*_4thr_wall.txt`; x86 subscribe (worker) from `results/timing/x86/subscribe/bench_persistent_worker/*_4thr_run{1..5}_wall.txt`; RPi5 column is a ×3.5 projection, not measured.*
 
 Since subscribe now matches serial, the RPi5 projection for subscribe mode is the
 same as serial: **~40ms, within the 50ms budget**. Previously, the 2x subscribe

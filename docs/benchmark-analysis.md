@@ -43,6 +43,8 @@ not comparable to the paper (which uses wall clock).
 | Re-tri & Marg | 1.5 | **2.2** | 1.5 | **1.5x** |
 | **Total** | **10.1** | **15.6** | **10.1** | **1.54x** |
 
+*Source: `results/timing/x86/serial/bench_5rep_3clock/V2_02_medium_4thr_{wall,cpu,thread}.txt`*
+
 **1 OpenCV thread (ms):**
 
 | Component | Wall | Proc CPU | Thread | CPU/Wall |
@@ -54,6 +56,8 @@ not comparable to the paper (which uses wall clock).
 | SLAM Delayed | 1.5 | 1.5 | 1.5 | 1.0x |
 | Re-tri & Marg | 1.4 | 1.4 | 1.4 | 1.0x |
 | **Total** | **11.2** | **11.2** | **11.1** | **1.0x** |
+
+*Source: `results/timing/x86/serial/bench_5rep_3clock/V2_02_medium_1thr_{wall,cpu,thread}.txt`*
 
 **Observations:**
 - With 4 threads: CPU/Wall > 1 only for Tracking (2.7x) and Re-tri (1.5x) — the
@@ -74,6 +78,8 @@ not comparable to the paper (which uses wall clock).
 | Re-tri & Marg | 1.5 | 1.5 | 1.5 |
 | **Total** | **11.3** | **10.4** | **10.1** |
 | **p99** | **19.2** | **18.3** | **16.9** |
+
+*Source: `results/timing/x86/serial/bench_5rep_3clock/{V1_01_easy,MH_03_medium,V2_02_medium}_4thr_wall.txt`*
 
 **Note:** SLAM Update is highest on V1_01 (4.5ms, 40%) because the easy sequence
 maintains the most SLAM features. V2_02 has fewer stable features (medium difficulty),
@@ -96,6 +102,8 @@ tracking dominates because motion blur reduces the feature count.
 | SLAM Delayed | 2.3 | 2.4 | 2.3 | 1.5x | 1.5x |
 | Re-tri & Marg | 2.0 | **3.0** | 2.0 | 1.3x | 1.3x |
 | **Total** | **20.8** | **37.1** | **20.6** | **2.1x** | **2.0x** |
+
+*Source: `results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`; serial-ratio columns compared against `results/timing/x86/serial/bench_5rep_3clock/V2_02_medium_4thr_{wall,thread}.txt`*
 
 **Key observation:** Thread ≈ Wall in subscribe mode (20.6 vs 20.8ms). This means
 scheduling delay (VIO thread waiting to be scheduled) is only ~0.2ms per frame —
@@ -121,6 +129,8 @@ ROS2 message deserialization vs direct bag reading) has not been ruled out.
 | Re-tri & Marg | 1.2x | 1.5x | 1.3x | Fixed sliding window |
 | **Total** | **1.9x** | **1.9x** | **2.0x** | |
 
+*Source: derived from `results/timing/x86/{serial,subscribe}/bench_5rep_3clock/{V1_01_easy,MH_03_medium,V2_02_medium}_4thr*_thread.txt`*
+
 The inflation ratio is non-uniform and consistent across sequences. Tracking is
 always the most affected (~3x), EKF stages are 1.3-1.7x.
 
@@ -142,6 +152,8 @@ We compare with our subscribe (wall clock) and serial (wall + thread clocks).
 | Re-tri & Marg | 2.24 ± 0.20 | 2.0 ± 0.7 | 1.5 ± 0.2 | 1.5 ± 0.2 |
 | **Total** | **16.43 ± 4.53** | **20.8 ± 4.5** | **10.1 ± 2.9** | **10.1 ± 2.9** |
 
+*Source: "Our sub" from `results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_4thr_run*_wall.txt`; "Our serial" from `results/timing/x86/serial/bench_5rep_3clock/V2_02_medium_4thr_{wall,thread}.txt`; Paper column is Semenova et al. 2024 Table 4.*
+
 *Paper combines SLAM Update + SLAM Delayed. Our combined: sub 5.1+2.3=7.4ms, serial 3.0+1.5=4.5ms.
 
 ### 1 OpenCV thread (ms)
@@ -154,6 +166,8 @@ We compare with our subscribe (wall clock) and serial (wall + thread clocks).
 | SLAM Upd+Del* | 8.28 ± 4.79 | 6.2 ± 3.2 | 4.5 ± 2.4 | 4.5 ± 2.4 |
 | Re-tri & Marg | 2.52 ± 0.21 | 1.7 ± 0.4 | 1.4 ± 0.2 | 1.4 ± 0.2 |
 | **Total** | **21.25 ± 5.57** | **21.3 ± 4.2** | **11.2 ± 2.9** | **11.1 ± 2.9** |
+
+*Source: "Our sub" from `results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_1thr_run*_wall.txt`; "Our serial" from `results/timing/x86/serial/bench_5rep_3clock/V2_02_medium_1thr_{wall,thread}.txt`; Paper column is Semenova et al. 2024 Table 4.*
 
 ### Analysis
 
@@ -189,6 +203,8 @@ CPU — again suggesting our larger executor thread pool creates more cache poll
 | MH_03_medium | 20.2, 19.6, 21.3, 19.0, 21.4 | **2.4ms** | 20.8, 20.9, 21.0, 20.7, 21.2 | 0.5ms |
 | V2_02_medium | 20.8, 20.7, 20.6, 20.7, 20.7 | 0.2ms | 21.3, 21.4, 21.1, 21.0, 21.1 | 0.4ms |
 
+*Source: `results/timing/x86/subscribe/bench_5rep_3clock/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_wall.txt`*
+
 V1_01 and V2_02 are very consistent (<0.5ms range). MH_03 4-thr shows 2.4ms range —
 likely because the machine hall has more variable feature density, causing different
 amounts of SLAM/MSCKF work per frame depending on which features survive in each run.
@@ -200,6 +216,8 @@ amounts of SLAM/MSCKF work per frame depending on which features survive in each
 | V1_01_easy | 34.9, 35.0, 35.1, 35.1, 34.9 | 0.2ms |
 | MH_03_medium | 35.1, 34.5, 36.2, 34.5, 36.4 | 1.9ms |
 | V2_02_medium | 37.1, 36.9, 36.7, 36.8, 36.9 | 0.4ms |
+
+*Source: `results/timing/x86/subscribe/bench_5rep_3clock/{V1_01_easy,MH_03_medium,V2_02_medium}_4thr_run{1..5}_cpu.txt`*
 
 The process CPU overhead (executor threads) is stable. The 37ms process CPU on V2_02
 means the system consumes ~37ms of total CPU per frame across all threads — relevant
@@ -214,6 +232,8 @@ for thermal budgeting on RPi5.
 | V1_01_easy | 46.0 | 44.4, 44.6, 44.6, 44.7, 43.8 | 44.1, 44.6, 44.3, 44.1, 44.3 |
 | MH_03_medium | 41.5 | 34.4, **31.2**, 38.2, **26.0**, 38.7 | **29.1**, 40.2, 37.9, 36.5, 39.6 |
 | V2_02_medium | 38.4 | 35.5, 35.1, 34.7, 35.8, 35.2 | 35.2, 35.8, 34.8, 34.6, 34.9 |
+
+*Source: serial from `results/timing/x86/serial/bench_5rep_3clock/{V1_01_easy,MH_03_medium,V2_02_medium}_4thr_feats.txt`; subscribe from `results/timing/x86/subscribe/bench_5rep_3clock/*_{1,4}thr_run{1..5}_feats.txt`*
 
 **V1_01 is naturally stable** — subscribe matches serial closely (44-45 vs 46).
 
@@ -239,6 +259,8 @@ to 26-31. This is acceptable — ATE is still good (see below).
 | MH_03_medium | 3.450 | 3.451, 3.455, 3.440, 3.454, 3.458 | 3.453, 3.440, 3.439, 3.439, 3.443 |
 | V2_02_medium | 2.099 | (tool*), 2.097, 2.094, (tool*), 2.093 | 2.092, 2.091, 2.089, 2.090, (tool*) |
 
+*Source: serial from `results/timing/x86/serial/bench_5rep_3clock/*_4thr_est.txt`; subscribe from `results/timing/x86/subscribe/bench_5rep_3clock/*_{1,4}thr_run{1..5}_est.txt`; compared against ground truth `src/open_vins/ov_data/euroc_mav/{V1_01_easy,MH_03_medium,V2_02_medium}.txt`*
+
 *"tool" = ov_eval NaN assertion crash on runs with healthy trajectories (verified
 via final position check — not a divergence). This is a bug in the analysis tool,
 not in the VIO.
@@ -262,6 +284,8 @@ consistency if errors cancel over the full trajectory.
 | MH_03_medium | 5.655 | 5.721, 5.706, 5.582, 5.631, 5.624 | 5.626, 5.601, 5.630, 5.650, 5.641 |
 | V2_02_medium | 2.863 | 2.867, 2.855, 2.883, (tool*), 2.879 | 2.875, 2.862, 2.849, 2.883, (tool*) |
 
+*Source: same `*_est.txt` files as the ATE table (RPE is computed from the same estimates).*
+
 **Subscribe RPE matches serial within ~0.07m on V1_01, ~0.07m on MH_03, and
 ~0.02m on V2_02.** The local consistency is preserved — the SLAM recovery mechanism
 does not degrade short-term accuracy.
@@ -275,6 +299,8 @@ does not degrade short-term accuracy.
 | 24m | 2.714 | 2.713 | -0.001 |
 | 32m | 3.220 | 3.162 | -0.058 |
 | 40m | 3.018 | 3.041 | +0.023 |
+
+*Source: serial from `results/timing/x86/serial/bench_5rep_3clock/V2_02_medium_4thr_est.txt`; subscribe run 1 from `results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_4thr_run1_est.txt`*
 
 RPE is consistent across all segment lengths — no divergence at any scale.
 
@@ -290,6 +316,8 @@ SLAM features affect local accuracy?
 | 24m | 4.891 | 4.924 | +0.033 |
 | 32m | 5.380 | 5.375 | -0.005 |
 | 40m | 3.437 | 3.569 | +0.132 |
+
+*Source: serial from `results/timing/x86/serial/bench_5rep_3clock/MH_03_medium_4thr_est.txt`; low-SLAM run (avg SLAM = 26.0) from `results/timing/x86/subscribe/bench_5rep_3clock/MH_03_medium_4thr_run4_est.txt`*
 
 **Even the worst-case low-SLAM run matches serial RPE within 0.13m at all segment
 lengths.** The largest deviation is at 40m segments (+0.132m), suggesting a slight
@@ -319,6 +347,8 @@ We project RPi5 timing by scaling x86 serial measurements:
 | MH_03_medium | 10.4ms | ~36ms | ~67ms | 50ms @20Hz |
 | V2_02_medium | 10.1ms | ~35ms | ~65ms | 50ms @20Hz |
 
+*Source: x86 serial wall from `results/timing/x86/serial/bench_5rep_3clock/{V1_01_easy,MH_03_medium,V2_02_medium}_4thr_wall.txt`; RPi5 columns are projections (×3.5, ×1.85), not measurements.*
+
 **Serial on RPi5 is projected within budget** with ~10-15ms headroom.
 
 **Subscribe on RPi5 exceeds budget by ~30-45%.** This means subscribe mode on RPi5
@@ -331,6 +361,8 @@ Phase 2 sweep data on V1_01):
 | Downsample images | -16% (11.3→9.5ms) | ~61ms |
 | Mono mode | -27% (11.3→8.2ms) | ~53ms |
 | 100 features + downsample | ~-50% (est ~5.5ms) | ~36ms |
+
+*Source: x86 serial savings from `results/timing/x86/serial/sweep/{A_downsample,B_num_pts_100}.txt` + `results/timing/x86/serial/mono/V1_01_easy.txt` (baseline: `results/timing/x86/serial/stereo/V1_01_easy.txt`); RPi5 column is the same savings applied to the projected subscribe baseline.*
 
 The most aggressive config (mono + 100 features + downsample) projects to ~26ms —
 comfortably within budget even for 30Hz cameras.
@@ -347,6 +379,8 @@ comfortably within budget even for 30Hz cameras.
 | Propagation | 0.2 | ~1 | 2% |
 | **Total** | **10.1** | **~35** | |
 
+*Source: x86 wall column from `results/timing/x86/serial/bench_5rep_3clock/V2_02_medium_4thr_wall.txt`; RPi5 column is a ×3.5 projection (not measured).*
+
 **Caveat on the 3.5x factor:** The scaling is unlikely to be uniform across
 components. Tracking (SIMD-heavy KLT) may scale closer to 2x if ARM NEON is
 well-optimized in OpenCV. SLAM Update (memory-bound dense matrix) may scale
@@ -360,6 +394,8 @@ component-level factors can only be determined by actual RPi5 measurement.
 | Serial 4-thr | 15.6ms | ~55ms | ~1.5 cores avg |
 | Serial 1-thr | 11.2ms | ~39ms | ~1 core |
 | Subscribe 4-thr | 37.1ms | ~130ms | ~2.6 cores avg |
+
+*Source: x86 proc-CPU column from `results/timing/x86/serial/bench_5rep_3clock/V2_02_medium_{1,4}thr_cpu.txt` and `results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_4thr_run1_cpu.txt`; RPi5 column is a ×3.5 projection.*
 
 Subscribe 4-thr on RPi5 would consume ~130ms of CPU per frame at 20Hz (50ms interval),
 meaning the system would be constantly using 2.6 of 4 cores at 100%. This will cause

@@ -140,6 +140,8 @@ compared against a clean baseline without the recovery mechanism:
 | ATE position RMSE range | 2.088m - FAILED | **2.089 - 2.102m** |
 | Serial ATE reference | 2.101m | 2.099m |
 
+*Source: ad-hoc 10-run V2_02_medium baseline (pre-recovery debugging); the numbers are preserved here for the regression comparison but the raw CSVs were superseded by `results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_*_run{1..5}_{est,feats}.txt` (with recovery enabled).*
+
 ### Full benchmark (3 sequences × 5 reps, 30 runs total)
 
 Validated across V1_01_easy, MH_03_medium, and V2_02_medium with 5 repetitions
@@ -152,6 +154,8 @@ per configuration (see [benchmark-analysis.md](benchmark-analysis.md) for detail
 | ATE within 0.02m of serial | **All runs** (where ov_eval didn't crash) |
 | RPE (8m) within 0.07m of serial | **All runs** |
 | Worst-case SLAM dip | MH_03 avg SLAM = 26.0 (still produced ATE within 0.004m and RPE within 0.13m of serial) |
+
+*Source: `results/timing/x86/subscribe/bench_5rep_3clock/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_{est,feats}.txt` vs `results/timing/x86/serial/bench_5rep_3clock/*_{1,4}thr_{est,feats}.txt`; see [benchmark-analysis.md](benchmark-analysis.md) for per-run numbers.*
 
 The recovery mechanism maintains accuracy identical to serial mode as measured by
 both global trajectory error (ATE) and local consistency (RPE at 8-40m segments).
