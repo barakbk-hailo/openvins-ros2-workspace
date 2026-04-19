@@ -406,6 +406,23 @@ performance-related. **x86 has zero real frame drops even at 5x realtime.**
 
 ---
 
+## Phase 3b: Paper reproduction and subscribe-mode reliability
+
+Phase 3b reproduced the OpenVINS laptop results from Semenova et al. (2024)
+on V2_02_medium using 3-clock timing (wall, process CPU, thread CPU) and
+identified a SLAM feature collapse failure mode in subscribe mode. This led
+to a SLAM recovery mechanism that prevents the irrecoverable empty-state
+feedback loop.
+
+The full analysis is split across two dedicated documents:
+
+- **[Benchmark Analysis](benchmark-analysis.md)** — paper comparison (30 runs),
+  3-clock timing breakdown, accuracy and consistency results, RPi5 projections
+- **[Subscribe Reliability](subscribe-reliability.md)** — root cause analysis
+  of subscribe-mode non-determinism, SLAM recovery mechanism, fork changes
+
+---
+
 ## RPi5 projections — methodology and caveats
 
 The RPi5 estimates below are **projections, not measurements**. They use two scaling

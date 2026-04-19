@@ -27,6 +27,8 @@ bash install.sh
 | [Installation](docs/installation.md) | Native build on Ubuntu 22.04 (ROS 2 Humble) |
 | [Running EuRoC](docs/running-euroc.md) | Download dataset, launch OpenVINS, visualize in RViz |
 | [Evaluation](docs/evaluation.md) | ATE/RPE benchmarks, paper comparison, reproduction script |
+| [Subscribe Reliability](docs/subscribe-reliability.md) | SLAM recovery mechanism, subscribe-mode non-determinism analysis, fork changes |
+| [Benchmark Analysis](docs/benchmark-analysis.md) | Paper comparison, 3-clock timing, accuracy, consistency, RPi5 projections (latest data) |
 | [Timing](docs/timing.md) | Per-component timing breakdown, config sensitivity, realtime feasibility, RPi5 projections |
 | [Docker (RPi5)](docs/docker.md) | Containerized build for Raspberry Pi 5 / Debian Trixie |
 | [RPi5 Deployment](docs/rpi5-deployment.md) | Camera, IMU, calibration, live VIO on RPi5 |
