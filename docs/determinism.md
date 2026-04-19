@@ -414,7 +414,8 @@ overhead projected to ~74ms (over budget), requiring aggressive config optimizat
 With the persistent worker, the default config may work on RPi5 without changes.
 
 Actual RPi5 measurements confirming this projection are in
-[rpi5-benchmarking.md](rpi5-benchmarking.md).
+[rpi5-benchmarking.md](rpi5-benchmarking.md). A deeper follow-up
+investigating RPi5 subscribe-mode accuracy variance is in §6 below.
 
 ---
 
@@ -626,3 +627,140 @@ Subscribe test scripts now kill any stale `run_subscribe_msckf` processes before
 and after each run. Stale nodes on the same DDS domain steal messages from active
 subscribers, causing non-deterministic data loss — a critical issue we discovered
 during testing that invalidated several earlier measurement batches.
+
+---
+
+## 6. RPi5 follow-up: why accuracy variance doesn't transfer
+
+### Context
+
+Validating the x86 persistent-worker results on actual RPi5 hardware (Debian Trixie,
+Docker-hosted ROS 2 Humble, `openvins-humble-pwt` image) revealed that **timing and
+SLAM-health fixes transfer cleanly, but accuracy variance does not**. A 5-run subscribe
+test showed position RMSE range of 53 mm (vs x86's 3 mm) and orientation range of
+0.53° (vs x86's ~0.3 mdeg). We investigated three hypotheses with matched 10-run
+benchmarks on V1_01_easy stereo:
+
+1. **Docker CFS scheduling / memory locking jitter** — fixed by `--cap-add=SYS_NICE
+   --ulimit rtprio=99 --ulimit memlock=-1 --cpuset-cpus=0-3`
+2. **`ApproximateTime` unbounded pairing** — fixed by calling
+   `sync->setMaxIntervalDuration(rclcpp::Duration::from_seconds(0.02))` to match
+   serial mode's ±20 ms window. Queue depth stays at 10 so no frames are dropped.
+3. **Residual remote causes** — identified by whatever variance remains after (1) and (2).
+
+### Hardware
+
+- **RPi5** (this investigation): Broadcom BCM2712, 4× Cortex-A76 @ 2.4 GHz, 8 GB,
+  Debian 13 Trixie, Docker with ROS 2 Humble (Ubuntu 22.04 base image)
+- Comparison rows below use x86 values from the preceding sections of this document
+
+### Methodology
+
+`~/workspace/run_pwt_benchmark_v2.sh` runs 2 serial + 10 subscribe reps on V1_01_easy
+stereo in fresh containers per rep (no state leakage between runs). Each rep captures
+wall, process-CPU and thread-CPU timing, feature counts, and the saved trajectory.
+Results are aggregated via `~/workspace/catkin_ws_ov/scripts/aggregate_pwt.py`.
+
+Three matched runs were executed, with results saved under
+`results/rpi5/{pwt_baseline,pwt_rtflags,pwt_maxinterval}/`.
+
+### Cross-run timing variability (subscribe, 10 reps)
+
+**Clock:** wall. Mean/std/CV are computed *across* the 10 per-run totals (run-to-run
+variability — complements the per-frame std seen in §3's tables).
+
+| Condition | Mean (ms) | Std (ms) | CV | Range (ms) |
+|-----------|-----------|----------|-----|------------|
+| Baseline (PWT only) | 22.97 | 0.105 | 0.46% | 22.79 – 23.17 |
+| + Docker RT flags | 23.03 | 0.061 | 0.26% | 22.91 – 23.13 |
+| + Max-interval 20 ms | 23.02 | 0.072 | 0.31% | 22.94 – 23.17 |
+
+*Source: `results/rpi5/{pwt_baseline,pwt_rtflags,pwt_maxinterval}/sub_run{1..10}_wall.txt`.*
+
+Timing stability is ≤0.5% CV across all conditions — comparable to the x86 target
+(CV < 1.3%). The persistent worker alone is sufficient to stabilize timing on RPi5.
+
+### SLAM feature health (avg features in state, max_slam=50)
+
+| Sequence | x86 Serial | x86 Subscribe (5 reps) | **RPi5 Serial** | **RPi5 Subscribe** (10 reps, baseline) |
+|----------|-----------|----------------------|-----------------|----------------------------------------|
+| V1_01_easy | 46.3 | 46.1 – 46.4 | **46.32** | **45.59 – 46.12** (mean 45.79) |
+
+*Source: RPi5 columns from
+`results/rpi5/pwt_baseline/{serial_run*,sub_run*}_feats.txt`, column 1 (slam_feats_in_state)
+averaged across all frames per run.*
+
+RPi5 subscribe SLAM health tracks serial within 1.1%. **SLAM feature collapse is NOT
+the mechanism behind RPi5 subscribe accuracy degradation** — the filter is
+maintaining a healthy state vector; the error comes from elsewhere.
+
+### ATE — cross-run variability of each intervention (subscribe, posyaw alignment)
+
+Stats computed across the 10 per-run RMSE values. "Serial" is a single
+deterministic run (std and range are 0 by construction).
+
+| Condition | rmse_ori mean ± std | rmse_ori range | rmse_pos mean ± std | rmse_pos range |
+|-----------|---------------------|----------------|---------------------|----------------|
+| **Serial (deterministic)** | 0.536 ± 0.000° | 0.000° | 42.0 ± 0.0 mm | 0.0 mm |
+| Baseline (PWT only) | 0.700 ± 0.099° | 0.356° | 58.7 ± 14.0 mm | 50.0 mm |
+| + Docker RT flags | 0.695 ± 0.089° | 0.293° | 60.4 ± **9.9** mm | **36.0** mm |
+| + Max-interval 20 ms | 0.688 ± 0.171° | 0.496° | 66.7 ± **5.4** mm | **17.0** mm |
+
+*Source: `results/rpi5/{pwt_baseline,pwt_rtflags,pwt_maxinterval}/sub_run{1..10}_pose.txt`
+evaluated against `ov_data/euroc_mav/V1_01_easy.txt`.*
+
+### Findings
+
+1. **Docker RT flags help moderately** (~30% variance reduction in position RMSE, 18%
+   in orientation range). Memory locking and CPU pinning reduce some scheduling
+   jitter, but they're not the dominant cause of RPi5 subscribe variance. (OpenVINS
+   doesn't call `sched_setscheduler()` anywhere, so `rtprio=99` is only relevant if
+   the app explicitly requests RT priority.)
+
+2. **`setMaxIntervalDuration(0.02)` dramatically reduces position variance** — range
+   drops from 50 mm → 17 mm (2.9× reduction), std from 14.0 mm → 5.4 mm (2.6×
+   reduction). Frame count is unchanged (2800 per run), confirming the ±20 ms
+   constraint doesn't drop EuRoC's hardware-synced stereo pairs. **This confirms
+   `ApproximateTime` unbounded pairing was the dominant cause of position variance.**
+
+3. **Orientation variance is bimodal across runs.** Median rmse_ori is lowest with
+   max-interval (0.625° vs 0.686° baseline), but the std/range are dominated by
+   occasional outlier runs (0.99° in 2/10 runs). These outliers survive the
+   max-interval fix, suggesting an additional mechanism — most likely residual
+   IMU-callback interleaving jitter at the start of runs, before the filter
+   converges.
+
+4. **No intervention closes the gap to x86.** x86 position RMSE std is ~1 mm; best
+   RPi5 (max-interval) is 5.4 mm. The gap is narrower (5× vs 17×), but the platform
+   clearly has an additional source of non-determinism we didn't isolate. The
+   OpenVINS docs' warning that Docker "is not real-time in nature" appears to apply
+   beyond what `--cap-add=SYS_NICE` alone can fix.
+
+### Recommendation for RPi5 deployment
+
+- **For accuracy-critical offline benchmarking: use serial mode.** It is bit-identical
+  across runs and matches x86's algorithmic cost.
+- **For live deployment: use subscribe mode with `setMaxIntervalDuration(0.02)`
+  enabled.** This is committed on the fork branch `sync-max-interval-20ms` (commit
+  `e57e88d`) and brings RPi5 position variance to within 3× of serial — acceptable
+  for most VIO applications. The `barakbk-hailo/open_vins` fork exposes this as a
+  default.
+- **Optional**: Add Docker RT flags (`--cap-add=SYS_NICE --ulimit rtprio=99 --ulimit
+  memlock=-1 --cpuset-cpus=0-3`) for a further ~30% variance reduction. Small
+  effect, but free — no code changes.
+- **Do not rely on subscribe mode for publishable accuracy comparisons across runs.**
+  The remaining variance is inherent to the callback-driven architecture on
+  resource-constrained ARM + Docker.
+
+### Open question
+
+The residual orientation outlier behavior (2/10 runs hitting ~1.0° when the median
+is 0.63°) is worth investigating further. Candidates:
+
+- IMU-callback batch boundary jitter at initialization (before the filter converges)
+- `MultiThreadedExecutor` cold-start behavior on first callback
+- Container filesystem caching affecting the initial bag read
+
+None of these were isolated in this round. A targeted study would discard the first
+2-3 seconds of each run and recompute ATE to separate initialization transients from
+steady-state drift.
