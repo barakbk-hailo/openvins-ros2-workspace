@@ -41,24 +41,42 @@ to **1.0x serial** (i.e., subscribe now runs at serial speed).
 ```
   IMU callback (200 Hz, on executor thread):
     1. feed_imu() — buffer IMU data
-    2. lock worker_mtx
-    3. latest_imu_timestamp = msg.timestamp  ← member variable, not stack
-    4. unlock
+    2. lock worker_mtx                         ← mutex A
+    3. latest_imu_timestamp = msg.timestamp     (member variable, not stack)
+    4. unlock worker_mtx
     5. notify worker_cv
 
   Worker thread (ONE for entire run, created in constructor):
     loop:
       1. wait on worker_cv
-      2. read latest_imu_timestamp (under mutex)
-      3. lock camera_queue_mtx
-      4. process eligible camera frames
-      5. unlock, loop back
+      2. lock worker_mtx                       ← mutex A
+      3. read latest_imu_timestamp
+      4. unlock worker_mtx
+      5. lock camera_queue_mtx                 ← mutex B
+      6. process eligible camera frames
+      7. unlock camera_queue_mtx
+      8. loop back to 1
 
   Camera callback (20 Hz):
-    1. lock camera_queue_mtx
+    1. lock camera_queue_mtx                   ← mutex B
     2. push frame to queue, sort
-    3. notify worker_cv
+    3. unlock camera_queue_mtx
+    4. notify worker_cv
 ```
+
+Two mutexes, each protecting a distinct resource:
+
+| Mutex | Protects | Writers | Readers |
+|-------|----------|---------|---------|
+| **`worker_mtx`** (A) | `latest_imu_timestamp`, `worker_should_exit` | IMU callback, destructor | Worker thread |
+| **`camera_queue_mtx`** (B) | `camera_queue` deque | Camera callbacks | Worker thread |
+
+Lock ordering is always A then B (worker locks `worker_mtx` first, then
+`camera_queue_mtx`), so no deadlock is possible.
+
+### Architecture diagram
+
+![Persistent worker thread architecture](persistent-worker-architecture.svg)
 
 ## Bugs fixed
 

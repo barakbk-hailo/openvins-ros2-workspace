@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" font-family="monospace" font-size="12">
+  <!-- Background -->
+  <rect width="900" height="520" fill="#fff" rx="8"/>
+
+  <!-- Title -->
+  <text x="450" y="28" text-anchor="middle" font-size="16" font-weight="bold" fill="#333">Subscribe-Mode Architecture: Persistent Worker Thread</text>
+
+  <!-- Executor box -->
+  <rect x="20" y="50" width="500" height="220" rx="6" fill="#f0f4ff" stroke="#4a7adb" stroke-width="1.5"/>
+  <text x="270" y="70" text-anchor="middle" font-size="13" font-weight="bold" fill="#4a7adb">ROS 2 MultiThreadedExecutor</text>
+
+  <!-- IMU callback -->
+  <rect x="40" y="85" width="220" height="170" rx="4" fill="#fff" stroke="#666" stroke-width="1"/>
+  <text x="150" y="103" text-anchor="middle" font-weight="bold" fill="#333">IMU Callback (200 Hz)</text>
+  <line x1="40" y1="110" x2="260" y2="110" stroke="#ccc"/>
+  <text x="50" y="128" fill="#555">1. feed_imu(msg)</text>
+  <text x="50" y="146" fill="#555">2. visualize_odometry()</text>
+  <text x="50" y="170" fill="#c44">3. lock worker_mtx</text>
+  <text x="50" y="188" fill="#c44">4. latest_imu_ts = ts</text>
+  <text x="50" y="206" fill="#c44">5. unlock</text>
+  <text x="50" y="230" fill="#07a">6. notify worker_cv</text>
+
+  <!-- Camera callback -->
+  <rect x="280" y="85" width="220" height="170" rx="4" fill="#fff" stroke="#666" stroke-width="1"/>
+  <text x="390" y="103" text-anchor="middle" font-weight="bold" fill="#333">Camera Callback (20 Hz)</text>
+  <line x1="280" y1="110" x2="500" y2="110" stroke="#ccc"/>
+  <text x="290" y="128" fill="#555">1. build CameraData</text>
+  <text x="290" y="152" fill="#a70">2. lock camera_queue_mtx</text>
+  <text x="290" y="170" fill="#a70">3. push + sort queue</text>
+  <text x="290" y="188" fill="#a70">4. unlock</text>
+  <text x="290" y="212" fill="#07a">5. notify worker_cv</text>
+
+  <!-- Worker thread box -->
+  <rect x="560" y="50" width="320" height="450" rx="6" fill="#f0fff0" stroke="#2a9d2a" stroke-width="1.5"/>
+  <text x="720" y="70" text-anchor="middle" font-size="13" font-weight="bold" fill="#2a9d2a">Persistent Worker Thread</text>
+  <text x="720" y="86" text-anchor="middle" font-size="10" fill="#666">(created once in constructor, joined in destructor)</text>
+
+  <rect x="580" y="100" width="280" height="380" rx="4" fill="#fff" stroke="#666" stroke-width="1"/>
+  <text x="720" y="118" text-anchor="middle" font-weight="bold" fill="#333">processing_worker() loop</text>
+  <line x1="580" y1="125" x2="860" y2="125" stroke="#ccc"/>
+
+  <text x="590" y="148" fill="#07a">1. wait on worker_cv</text>
+  <text x="605" y="166" fill="#888" font-size="10">sleeps until IMU or camera notifies</text>
+
+  <text x="590" y="192" fill="#c44">2. lock worker_mtx</text>
+  <text x="590" y="210" fill="#c44">3. read latest_imu_ts</text>
+  <text x="590" y="228" fill="#c44">4. unlock worker_mtx</text>
+
+  <text x="590" y="258" fill="#a70">5. lock camera_queue_mtx</text>
+  <text x="590" y="276" fill="#555">6. check unique camera streams</text>
+
+  <text x="590" y="304" fill="#555">7. compute imu_cutoff =</text>
+  <text x="605" y="320" fill="#555">latest_imu_ts - dt_offset</text>
+
+  <text x="590" y="348" fill="#555">8. while queue.front.ts</text>
+  <text x="605" y="364" fill="#555">&lt; imu_cutoff:</text>
+  <text x="620" y="382" fill="#36a">feed_measurement_camera()</text>
+  <text x="620" y="400" fill="#36a">visualize()</text>
+  <text x="620" y="418" fill="#555">pop frame</text>
+
+  <text x="590" y="444" fill="#a70">9. unlock camera_queue_mtx</text>
+  <text x="590" y="464" fill="#888">10. loop back to 1</text>
+
+  <!-- Arrows: notify signals -->
+  <defs>
+    <marker id="arrowG" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#07a"/>
+    </marker>
+    <marker id="arrowR" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#c44"/>
+    </marker>
+  </defs>
+
+  <!-- IMU notify arrow -->
+  <path d="M260,230 C380,230 430,148 578,148" fill="none" stroke="#07a" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arrowG)"/>
+  <text x="400" y="178" fill="#07a" font-size="10" text-anchor="middle">notify</text>
+
+  <!-- Camera notify arrow -->
+  <path d="M500,212 C530,212 540,148 578,148" fill="none" stroke="#07a" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arrowG)"/>
+
+  <!-- Mutex legend -->
+  <rect x="20" y="290" width="500" height="90" rx="6" fill="#fafafa" stroke="#ddd" stroke-width="1"/>
+  <text x="270" y="310" text-anchor="middle" font-weight="bold" fill="#333">Mutex Responsibilities</text>
+  <rect x="35" y="322" width="12" height="12" fill="#fdd" stroke="#c44"/>
+  <text x="55" y="333" fill="#333"><tspan font-weight="bold">worker_mtx</tspan> — protects latest_imu_timestamp, worker_should_exit, worker_cv</text>
+  <rect x="35" y="348" width="12" height="12" fill="#fed" stroke="#a70"/>
+  <text x="55" y="359" fill="#333"><tspan font-weight="bold">camera_queue_mtx</tspan> — protects camera_queue (deque of CameraData)</text>
+
+  <!-- Key improvement box -->
+  <rect x="20" y="400" width="500" height="100" rx="6" fill="#fffbe6" stroke="#cca300" stroke-width="1"/>
+  <text x="270" y="420" text-anchor="middle" font-weight="bold" fill="#8a7000">Key Improvement</text>
+  <text x="35" y="440" fill="#555">IMU callbacks never spawn threads — just write a timestamp and notify.</text>
+  <text x="35" y="458" fill="#555">One persistent thread does all VIO processing with warm cache.</text>
+  <text x="35" y="476" fill="#555">No TOCTOU race, no dangling refs, no thread churn.</text>
+  <text x="35" y="494" fill="#555">Subscribe overhead: <tspan font-weight="bold">2.0x → 1.0x serial</tspan></text>
+</svg>
