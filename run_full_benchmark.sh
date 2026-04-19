@@ -105,7 +105,9 @@ FEATS_TMP="/tmp/traj_features.txt"
 EST_TMP="/tmp/ov_estimate.txt"
 STD_TMP="/tmp/ov_estimate_std.txt"
 
-source /opt/ros/humble/setup.bash
+for _distro in jazzy humble; do
+  if [ -f "/opt/ros/$_distro/setup.bash" ]; then source "/opt/ros/$_distro/setup.bash"; break; fi
+done
 source "$WS_DIR/install/setup.bash"
 
 cleanup_stale() {

@@ -23,7 +23,9 @@ SEQ="V1_01_easy"
 CONFIG_DIR="$WS_DIR/src/open_vins/config/euroc_mav"
 TMP_CONFIG="$CONFIG_DIR/estimator_config_timing.yaml"
 
-source /opt/ros/humble/setup.bash
+for _distro in jazzy humble; do
+  if [ -f "/opt/ros/$_distro/setup.bash" ]; then source "/opt/ros/$_distro/setup.bash"; break; fi
+done
 source "$WS_DIR/install/setup.bash"
 
 # Create temp config with timing enabled

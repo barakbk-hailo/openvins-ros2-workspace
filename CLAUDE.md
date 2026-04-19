@@ -5,7 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build
 
 ```bash
-source /opt/ros/humble/setup.bash
+# Ubuntu 22.04 (Jammy) → Humble; Ubuntu 24.04 (Noble) → Jazzy
+source /opt/ros/jazzy/setup.bash    # or /opt/ros/humble/setup.bash on 22.04
 cd ~/workspace/catkin_ws_ov
 colcon build --symlink-install
 source install/setup.bash
@@ -16,7 +17,7 @@ Rebuild a single package:
 colcon build --symlink-install --packages-select ov_msckf
 ```
 
-Dependencies: Eigen3, OpenCV 3/4, Boost, Ceres, libglog, libgflags, libatlas, libsuitesparse, ROS 2 Humble.
+Dependencies: Eigen3, OpenCV 3/4, Boost, Ceres, libglog, libgflags, libatlas, libsuitesparse, ROS 2 Humble (Ubuntu 22.04) or Jazzy (Ubuntu 24.04).
 
 One-shot setup from scratch: `./install.sh`
 
