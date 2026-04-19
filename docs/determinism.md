@@ -745,12 +745,51 @@ evaluated against `ov_data/euroc_mav/V1_01_easy.txt`.*
   `e57e88d`) and brings RPi5 position variance to within 3× of serial — acceptable
   for most VIO applications. The `barakbk-hailo/open_vins` fork exposes this as a
   default.
-- **Optional**: Add Docker RT flags (`--cap-add=SYS_NICE --ulimit rtprio=99 --ulimit
-  memlock=-1 --cpuset-cpus=0-3`) for a further ~30% variance reduction. Small
-  effect, but free — no code changes.
+- **Recommended full deployment configuration**: use the
+  `openvins-humble-maxinterval` image (built from `sync-max-interval-20ms`) with
+  Docker flags
+  `--cap-add=SYS_NICE --ulimit rtprio=99 --ulimit memlock=-1 --cpuset-cpus=0-3`
+  for a further ~30% variance reduction beyond max-interval alone.
 - **Do not rely on subscribe mode for publishable accuracy comparisons across runs.**
   The remaining variance is inherent to the callback-driven architecture on
   resource-constrained ARM + Docker.
+
+### Frame-drop check for the 20 ms bound
+
+Concern: could the tighter pairing constraint discard stereo frames that
+unbounded `ApproximateTime` would have accepted? Across all 10 subscribe reps on
+V1_01_easy, **every run processed exactly 2800 frames** — identical to baseline
+and Docker-RT-flags conditions. Zero drops.
+
+This is because EuRoC's cameras are hardware-triggered synced — the two
+timestamps per frame differ by microseconds, orders of magnitude below 20 ms.
+The bound only discards pairs that arise from queue-state race conditions
+(exactly what we want to eliminate).
+
+**When 20 ms is too tight:**
+- Software-triggered cameras with no hardware sync (e.g., USB webcam pair) can
+  have > 20 ms cross-camera timestamp jitter. In that case,
+  `setMaxIntervalDuration(0.02)` would drop real stereo pairs. **Serial mode
+  has the same issue** — it uses the same ±20 ms lookahead in
+  `ros2_serial_msckf.cpp:253`. Both would need a looser bound, tuned to your
+  sensor's actual worst-case cross-camera timestamp drift.
+- The 20 ms value is a legacy constant. Promoting it to a config parameter
+  (e.g., `stereo_max_interval_s` in `estimator_config.yaml`) would let
+  deployments on non-hardware-synced rigs loosen the bound without forking.
+  **Not yet done** in this branch; noted as follow-up.
+
+### Changes introduced on the `sync-max-interval-20ms` fork branch
+
+Branched from `persistent-worker-thread` at `0fe81a6`:
+
+| Commit | File | Change |
+|--------|------|--------|
+| `e57e88d` | `ov_msckf/src/ros/ROS2Visualizer.cpp` | `sync->setMaxIntervalDuration(rclcpp::Duration::from_seconds(0.02))` after the stereo `Synchronizer` is constructed |
+| `f12c80e` | `Dockerfile_ros2_humble_jammy` | Clone `-b sync-max-interval-20ms` by default so any fresh build produces an image with the fix |
+
+Diff summary: 2 commits, 2 files changed, 5 insertions, 1 deletion. The code
+change is additive only (no behavior is removed or altered for existing users
+who explicitly set a different max interval).
 
 ### Open question
 
