@@ -178,48 +178,51 @@ V1_01_easy is also the sequence used for our accuracy benchmarks (see
 mono modes (6 runs total). Serial mode reads the bag directly — no `ros2 bag play`
 needed.
 
-**Script:** `run_full_benchmark.sh -m serial -c both -r 1`
+**Script:** `run_full_benchmark.sh -m serial -c both -r 1 --tag <name>`
 Loops over sequences × {stereo, mono}, runs `ros2 launch ov_msckf serial.launch.py`
 with `max_cameras:=2 use_stereo:=true` (or `1`/`false` for mono), and copies the
-timing CSV to the results directory. Skips runs whose output already exists (safe to
-re-run).
+timing CSVs (wall + cpu + thread + feats + est) to the results directory. Skips
+runs whose output already exists (safe to re-run).
 
 **Default config:** 200 features (`num_pts`), full resolution, 4 OpenCV threads,
 50 SLAM landmarks (`max_slam`), 11 clones in the sliding window.
 
-### Stereo results (mean total time in ms)
+### Stereo results (thread-clock mean, ms — 4 OpenCV threads)
 
 | Component | V1_01_easy | MH_03_medium | V1_03_difficult |
 |-----------|-----------|-------------|----------------|
-| tracking | 2.6 (p99: 4.1, max: 10.1) | 2.7 (p99: 4.1, max: 6.4) | 3.0 (p99: 7.0, max: 14.1) |
+| tracking | 2.6 (p99: 3.9) | 2.6 (p99: 3.9) | 3.3 (p99: 7.3) |
 | propagation | 0.2 (p99: 0.3) | 0.2 (p99: 0.3) | 0.2 (p99: 0.3) |
-| msckf update | 1.6 (p99: 11.0, max: 15.5) | 1.2 (p99: 9.8, max: 17.2) | 1.2 (p99: 7.8, max: 14.9) |
-| slam update | 4.5 (p99: 6.3, max: 9.3) | 3.6 (p99: 5.8, max: 7.6) | 2.1 (p99: 5.9, max: 7.3) |
-| slam delayed | 0.9 (p99: 8.0, max: 16.5) | 1.3 (p99: 10.7, max: 23.4) | 1.5 (p99: 10.0, max: 14.2) |
-| re-tri & marg | 1.5 (p99: 1.9, max: 2.7) | 1.5 (p99: 2.1, max: 2.8) | 1.5 (p99: 1.9, max: 2.5) |
-| **total** | **11.3** (p99: 22.7, max: 30.2) | **10.5** (p99: 22.5, max: 30.9) | **9.5** (p99: 20.5, max: 26.0) |
+| msckf update | 1.6 (p99: 11.0) | 1.2 (p99: 9.1) | 1.2 (p99: 8.8) |
+| slam update | 4.5 (p99: 6.3) | 3.7 (p99: 5.7) | 2.1 (p99: 5.8) |
+| slam delayed | 0.9 (p99: 8.1) | 1.2 (p99: 10.3) | 1.5 (p99: 9.9) |
+| re-tri & marg | 1.5 (p99: 1.9) | 1.5 (p99: 1.9) | 1.5 (p99: 2.5) |
+| **total** | **11.3** (p99: 22.7) | **10.3** (p99: 21.6) | **9.8** (p99: 20.3) |
 
-*Source: `results/timing/x86/serial/stereo/{V1_01_easy,MH_03_medium,V1_03_difficult}.txt`*
+*Source: `results/timing/x86/serial/bench_5rep_3clock/{V1_01_easy,MH_03_medium}_4thr_thread.txt` and `results/timing/x86/serial/thread_rewrite/V1_03_difficult_4thr_thread.txt`*
 
-Frames processed: V1_01=2776, MH_03=2302, V1_03=1990 (out of 2912 in each bag;
+Frames processed: V1_01=2776, MH_03=2302, V1_03=1991 (out of 2912 in each bag;
 the difference is from the initialization period where no timing is recorded, plus
-stereo sync misses where no matching pair was found within ±20ms)
+stereo sync misses where no matching pair was found within ±20ms). Thread clock
+is the VIO thread's own CPU time — the cleanest signal for algorithmic cost
+since it excludes scheduling delays. (On x86 in serial mode, wall-clock and
+thread-clock agree to within ~0.1 ms — the two are equivalent here.)
 
-### Mono results (mean total time in ms)
+### Mono results (thread-clock mean, ms — 4 OpenCV threads)
 
 | Component | V1_01_easy | MH_03_medium | V1_03_difficult |
 |-----------|-----------|-------------|----------------|
-| tracking | 1.8 (p99: 2.7, max: 6.4) | 1.8 (p99: 2.9, max: 4.2) | 2.2 (p99: 7.6, max: 19.5) |
-| propagation | 0.2 (p99: 0.3) | 0.2 (p99: 0.3) | 0.2 (p99: 0.2) |
-| msckf update | 2.0 (p99: 6.2, max: 8.5) | 1.6 (p99: 5.5, max: 8.1) | 1.2 (p99: 5.2, max: 7.9) |
-| slam update | 2.6 (p99: 3.5, max: 7.9) | 2.3 (p99: 3.2, max: 5.6) | 1.3 (p99: 3.0, max: 6.6) |
-| slam delayed | 0.6 (p99: 3.4, max: 6.7) | 0.8 (p99: 4.2, max: 9.8) | 1.1 (p99: 5.7, max: 13.8) |
-| re-tri & marg | 1.0 (p99: 1.5, max: 4.4) | 1.0 (p99: 1.5, max: 2.0) | 0.9 (p99: 1.3, max: 3.8) |
-| **total** | **8.2** (p99: 13.1, max: 16.8) | **7.7** (p99: 12.8, max: 16.0) | **6.9** (p99: 13.6, max: 24.0) |
+| tracking | 1.8 (p99: 2.9) | 1.9 (p99: 3.0) | 2.3 (p99: 6.5) |
+| propagation | 0.2 (p99: 0.3) | 0.2 (p99: 0.3) | 0.2 (p99: 0.3) |
+| msckf update | 1.9 (p99: 6.2) | 1.5 (p99: 5.7) | 1.1 (p99: 5.6) |
+| slam update | 2.5 (p99: 4.3) | 2.2 (p99: 4.1) | 1.4 (p99: 3.3) |
+| slam delayed | 0.6 (p99: 3.6) | 0.8 (p99: 4.3) | 1.1 (p99: 5.7) |
+| re-tri & marg | 1.1 (p99: 1.8) | 1.0 (p99: 1.6) | 0.9 (p99: 1.4) |
+| **total** | **8.1** (p99: 13.2) | **7.7** (p99: 13.2) | **7.0** (p99: 14.2) |
 
-*Source: `results/timing/x86/serial/mono/{V1_01_easy,MH_03_medium,V1_03_difficult}.txt`*
+*Source: `results/timing/x86/serial/thread_rewrite/{V1_01_easy,MH_03_medium,V1_03_difficult}_4thr_mono_thread.txt`*
 
-Frames processed: V1_01=2799, MH_03=2310, V1_03=2004
+Frames processed: V1_01=2799, MH_03=2311, V1_03=2005
 
 ### Phase 1 findings
 
@@ -232,20 +235,20 @@ Frames processed: V1_01=2799, MH_03=2310, V1_03=2004
    expensive.
 
 3. **Tracking scales with difficulty.** On V1_03_difficult (fast motion, blur),
-   tracking mean increases from 2.6ms to 3.0ms and p99 from 4.1ms to 7.0ms. KLT
-   has to work harder to track through motion blur.
+   tracking mean increases from 2.6 ms to 3.3 ms and p99 from 3.9 ms to 7.3 ms.
+   KLT has to work harder to track through motion blur.
 
 4. **MSCKF update and SLAM delayed are spiky.** These components have high variance
    (std ~ mean) because their cost depends on how many features are lost or
-   initialized on each frame. The p99 and max values are 3-10x the mean.
+   initialized on each frame. Their p99 values are 5-10× the mean.
 
-5. **Stereo is ~38% slower than mono** (11.3ms vs 8.2ms on V1_01). The gap:
-   - Tracking: +0.8ms (stereo matching between left/right cameras)
-   - SLAM update: +1.9ms (larger state vector — stereo adds extrinsic calibration)
-   - Re-tri & marg: +0.5ms (more features to re-triangulate)
+5. **Stereo is ~40% slower than mono** (11.3 ms vs 8.1 ms on V1_01). The gap:
+   - Tracking: +0.8 ms (stereo matching between left/right cameras)
+   - SLAM update: +2.0 ms (larger state vector — stereo adds extrinsic calibration)
+   - Re-tri & marg: +0.4 ms (more features to re-triangulate)
 
-6. **Paradox: difficult sequences are faster.** V1_03_difficult (9.5ms) is faster
-   than V1_01_easy (11.3ms) because fewer features survive motion blur, so SLAM
+6. **Paradox: difficult sequences are faster.** V1_03_difficult (9.8 ms) is faster
+   than V1_01_easy (11.3 ms) because fewer features survive motion blur, so SLAM
    update and MSCKF update have less work. The tracking component gets more
    expensive, but the overall pipeline gets lighter.
 
@@ -273,49 +276,49 @@ Cleans up the temp file after all runs.
 | D: No SLAM | `max_slam: 0, max_slam_in_update: 0` | Since SLAM update is the dominant component (Phase 1 finding), what happens if we eliminate it entirely? Features that would become SLAM landmarks go through MSCKF instead. |
 | E: 1 OpenCV thread | `num_opencv_threads: 1` (from 4) | How much does OpenCV parallelism actually help? Worth knowing before contending with ROS 2 executor threads for cores. |
 
-### Results (all times in ms, V1_01_easy stereo)
+### Results (thread-clock mean, ms — V1_01_easy stereo serial)
 
-| Variant | Tracking | Propagation | MSCKF upd | SLAM upd | SLAM delay | Re-tri/marg | **Total** | **p99** | **max** |
-|---------|----------|-------------|-----------|----------|------------|-------------|-----------|---------|---------|
-| **Baseline** (200pts, full-res, 4 thr) | 2.6 | 0.2 | 1.6 | 4.5 | 0.9 | 1.5 | **11.3** | **19.2** | **30.2** |
-| **A: Downsample** | 1.7 | 0.2 | 1.5 | 4.6 | 0.9 | 0.6 | **9.5** | **14.9** | **23.8** |
-| **B: 100 features** | 1.8 | 0.2 | 0.1 | 2.9 | 0.5 | 1.3 | **6.8** | **12.7** | **32.5** |
-| **C: 300 features** | 3.3 | 0.2 | 3.5 | 4.6 | 1.0 | 1.8 | **14.3** | **22.6** | **33.4** |
-| **D: No SLAM** | 2.5 | 0.1 | 3.2 | — | — | 1.5 | **7.4** | **14.6** | **20.7** |
-| **E: 1 OpenCV thread** | 3.7 | 0.2 | 1.6 | 4.5 | 0.9 | 1.4 | **12.3** | **20.5** | **34.7** |
+| Variant | Tracking | Propagation | MSCKF upd | SLAM upd | SLAM delay | Re-tri/marg | **Total** | **p99** |
+|---------|----------|-------------|-----------|----------|------------|-------------|-----------|---------|
+| **Baseline** (200pts, full-res, 4 thr) | 2.6 | 0.2 | 1.6 | 4.5 | 0.9 | 1.5 | **11.3** | **22.7** |
+| **A: Downsample** | 1.9 | 0.2 | 1.4 | 4.7 | 1.0 | 0.6 | **9.8** | **17.1** |
+| **B: 100 features** | 2.0 | 0.2 | 0.1 | 2.8 | 0.5 | 1.3 | **6.8** | **20.4** |
+| **C: 300 features** | 3.5 | 0.2 | 3.6 | 4.9 | 1.0 | 1.8 | **15.1** | **26.6** |
+| **D: No SLAM** | 2.6 | 0.1 | 3.1 | — | — | 1.5 | **7.4** | **17.9** |
+| **E: 1 OpenCV thread** | 3.7 | 0.2 | 1.6 | 4.6 | 0.9 | 1.5 | **12.5** | **24.8** |
 
-*Source: `results/timing/x86/serial/sweep/{A_downsample,B_num_pts_100,C_num_pts_300,D_no_slam,E_opencv_1thread}.txt`; baseline row from `results/timing/x86/serial/stereo/V1_01_easy.txt`*
+*Source: `results/timing/x86/serial/sweep/thread_rewrite/{A_downsample,B_num_pts_100,C_num_pts_300,D_no_slam,E_opencv_1thread}_thread.txt`; baseline row from `results/timing/x86/serial/bench_5rep_3clock/V1_01_easy_4thr_thread.txt`*
 
 ### Phase 2 findings — impact ranking
 
-1. **100 features** (-4.5ms, **-40%**): Biggest single win. MSCKF update nearly
-   vanishes (1.6ms -> 0.1ms — fewer features are lost per frame so fewer MSCKF
-   updates happen). SLAM update drops from 4.5ms to 2.9ms (fewer features in the
+1. **100 features** (-4.5 ms, **-40%**): Biggest single win. MSCKF update nearly
+   vanishes (1.6 → 0.1 ms — fewer features are lost per frame so fewer MSCKF
+   updates happen). SLAM update drops from 4.5 to 2.8 ms (fewer features in the
    state). Tracking drops slightly (less extraction work).
    *Tradeoff:* accuracy may degrade on difficult sequences with fewer visual cues.
 
-2. **No SLAM** (-3.9ms, **-35%**): Eliminates SLAM update (4.5ms) and SLAM delayed
-   (0.9ms) entirely. But MSCKF update doubles from 1.6ms to 3.2ms — features that
-   would have become persistent SLAM landmarks now go through the one-shot MSCKF
-   path instead, each requiring triangulation.
+2. **No SLAM** (-3.9 ms, **-35%**): Eliminates SLAM update (4.5 ms) and SLAM delayed
+   (0.9 ms) entirely. But MSCKF update nearly doubles from 1.6 to 3.1 ms — features
+   that would have become persistent SLAM landmarks now go through the one-shot
+   MSCKF path instead, each requiring triangulation.
    *Tradeoff:* no persistent landmarks means worse long-term drift, especially in
    revisited areas.
 
-3. **Downsample** (-1.8ms, **-16%**): Tracking drops 35% (2.6ms -> 1.7ms) — KLT
-   on quarter-pixel images is much cheaper. Re-tri & marg also drops (1.5ms -> 0.6ms).
+3. **Downsample** (-1.5 ms, **-13%**): Tracking drops 27% (2.6 → 1.9 ms) — KLT
+   on quarter-pixel images is cheaper. Re-tri & marg also drops (1.5 → 0.6 ms).
    Other components barely change since the number of features is the same.
    *Tradeoff:* minimal — features are still detected, just at lower resolution.
    This is likely the cheapest accuracy tradeoff.
 
-4. **1 OpenCV thread** (+1.0ms, **+9%**): Only tracking is affected (2.6ms -> 3.7ms,
+4. **1 OpenCV thread** (+1.2 ms, **+11%**): Only tracking is affected (2.6 → 3.7 ms,
    +42%). SLAM/MSCKF updates don't use OpenCV threading at all.
    *Key insight:* OpenCV parallelism gives only moderate benefit for this workload.
    On core-constrained machines, dedicating cores to the ROS 2 executor can pay
    off more than giving them to OpenCV.
 
-5. **300 features** (+3.0ms, **+27%**): Diminishing returns. 50% more features
-   costs 27% more total time. MSCKF update more than doubles (+119%) since more
-   features are lost per frame. Tracking grows +27%.
+5. **300 features** (+3.8 ms, **+34%**): Diminishing returns. 50% more features
+   costs 34% more total time. MSCKF update more than doubles since more features
+   are lost per frame. Tracking grows +35%.
 
 ### Key insight: SLAM update is the bottleneck
 
@@ -350,70 +353,72 @@ blocks until the bag finishes. After playback, waits 5 seconds for OpenVINS to d
 its message queue, then kills the process and copies the timing CSV. Reports
 processed frame count vs expected (2912) to quantify drops.
 
-**Why different rates:** 1x tests normal realtime. Higher rates stress-test to find
+**Why different rates:** 1× tests normal realtime. Higher rates stress-test to find
 the breaking point — the playback rate at which VIO falls behind and starts dropping
 frames.
 
+> **Post-fix numbers.** These measurements are from the current `master`, which
+> includes the persistent worker thread (see [determinism.md](determinism.md)).
+> Before that fix, subscribe at 1× was ~1.85× slower than serial; now it's
+> essentially equal.
+
 ### Frame drop analysis
 
-| Playback rate | Processed frames | "Dropped" | Drop % |
-|---------------|-----------------|-----------|--------|
-| 1.0x (realtime) | 2800 | 112 | 3.8% |
-| 2.0x | 2800 | 112 | 3.8% |
-| 5.0x | 2799 | 113 | 3.9% |
-| Serial (reference) | 2776 | 136 | 4.7% |
+| Playback rate | Processed frames | "Dropped" | Drop % | Notes |
+|---------------|-----------------|-----------|--------|-------|
+| 1.0× (realtime) | 2800 | 112 | 3.8% | init + stereo-sync, not perf |
+| 2.0× | 2800 | 112 | 3.8% | init + stereo-sync, not perf |
+| 5.0× | 2707 | 205 | 7.0% | ~93 real drops — first sign of stress |
+| Serial (reference) | 2776 | 136 | 4.7% | strict ±20 ms stereo sync |
 
-*Source: `results/timing/x86/subscribe/V1_01_easy_rate{1.0,2.0,5.0}.txt`; serial reference from `results/timing/x86/serial/stereo/V1_01_easy.txt`*
+*Source: `results/timing/x86/subscribe/thread_rewrite/V1_01_easy_rate{1.0,2.0,5.0}_thread.txt`; serial reference from `results/timing/x86/serial/bench_5rep_3clock/V1_01_easy_4thr_thread.txt`*
 
-The ~112-136 "missing" frames are **NOT performance-related drops**. They come from:
-1. The initialization period (first ~2s before VIO converges, no timing is recorded)
-2. Stereo sync misses (serial uses a strict +/-20ms window; subscribe uses ROS2's
+The ~112-136 baseline "missing" frames at 1× and 2× are **NOT performance-related
+drops**. They come from:
+1. The initialization period (first ~2 s before VIO converges, no timing is recorded)
+2. Stereo sync misses (serial uses a strict ±20 ms window; subscribe uses ROS 2's
    `ApproximateTime` policy which is slightly more permissive)
 
-Subscribe actually processes MORE frames than serial (2800 vs 2776) because of this
-sync policy difference (also noted in [evaluation](evaluation.md) when comparing
-accuracy results).
+Subscribe actually processes MORE frames than serial at 1× (2800 vs 2776) because of
+this sync policy difference (also noted in [evaluation](evaluation.md)).
 
-The drop count being identical at 1x, 2x, and 5x proves these are not
-performance-related. **x86 has zero real frame drops even at 5x realtime.**
+At 5× the system processes only 2707 frames — ~93 real drops beyond the sync
+baseline. That's modest (3.3% real drop rate) but it's the first sign of stress.
 
-### Per-component timing: subscribe vs serial
+### Per-component timing: subscribe vs serial (thread clock, ms)
 
-| Component | Serial (ms) | Subscribe 1x (ms) | Subscribe 2x (ms) | Subscribe 5x (ms) |
-|-----------|------------|-------------------|-------------------|-------------------|
-| tracking | 2.6 | **7.1** | 4.0 | 2.9 |
-| propagation | 0.2 | 0.4 | 0.2 | 0.1 |
-| msckf update | 1.6 | 3.1 | 1.8 | 0.2 |
-| slam update | 4.5 | **7.4** | 4.9 | 0.3 |
-| slam delayed | 0.9 | 1.2 | 1.3 | 0.5 |
-| re-tri & marg | 1.5 | 1.8 | 1.7 | 1.6 |
-| **total** | **11.3** | **20.9** | **13.9** | **5.7** |
+| Component | Serial | Subscribe 1× | Subscribe 2× | Subscribe 5× |
+|-----------|--------|--------------|--------------|--------------|
+| tracking | 2.6 | 2.9 | 3.0 | 3.1 |
+| propagation | 0.2 | 0.2 | 0.2 | 0.1 |
+| msckf update | 1.6 | 1.7 | 1.8 | **0.5** |
+| slam update | 4.5 | 4.7 | 5.0 | **1.2** |
+| slam delayed | 0.9 | 1.0 | 1.1 | 1.3 |
+| re-tri & marg | 1.5 | 1.6 | 1.7 | 1.8 |
+| **total** | **11.3** | **12.0** | **12.9** | **8.0** |
 
-*Source: `results/timing/x86/subscribe/V1_01_easy_rate{1.0,2.0,5.0}.txt`; serial column from `results/timing/x86/serial/stereo/V1_01_easy.txt`*
+*Source: `results/timing/x86/subscribe/thread_rewrite/V1_01_easy_rate{1.0,2.0,5.0}_thread.txt`; serial column from `results/timing/x86/serial/bench_5rep_3clock/V1_01_easy_4thr_thread.txt`*
 
 ### Phase 3 findings
 
-1. **Subscribe 1x is 1.85x slower than serial** (20.9ms vs 11.3ms). The overhead
-   comes from the ROS2 `MultiThreadedExecutor`, message deserialization through the
-   subscriber pipeline, and CPU contention between the VIO update thread and the
-   executor's callback threads. This is real overhead that exists on any ROS2
-   deployment — it's the cost of the middleware.
+1. **Subscribe 1× matches serial** (12.0 ms vs 11.3 ms, ~6% overhead). The ROS 2
+   middleware penalty has been eliminated by the persistent worker thread —
+   see [determinism.md](determinism.md) for the architecture and the old-dispatch
+   comparison (which saw 20.9 ms at 1×, 1.85× slower than serial).
 
-2. **Subscribe 2x is faster than 1x** (13.9ms vs 20.9ms). This is counterintuitive
-   but makes sense: at 1x rate, the executor has idle time between callbacks where
-   CPU caches cool and threads context-switch more. At 2x, messages arrive
-   back-to-back, keeping the CPU pipeline hot and reducing scheduling overhead.
+2. **Subscribe 2× tracks 1× closely** (12.9 vs 12.0 ms). Higher message arrival
+   rate adds only ~1 ms of per-frame cost — the pipeline has headroom.
 
-3. **Subscribe 5x shows artificially low times** (5.7ms). At 5x, VIO can't process
-   frames as fast as they arrive, so it runs with a lighter state (fewer tracked
-   features, fewer SLAM landmarks converge). The SLAM and MSCKF updates shrink
-   accordingly. This is NOT a valid measure of algorithmic cost — it's an artifact
-   of VIO running in a degraded mode.
+3. **Subscribe 5× shows degraded mode** (8.0 ms total — SLAM upd drops to 1.2 ms,
+   MSCKF upd to 0.5 ms). The system can't keep up with 100 Hz arrival, so the
+   filter runs with fewer tracked features and fewer SLAM landmarks. The total is
+   artificially low — this is NOT a valid measure of algorithmic cost, it's an
+   artifact of running in a lighter state. ~3% of frames are also dropped.
 
-4. **Tracking suffers most from contention** — 2.7x slower in subscribe 1x vs
-   serial (7.1ms vs 2.6ms). KLT optical flow is compute-intensive and sensitive to
-   cache pressure from concurrent threads. The EKF updates (which are memory-bound
-   matrix operations) also slow down but by a smaller factor.
+4. **Tracking overhead is now negligible** (2.9 ms subscribe vs 2.6 ms serial,
+   +12%). Under the old dispatch, tracking inflated 2.7× (to 7.1 ms) because every
+   frame spawned a new `std::thread`; the persistent worker keeps caches warm and
+   scheduling quiet.
 
 ---
 
@@ -466,12 +471,12 @@ Total: 11.3ms per frame
 |-------------|---------|-------|
 | Reduce features to 100 | -40% | Biggest win. Impacts tracking + all updates. |
 | Disable SLAM (max_slam=0) | -35% | Eliminates largest component. MSCKF takes over. |
-| Switch to mono | -27% | Removes stereo matching + smaller state. |
-| Downsample images | -16% | Cheap win. Tracking + re-tri savings. |
-| Reduce OpenCV threads | +9% | Modest. Not worth worrying about. |
-| Increase features to 300 | +27% | Diminishing returns. Avoid. |
+| Switch to mono | -28% | Removes stereo matching + smaller state. |
+| Downsample images | -13% | Cheap win. Tracking + re-tri savings. |
+| Reduce OpenCV threads | +11% | Modest. Not worth worrying about. |
+| Increase features to 300 | +34% | Diminishing returns. Avoid. |
 
-*Source: derived from `results/timing/x86/serial/{stereo/V1_01_easy.txt,mono/V1_01_easy.txt,sweep/*.txt}`*
+*Source: derived from `results/timing/x86/serial/bench_5rep_3clock/V1_01_easy_4thr_thread.txt`, `results/timing/x86/serial/thread_rewrite/V1_01_easy_4thr_mono_thread.txt`, and `results/timing/x86/serial/sweep/thread_rewrite/*_thread.txt`*
 
 Recommended starting configs for RPi5 are listed in
 [rpi5-benchmarking.md](rpi5-benchmarking.md) — those were validated against
@@ -516,9 +521,9 @@ All scripts are in the workspace root. They skip runs whose output already exist
 
 | Script | Phase | What it does |
 |--------|-------|-------------|
-| `run_full_benchmark.sh -m serial -c both -r 1` | 1 | Runs serial mode on 3 sequences x {stereo, mono}. |
-| `run_timing_sweep.sh` | 2 | Runs 5 config variants on V1_01_easy (serial mode). |
-| `run_timing_subscribe.sh [rate]` | 3 | Subscribe mode + bag playback at given rate. |
+| `run_full_benchmark.sh -m serial -c both -r 1` | 1 | Runs serial mode on 3 sequences × {stereo, mono}. |
+| `run_timing_sweep.sh [--tag NAME]` | 2 | Runs 5 config variants on V1_01_easy (serial mode). |
+| `run_timing_subscribe.sh [rate] [--tag NAME]` | 3 | Subscribe mode + bag playback at given rate. |
 
 ## Key source files
 

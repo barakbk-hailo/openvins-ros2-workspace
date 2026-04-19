@@ -4,7 +4,10 @@
 # Runs OpenVINS in subscribe mode while playing a bag at various rates.
 #
 # Usage:
-#   bash run_timing_subscribe.sh [rate]   # default rate=1.0
+#   bash run_timing_subscribe.sh [rate] [--tag <name>]
+#
+# --tag routes output under $HOME/results/timing/x86/subscribe/<tag>/
+# so reruns don't clobber earlier results.
 
 set -eo pipefail
 
@@ -12,9 +15,18 @@ set -eo pipefail
 pkill -9 -f "run_subscribe_msckf" 2>/dev/null || true
 sleep 1
 
-RATE="${1:-1.0}"
+RATE="1.0"
+TAG=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --tag) TAG="$2"; shift 2 ;;
+    -h|--help) sed -n '2,9p' "$0" | sed 's/^# \?//'; exit 0 ;;
+    *) RATE="$1"; shift ;;
+  esac
+done
+
 DATASETS_DIR="$HOME/datasets/euroc"
-RESULTS_DIR="$HOME/results/timing/x86/subscribe"
+RESULTS_DIR="$HOME/results/timing/x86/subscribe${TAG:+/$TAG}"
 TIMING_TMP="/tmp/traj_timing.txt"
 TIMING_TMP_CPU="/tmp/traj_timing_cpu.txt"
 TIMING_TMP_THREAD="/tmp/traj_timing_thread.txt"

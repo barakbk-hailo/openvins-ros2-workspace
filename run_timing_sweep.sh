@@ -4,12 +4,24 @@
 # Tests which config knobs matter most for RPi5 optimization.
 #
 # Usage:
-#   bash run_timing_sweep.sh
+#   bash run_timing_sweep.sh [--tag <name>]
+#
+# --tag routes output under $HOME/results/timing/x86/serial/sweep/<tag>/
+# so reruns don't clobber earlier results.
 
 set -eo pipefail
 
+TAG=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --tag) TAG="$2"; shift 2 ;;
+    -h|--help) sed -n '2,9p' "$0" | sed 's/^# \?//'; exit 0 ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
 DATASETS_DIR="$HOME/datasets/euroc"
-RESULTS_DIR="$HOME/results/timing/x86/serial/sweep"
+RESULTS_DIR="$HOME/results/timing/x86/serial/sweep${TAG:+/$TAG}"
 TIMING_TMP="/tmp/traj_timing.txt"
 TIMING_TMP_CPU="/tmp/traj_timing_cpu.txt"
 TIMING_TMP_THREAD="/tmp/traj_timing_thread.txt"
