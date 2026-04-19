@@ -178,6 +178,8 @@ a worst case of 26.0 on MH_03 (partial SLAM dip).
 ¹ ov_eval NaN assertion crash on a healthy trajectory (tool bug, not a divergence —
 final position is correct).
 
+*Source: Serial from `results/timing/x86/serial/bench_persistent_worker/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_est.txt`; subscribe from `results/timing/x86/subscribe/bench_persistent_worker/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_est.txt`; compared against `src/open_vins/ov_data/euroc_mav/{V1_01_easy,MH_03_medium,V2_02_medium}.txt`*
+
 **Orientation RMSE (millidegrees) across all runs:**
 
 | Sequence | Serial | Sub 4-thr (5 reps) | Sub 1-thr (5 reps) |
@@ -186,6 +188,8 @@ final position is correct).
 | MH_03_medium | 147.2 | 146.0, 148.9, 146.8, 145.3, 145.7 | 147.1, 146.5, 146.8, 145.9, 146.6 |
 | V2_02_medium | 122.4 | 122.6, 122.9, 122.3, —¹, 122.5 | 123.1, 122.9, 122.9, 122.7, 122.7 |
 
+*Source: same `*_est.txt` files as the Position RMSE table (orientation RMSE is extracted from the same `error_singlerun` outputs).*
+
 **Cross-run variability summary:**
 
 | Sequence | Serial ATE pos | Subscribe ATE pos range | Max deviation | Subscribe ATE pos std |
@@ -193,6 +197,8 @@ final position is correct).
 | V1_01_easy | 1.946m | 1.943 – 1.946m | **0.003m** | **0.001m** |
 | MH_03_medium | 3.450m | 3.440 – 3.445m | **0.010m** | **0.002m** |
 | V2_02_medium | 2.099m | 2.091 – 2.102m | **0.008m** | **0.004m** |
+
+*Source: derived from the Position RMSE table above — same `*_est.txt` files under `results/timing/x86/{serial,subscribe}/bench_persistent_worker/`.*
 
 ### RPE — Relative Pose Error (median position, meters)
 
@@ -209,6 +215,8 @@ run 1 comparison (4-thread):
 | 32m | 2.458 | 2.434 | 0.024 |
 | 40m | 2.378 | 2.363 | 0.015 |
 
+*Source: Serial from `results/timing/x86/serial/bench_persistent_worker/V1_01_easy_4thr_est.txt`; Subscribe run 1 from `results/timing/x86/subscribe/bench_persistent_worker/V1_01_easy_4thr_run1_est.txt`.*
+
 **MH_03_medium:**
 
 | Segment | Serial | Subscribe | Delta |
@@ -218,6 +226,8 @@ run 1 comparison (4-thread):
 | 24m | 4.884 | 4.893 | 0.009 |
 | 32m | 5.362 | 5.391 | 0.029 |
 | 40m | 3.442 | 3.438 | 0.004 |
+
+*Source: Serial from `results/timing/x86/serial/bench_persistent_worker/MH_03_medium_4thr_est.txt`; Subscribe run 1 from `results/timing/x86/subscribe/bench_persistent_worker/MH_03_medium_4thr_run1_est.txt`.*
 
 **V2_02_medium:**
 
@@ -229,10 +239,10 @@ run 1 comparison (4-thread):
 | 32m | 3.215 | 3.171 | 0.044 |
 | 40m | 3.032 | 3.029 | 0.003 |
 
+*Source: Serial from `results/timing/x86/serial/bench_persistent_worker/V2_02_medium_4thr_est.txt`; Subscribe run 1 from `results/timing/x86/subscribe/bench_persistent_worker/V2_02_medium_4thr_run1_est.txt`.*
+
 RPE deltas are <0.05m across all segments and sequences — subscribe local
 consistency matches serial.
-
-*Source: Serial from `results/timing/x86/serial/bench_persistent_worker/*_4thr_est.txt`; Worker subscribe from `results/timing/x86/subscribe/bench_persistent_worker/*_4thr_run{1..5}_est.txt`; compared against `src/open_vins/ov_data/euroc_mav/{V1_01_easy,MH_03_medium,V2_02_medium}.txt`*
 
 ### Process CPU reveals OpenCV parallelism cost (V2_02, 4-thr)
 
