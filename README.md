@@ -7,9 +7,9 @@ on Ubuntu 22.04. No GPU required — OpenVINS is a CPU-based MSCKF/EKF algorithm
 
 Our fork adds:
 - **Serial deterministic VIO node** (`ros2_serial_msckf`) — ROS 2 port of the ROS 1 serial reader. Processes bag frames sequentially with blocking updates, eliminating message drops from ROS 2 middleware. Produces bit-identical results between runs on the same platform.
-- **3-clock timing instrumentation** — process CPU (`CLOCK_PROCESS_CPUTIME_ID`), thread CPU (`CLOCK_THREAD_CPUTIME_ID`), and wall-clock timing recorded per frame in separate CSVs. Also records per-frame feature counts (SLAM, MSCKF, delayed init). All disabled by default.
-- **Persistent worker thread** — replaces the upstream per-frame `detach()` dispatch in subscribe mode with a single persistent processing thread. Fixes a TOCTOU race, dangling-reference UB, and non-deterministic IMU triggering. Reduces subscribe-mode overhead from 2x serial to 1x serial.
+- **Persistent worker thread** — replaces the upstream per-frame `detach()` dispatch in subscribe mode with a single persistent processing thread. Fixes a TOCTOU race, dangling-reference UB, and non-deterministic IMU triggering. Reduces subscribe-mode overhead from 2× serial to 1× serial.
 - **SLAM recovery mechanism** — relaxes the chi-squared gate for delayed feature init when SLAM features drop below 25% of max, preventing an irrecoverable empty-state feedback loop (defense-in-depth).
+- **3-clock timing instrumentation** — process CPU (`CLOCK_PROCESS_CPUTIME_ID`), thread CPU (`CLOCK_THREAD_CPUTIME_ID`), and wall-clock timing recorded per frame in separate CSVs. Also records per-frame feature counts (SLAM, MSCKF, delayed init). All disabled by default.
 - **Configurable `multi_threading_subs`** — moved from hardcoded to a YAML parameter, allowing async vs inline VIO dispatch without recompiling.
 - **Custom RPE segment lengths** — `error_singlerun` accepts optional segment lengths from the command line.
 - **Launch file improvements** — `filepath_est`/`filepath_std` args for configurable output paths; `on_exit=Shutdown()` for clean exit in automated benchmark loops.
@@ -24,15 +24,38 @@ cd ~/workspace/catkin_ws_ov
 bash install.sh
 ```
 
+## Workspace structure
+
+```
+catkin_ws_ov/
+├── src/open_vins/              fork submodule (algorithm + nodes + launch files)
+├── install.sh                  one-shot Ubuntu 22.04 setup
+├── record_poses.py             subscribe-mode pose recorder (used by evaluation)
+├── run_full_benchmark.sh       flexible benchmark orchestrator (serial + subscribe)
+├── run_timing_subscribe.sh     Phase 3: subscribe at configurable bag-playback rates
+├── run_timing_sweep.sh         Phase 2: config sensitivity sweeps
+├── results/
+│   ├── stereo/  mono/          x86 EuRoC trajectory estimates (paper reproduction)
+│   ├── rpi5/stereo/            RPi5 EuRoC trajectory estimates
+│   └── timing/{x86,rpi5}/      per-frame timing CSVs (serial + subscribe)
+└── docs/                       (see index below)
+```
+
+Every committed timing CSV and trajectory estimate is referenced from the
+docs below. Tables that aggregate data from `results/` carry a
+`*Source: ...*` citation line identifying the underlying file(s).
+
 ## Documentation
+
+Follow the flow top-to-bottom — each doc builds on the previous ones.
 
 | Guide | Description |
 |---|---|
 | [Installation](docs/installation.md) | Native build on Ubuntu 22.04 (ROS 2 Humble) |
-| [Running EuRoC](docs/running-euroc.md) | Download dataset, launch OpenVINS, visualize in RViz |
-| [Evaluation](docs/evaluation.md) | ATE/RPE benchmarks, paper comparison, reproduction script |
+| [Running](docs/running.md) | Run the VIO pipeline on EuRoC — serial (deterministic) and subscribe (realtime) modes |
+| [Evaluation](docs/evaluation.md) | ATE/RPE benchmarks vs the OpenVINS paper + reproduction script |
 | [Determinism](docs/determinism.md) | Subscribe-mode determinism: persistent worker thread root-cause fix + SLAM recovery safety net + other fork changes |
-| [Benchmark Analysis](docs/benchmark-analysis.md) | Paper comparison, 3-clock timing, accuracy, consistency, RPi5 projections (latest data) |
-| [Timing](docs/timing.md) | Per-component timing breakdown, config sensitivity, realtime feasibility, RPi5 projections |
+| [Timing](docs/timing.md) | Per-component timing breakdown, config sensitivity, realtime feasibility (x86) |
+| [Benchmark Analysis](docs/benchmark-analysis.md) | 3-clock timing, paper comparison, accuracy and consistency under subscribe mode (x86) |
 | [RPi5 Setup](docs/rpi5-setup.md) | Build on RPi5 (Docker or native) + run the EuRoC benchmark; live-sensor deployment is WIP |
-| [RPi5 Benchmarking](docs/rpi5-benchmarking.md) | Phase 4 RPi5 timing, accuracy vs x86, config sweeps, subscribe mode, WIP list |
+| [RPi5 Benchmarking](docs/rpi5-benchmarking.md) | Phase 4 RPi5 timing, accuracy vs x86 (NEON/AVX determinism caveat), config sweeps, subscribe mode, WIP list |

@@ -22,6 +22,8 @@ One-shot setup from scratch: `./install.sh`
 
 ## Running VIO
 
+Full walk-through in [docs/running.md](docs/running.md). One-liners:
+
 **Serial mode** (deterministic, for benchmarking — reads bag directly, no `ros2 bag play`):
 ```bash
 ros2 launch ov_msckf serial.launch.py \
@@ -57,13 +59,19 @@ Timing files are CSV: `timestamp,tracking,propagation,msckf_update,slam_update,s
 
 | Script | Purpose |
 |--------|---------|
-| `run_full_benchmark.sh` | Complete suite: serial + subscribe, 3 sequences, 5 reps (~2.5 hrs) |
-| `run_timing_benchmark.sh` | Serial-only baseline: 3 sequences x stereo/mono |
-| `run_timing_combined.sh` | Subscribe timing + accuracy + feature counts with multi-rep |
-| `run_timing_subscribe.sh` | Subscribe-mode timing with configurable threads/SLAM delay |
-| `run_timing_sweep.sh` | Config sensitivity: thread count, feature density, SLAM delay |
+| `run_full_benchmark.sh` | Flexible orchestrator: serial/subscribe × sequences × threads × cameras × reps. `--quick` for 1-rep smoke, `--help` for options. |
+| `run_timing_subscribe.sh` | Subscribe mode at configurable bag-playback rates (1×/2×/5× realtime feasibility — Phase 3) |
+| `run_timing_sweep.sh` | Config sensitivity sweep: thread count, feature density, SLAM delay (Phase 2) |
 
-Results go to `~/results/timing/x86/{serial,subscribe}/`. File naming: `{SEQUENCE}_{THREADS}thr_run{N}_{wall|cpu|thread|feats|est}.txt`
+Example: targeted subscribe benchmark on a single sequence
+```bash
+bash run_full_benchmark.sh -m subscribe -s V2_02_medium -r 5 --tag bench_v2
+```
+
+Results go to `~/results/timing/x86/{serial,subscribe}/<tag>/`. File naming:
+`{SEQUENCE}_{THREADS}thr_run{N}_{wall|cpu|thread|feats|est}.txt` (subscribe),
+`{SEQUENCE}_{THREADS}thr_{wall|cpu|thread|feats|est}.txt` (serial). Mono runs
+append `_mono` to the tag.
 
 ## Formatting
 
@@ -105,7 +113,8 @@ Both use `ROS2Visualizer` to publish odometry, point clouds, and TF.
 ### Fork-Specific Additions
 
 - **Serial VIO node** (`ov_msckf/src/ros2_serial_msckf.cpp`) — deterministic offline bag processing for reproducible benchmarking
-- **SLAM recovery** — when SLAM features drop below 25% of `max_slam`, chi-squared gate relaxes 3x to prevent irrecoverable feature collapse in subscribe mode
+- **Persistent worker thread** (`ov_msckf/src/ros/ROS2Visualizer.{h,cpp}`) — replaces the upstream per-frame `detach()` dispatch with a single long-lived worker. Eliminates TOCTOU race, dangling-reference UB, and non-deterministic IMU triggering. Reduces subscribe overhead from 2× serial to 1× serial. Details in [docs/determinism.md](docs/determinism.md).
+- **SLAM recovery** — when SLAM features drop below 25% of `max_slam`, chi-squared gate relaxes 3× to prevent irrecoverable feature collapse in subscribe mode (defense-in-depth safety net)
 - **3-clock timing** — wall clock, process CPU, and thread CPU instrumentation in `VioManager::track_image_and_update()`
 - **Feature count recording** — per-frame MSCKF/SLAM/tracking feature counts
 
@@ -119,7 +128,23 @@ Dataset configs live in `src/open_vins/config/{dataset}/` with 3 files each:
 Key tuning knobs in `estimator_config.yaml`:
 - `num_pts` (feature density, default 200), `max_slam` (SLAM features, default 50)
 - `max_clones` (sliding window size, default 11), `max_cameras` (1=mono, 2=stereo)
-- `record_timing_information`, `record_timing_cpu_time`, `record_timing_thread_time`, `record_feature_counts`
-- `multi_threading_subs` (OpenCV parallel threads, default 4)
+- `num_opencv_threads` (OpenCV parallel threads, default 4) — controls KLT parallelism
+- `multi_threading_subs` (default `true`) — **fork addition**: async vs inline VIO dispatch in subscribe mode; previously hardcoded, now settable from YAML
+- `record_timing_information` (wall-clock CSV), `record_timing_cpu_time`, `record_timing_thread_time` (process-CPU and thread-CPU CSVs — fork additions), `record_feature_counts` (per-frame feature counts — fork addition)
 
 Primary benchmark config: `euroc_mav`. Custom config: `barak_mav` (for live RPi5 camera).
+
+## Docs guidelines
+
+- Docs in `docs/` follow a linear flow: install → run → evaluate →
+  determinism → timing → benchmark-analysis → rpi5-setup → rpi5-benchmarking.
+  See [README.md](README.md) for the full index and [docs/running.md](docs/running.md) as the entry point.
+- Every results/data table carries a `*Source: ...*` citation line pointing
+  at the CSV(s) under `results/` that produced it.
+  Example: `*Source: results/timing/x86/serial/stereo/V1_01_easy.txt*`
+- RPi5-specific content lives in `docs/rpi5-*.md` only. Don't add RPi5
+  sections to x86-scoped docs (`timing.md`, `benchmark-analysis.md`,
+  `evaluation.md`).
+- When adding a new benchmark table, include the `run_full_benchmark.sh`
+  invocation (with flags) that produced it — this keeps the docs
+  reproducible as the CLI evolves.
