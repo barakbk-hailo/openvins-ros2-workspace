@@ -44,7 +44,10 @@ sudo apt install -y \
   build-essential gcc g++ gdb clang
 
 echo "=== [3/4] Building the workspace ==="
+# Jazzy's setup scripts reference unset vars; disable nounset around sourcing.
+set +u
 source /opt/ros/${ROS_DISTRO}/setup.bash
+set -u
 cd "$SCRIPT_DIR"
 colcon build --symlink-install
 
