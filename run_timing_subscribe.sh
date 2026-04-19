@@ -8,10 +8,16 @@
 
 set -eo pipefail
 
+# Kill any stale OpenVINS subscribe processes from previous runs
+pkill -9 -f "run_subscribe_msckf" 2>/dev/null || true
+sleep 1
+
 RATE="${1:-1.0}"
 DATASETS_DIR="$HOME/datasets/euroc"
 RESULTS_DIR="$HOME/results/timing/x86/subscribe"
 TIMING_TMP="/tmp/traj_timing.txt"
+TIMING_TMP_CPU="/tmp/traj_timing_cpu.txt"
+TIMING_TMP_THREAD="/tmp/traj_timing_thread.txt"
 WS_DIR="$HOME/workspace/catkin_ws_ov"
 SEQ="V1_01_easy"
 CONFIG_DIR="$WS_DIR/src/open_vins/config/euroc_mav"
@@ -23,6 +29,8 @@ source "$WS_DIR/install/setup.bash"
 # Create temp config with timing enabled
 cp "$CONFIG_DIR/estimator_config.yaml" "$TMP_CONFIG"
 sed -i 's/^record_timing_information: false/record_timing_information: true/' "$TMP_CONFIG"
+sed -i 's/^record_timing_cpu_time: false/record_timing_cpu_time: true/' "$TMP_CONFIG"
+sed -i 's/^record_timing_thread_time: false/record_timing_thread_time: true/' "$TMP_CONFIG"
 trap 'rm -f "$TMP_CONFIG"' EXIT
 
 mkdir -p "$RESULTS_DIR"
@@ -34,7 +42,7 @@ if [ -f "$OUT" ]; then
 fi
 
 echo "=== Subscribe mode: $SEQ at rate $RATE ==="
-rm -f "$TIMING_TMP"
+rm -f "$TIMING_TMP" "$TIMING_TMP_CPU" "$TIMING_TMP_THREAD"
 
 # Launch OpenVINS subscribe node in background
 ros2 launch ov_msckf subscribe.launch.py config_path:="$TMP_CONFIG" &
@@ -66,6 +74,14 @@ if [ -f "$TIMING_TMP" ]; then
   DROP_PCT=$(awk "BEGIN {printf \"%.1f\", 100.0 * $DROPPED / 2912}")
   echo "Drop rate:        ${DROP_PCT}%"
   echo "Saved: $OUT"
+  if [ -f "$TIMING_TMP_CPU" ]; then
+    cp "$TIMING_TMP_CPU" "${OUT%.txt}_cpu.txt"
+    echo "Saved: ${OUT%.txt}_cpu.txt (process CPU time)"
+  fi
+  if [ -f "$TIMING_TMP_THREAD" ]; then
+    cp "$TIMING_TMP_THREAD" "${OUT%.txt}_thread.txt"
+    echo "Saved: ${OUT%.txt}_thread.txt (thread CPU time)"
+  fi
 else
   echo "WARNING: no timing file produced"
 fi

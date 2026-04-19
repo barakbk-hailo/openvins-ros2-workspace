@@ -11,6 +11,8 @@ set -eo pipefail
 DATASETS_DIR="$HOME/datasets/euroc"
 RESULTS_DIR="$HOME/results/timing/x86/serial/sweep"
 TIMING_TMP="/tmp/traj_timing.txt"
+TIMING_TMP_CPU="/tmp/traj_timing_cpu.txt"
+TIMING_TMP_THREAD="/tmp/traj_timing_thread.txt"
 WS_DIR="$HOME/workspace/catkin_ws_ov"
 SEQ="V1_01_easy"
 CONFIG_DIR="$WS_DIR/src/open_vins/config/euroc_mav"
@@ -36,11 +38,13 @@ run_sweep() {
   echo "=== $NAME ==="
   cp "$BASE_CONFIG" "$TMP_CONFIG"
   sed -i 's/^record_timing_information: false/record_timing_information: true/' "$TMP_CONFIG"
+  sed -i 's/^record_timing_cpu_time: false/record_timing_cpu_time: true/' "$TMP_CONFIG"
+  sed -i 's/^record_timing_thread_time: false/record_timing_thread_time: true/' "$TMP_CONFIG"
   for sedexpr in "$@"; do
     sed -i "$sedexpr" "$TMP_CONFIG"
   done
 
-  rm -f "$TIMING_TMP"
+  rm -f "$TIMING_TMP" "$TIMING_TMP_CPU" "$TIMING_TMP_THREAD"
 
   ros2 launch ov_msckf serial.launch.py \
       config_path:="$TMP_CONFIG" \
@@ -53,6 +57,14 @@ run_sweep() {
     echo "  -> Saved $OUT ($ROWS frames)"
   else
     echo "  -> WARNING: no timing file produced for $NAME"
+  fi
+  if [ -f "$TIMING_TMP_CPU" ]; then
+    cp "$TIMING_TMP_CPU" "${OUT%.txt}_cpu.txt"
+    echo "  -> Saved ${OUT%.txt}_cpu.txt (process CPU time)"
+  fi
+  if [ -f "$TIMING_TMP_THREAD" ]; then
+    cp "$TIMING_TMP_THREAD" "${OUT%.txt}_thread.txt"
+    echo "  -> Saved ${OUT%.txt}_thread.txt (thread CPU time)"
   fi
 }
 
