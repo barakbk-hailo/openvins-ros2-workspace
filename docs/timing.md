@@ -187,38 +187,42 @@ runs whose output already exists (safe to re-run).
 **Default config:** 200 features (`num_pts`), full resolution, 4 OpenCV threads,
 50 SLAM landmarks (`max_slam`), 11 clones in the sliding window.
 
-### Stereo results (thread-clock mean, ms — 4 OpenCV threads)
+### Stereo results (ms)
+
+**Clock:** thread (`CLOCK_THREAD_CPUTIME_ID`) — VIO thread CPU only,
+excludes scheduling delays. On x86 in serial mode, wall-clock and thread-clock
+agree within ~0.1 ms so the two are equivalent here. Format below is
+`mean ± std (p99: N)`. **4 OpenCV threads.**
 
 | Component | V1_01_easy | MH_03_medium | V1_03_difficult |
 |-----------|-----------|-------------|----------------|
-| tracking | 2.6 (p99: 3.9) | 2.6 (p99: 3.9) | 3.3 (p99: 7.3) |
-| propagation | 0.2 (p99: 0.3) | 0.2 (p99: 0.3) | 0.2 (p99: 0.3) |
-| msckf update | 1.6 (p99: 11.0) | 1.2 (p99: 9.1) | 1.2 (p99: 8.8) |
-| slam update | 4.5 (p99: 6.3) | 3.7 (p99: 5.7) | 2.1 (p99: 5.8) |
-| slam delayed | 0.9 (p99: 8.1) | 1.2 (p99: 10.3) | 1.5 (p99: 9.9) |
-| re-tri & marg | 1.5 (p99: 1.9) | 1.5 (p99: 1.9) | 1.5 (p99: 2.5) |
-| **total** | **11.3** (p99: 22.7) | **10.3** (p99: 21.6) | **9.8** (p99: 20.3) |
+| tracking | 2.6 ± 0.4 (p99: 3.9) | 2.6 ± 0.4 (p99: 3.9) | 3.3 ± 1.1 (p99: 7.3) |
+| propagation | 0.2 ± 0.0 (p99: 0.3) | 0.2 ± 0.0 (p99: 0.3) | 0.2 ± 0.0 (p99: 0.3) |
+| msckf update | 1.6 ± 2.5 (p99: 11.0) | 1.2 ± 1.9 (p99: 9.1) | 1.2 ± 1.5 (p99: 8.8) |
+| slam update | 4.5 ± 1.0 (p99: 6.3) | 3.7 ± 1.3 (p99: 5.7) | 2.1 ± 1.5 (p99: 5.8) |
+| slam delayed | 0.9 ± 1.7 (p99: 8.1) | 1.2 ± 2.2 (p99: 10.3) | 1.5 ± 2.1 (p99: 9.9) |
+| re-tri & marg | 1.5 ± 0.1 (p99: 1.9) | 1.5 ± 0.1 (p99: 1.9) | 1.5 ± 0.3 (p99: 2.5) |
+| **total** | **11.3 ± 3.4** (p99: 22.7) | **10.3 ± 3.4** (p99: 21.6) | **9.8 ± 3.3** (p99: 20.3) |
 
 *Source: `results/timing/x86/serial/bench_5rep_3clock/{V1_01_easy,MH_03_medium}_4thr_thread.txt` and `results/timing/x86/serial/thread_rewrite/V1_03_difficult_4thr_thread.txt`*
 
 Frames processed: V1_01=2776, MH_03=2302, V1_03=1991 (out of 2912 in each bag;
 the difference is from the initialization period where no timing is recorded, plus
-stereo sync misses where no matching pair was found within ±20ms). Thread clock
-is the VIO thread's own CPU time — the cleanest signal for algorithmic cost
-since it excludes scheduling delays. (On x86 in serial mode, wall-clock and
-thread-clock agree to within ~0.1 ms — the two are equivalent here.)
+stereo sync misses where no matching pair was found within ±20 ms).
 
-### Mono results (thread-clock mean, ms — 4 OpenCV threads)
+### Mono results (ms)
+
+**Clock:** thread. Format: `mean ± std (p99: N)`. **4 OpenCV threads.**
 
 | Component | V1_01_easy | MH_03_medium | V1_03_difficult |
 |-----------|-----------|-------------|----------------|
-| tracking | 1.8 (p99: 2.9) | 1.9 (p99: 3.0) | 2.3 (p99: 6.5) |
-| propagation | 0.2 (p99: 0.3) | 0.2 (p99: 0.3) | 0.2 (p99: 0.3) |
-| msckf update | 1.9 (p99: 6.2) | 1.5 (p99: 5.7) | 1.1 (p99: 5.6) |
-| slam update | 2.5 (p99: 4.3) | 2.2 (p99: 4.1) | 1.4 (p99: 3.3) |
-| slam delayed | 0.6 (p99: 3.6) | 0.8 (p99: 4.3) | 1.1 (p99: 5.7) |
-| re-tri & marg | 1.1 (p99: 1.8) | 1.0 (p99: 1.6) | 0.9 (p99: 1.4) |
-| **total** | **8.1** (p99: 13.2) | **7.7** (p99: 13.2) | **7.0** (p99: 14.2) |
+| tracking | 1.8 ± 0.4 (p99: 2.9) | 1.9 ± 0.3 (p99: 3.0) | 2.3 ± 1.1 (p99: 6.5) |
+| propagation | 0.2 ± 0.0 (p99: 0.3) | 0.2 ± 0.0 (p99: 0.3) | 0.2 ± 0.0 (p99: 0.3) |
+| msckf update | 1.9 ± 1.6 (p99: 6.2) | 1.5 ± 1.4 (p99: 5.7) | 1.1 ± 1.2 (p99: 5.6) |
+| slam update | 2.5 ± 0.5 (p99: 4.3) | 2.2 ± 0.7 (p99: 4.1) | 1.4 ± 0.9 (p99: 3.3) |
+| slam delayed | 0.6 ± 0.8 (p99: 3.6) | 0.8 ± 1.0 (p99: 4.3) | 1.1 ± 1.3 (p99: 5.7) |
+| re-tri & marg | 1.1 ± 0.2 (p99: 1.8) | 1.0 ± 0.1 (p99: 1.6) | 0.9 ± 0.2 (p99: 1.4) |
+| **total** | **8.1 ± 2.0** (p99: 13.2) | **7.7 ± 2.1** (p99: 13.2) | **7.0 ± 2.5** (p99: 14.2) |
 
 *Source: `results/timing/x86/serial/thread_rewrite/{V1_01_easy,MH_03_medium,V1_03_difficult}_4thr_mono_thread.txt`*
 
@@ -276,16 +280,19 @@ Cleans up the temp file after all runs.
 | D: No SLAM | `max_slam: 0, max_slam_in_update: 0` | Since SLAM update is the dominant component (Phase 1 finding), what happens if we eliminate it entirely? Features that would become SLAM landmarks go through MSCKF instead. |
 | E: 1 OpenCV thread | `num_opencv_threads: 1` (from 4) | How much does OpenCV parallelism actually help? Worth knowing before contending with ROS 2 executor threads for cores. |
 
-### Results (thread-clock mean, ms — V1_01_easy stereo serial)
+### Results (ms, V1_01_easy stereo serial)
 
-| Variant | Tracking | Propagation | MSCKF upd | SLAM upd | SLAM delay | Re-tri/marg | **Total** | **p99** |
-|---------|----------|-------------|-----------|----------|------------|-------------|-----------|---------|
-| **Baseline** (200pts, full-res, 4 thr) | 2.6 | 0.2 | 1.6 | 4.5 | 0.9 | 1.5 | **11.3** | **22.7** |
-| **A: Downsample** | 1.9 | 0.2 | 1.4 | 4.7 | 1.0 | 0.6 | **9.8** | **17.1** |
-| **B: 100 features** | 2.0 | 0.2 | 0.1 | 2.8 | 0.5 | 1.3 | **6.8** | **20.4** |
-| **C: 300 features** | 3.5 | 0.2 | 3.6 | 4.9 | 1.0 | 1.8 | **15.1** | **26.6** |
-| **D: No SLAM** | 2.6 | 0.1 | 3.1 | — | — | 1.5 | **7.4** | **17.9** |
-| **E: 1 OpenCV thread** | 3.7 | 0.2 | 1.6 | 4.6 | 0.9 | 1.5 | **12.5** | **24.8** |
+**Clock:** thread. Per-component cells are the mean; **Total** is `mean ± std`
+and **p99** is the per-frame 99th percentile of the total.
+
+| Variant | Tracking | Propagation | MSCKF upd | SLAM upd | SLAM delay | Re-tri/marg | **Total (mean ± std)** | **p99** |
+|---------|----------|-------------|-----------|----------|------------|-------------|------------------------|---------|
+| **Baseline** (200 pts, full-res, 4 thr) | 2.6 | 0.2 | 1.6 | 4.5 | 0.9 | 1.5 | **11.3 ± 3.4** | **22.7** |
+| **A: Downsample** | 1.9 | 0.2 | 1.4 | 4.7 | 1.0 | 0.6 | **9.8 ± 2.6** | **17.1** |
+| **B: 100 features** | 2.0 | 0.2 | 0.1 | 2.8 | 0.5 | 1.3 | **6.8 ± 2.7** | **20.4** |
+| **C: 300 features** | 3.5 | 0.2 | 3.6 | 4.9 | 1.0 | 1.8 | **15.1 ± 3.8** | **26.6** |
+| **D: No SLAM** | 2.6 | 0.1 | 3.1 | — | — | 1.5 | **7.4 ± 3.2** | **17.9** |
+| **E: 1 OpenCV thread** | 3.7 | 0.2 | 1.6 | 4.6 | 0.9 | 1.5 | **12.5 ± 3.7** | **24.8** |
 
 *Source: `results/timing/x86/serial/sweep/thread_rewrite/{A_downsample,B_num_pts_100,C_num_pts_300,D_no_slam,E_opencv_1thread}_thread.txt`; baseline row from `results/timing/x86/serial/bench_5rep_3clock/V1_01_easy_4thr_thread.txt`*
 
@@ -385,7 +392,10 @@ this sync policy difference (also noted in [evaluation](evaluation.md)).
 At 5× the system processes only 2707 frames — ~93 real drops beyond the sync
 baseline. That's modest (3.3% real drop rate) but it's the first sign of stress.
 
-### Per-component timing: subscribe vs serial (thread clock, ms)
+### Per-component timing: subscribe vs serial (ms)
+
+**Clock:** thread. Per-component cells are the mean; **total** is `mean ± std`
+and **p99** is the per-frame 99th percentile of the total.
 
 | Component | Serial | Subscribe 1× | Subscribe 2× | Subscribe 5× |
 |-----------|--------|--------------|--------------|--------------|
@@ -395,7 +405,8 @@ baseline. That's modest (3.3% real drop rate) but it's the first sign of stress.
 | slam update | 4.5 | 4.7 | 5.0 | **1.2** |
 | slam delayed | 0.9 | 1.0 | 1.1 | 1.3 |
 | re-tri & marg | 1.5 | 1.6 | 1.7 | 1.8 |
-| **total** | **11.3** | **12.0** | **12.9** | **8.0** |
+| **total (mean ± std)** | **11.3 ± 3.4** | **12.0 ± 3.9** | **12.9 ± 4.4** | **8.0 ± 3.8** |
+| **total p99** | **22.7** | **25.7** | **28.0** | **23.1** |
 
 *Source: `results/timing/x86/subscribe/thread_rewrite/V1_01_easy_rate{1.0,2.0,5.0}_thread.txt`; serial column from `results/timing/x86/serial/bench_5rep_3clock/V1_01_easy_4thr_thread.txt`*
 

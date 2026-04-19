@@ -217,7 +217,12 @@ bash run_full_benchmark.sh -r 5 --tag bench_5rep_3clock
 Both write to `~/results/timing/x86/{serial,subscribe}/<tag>/`. The `*Source:*`
 lines on each table below point at the specific CSVs produced.
 
-#### Subscribe-mode wall-clock total (ms): old dispatch vs persistent worker
+#### Subscribe total: old dispatch vs persistent worker
+
+**Clock:** wall (to match the paper's methodology — the paper reports wall time
+and this is the most direct apples-to-apples comparison). Thread-clock totals
+differ by <0.2 ms on x86 post-fix; see §"Per-component comparison" below for
+both. Cells list the 5 individual runs' means (ms).
 
 | Sequence | Old dispatch (5 reps) | Persistent worker (5 reps) | Serial |
 |----------|----------------------|---------------------------|--------|
@@ -233,6 +238,11 @@ Subscribe/serial ratio: **2.0× → 1.0×** (eliminated entirely).
 
 #### Per-component comparison with paper: V2_02, 4 OpenCV threads (ms)
 
+**Clocks:** paper column uses wall (their methodology); our "sub (wall)" and
+"serial (wall)" are wall-clock; "serial (proc CPU)" is `CLOCK_PROCESS_CPUTIME_ID`
+(sum of CPU across all threads, useful for thermal/power budget). Cells are
+`mean ± std` over per-frame values.
+
 | Component | Paper¹ (sub, wall) | Old dispatch (sub, wall) | **Worker (sub, wall)** | Serial (wall) | Serial (proc CPU) |
 |-----------|-------------------|-------------------------|----------------------|--------------|-------------------|
 | Tracking | 6.12 ± 1.13 | 8.4 ± 2.1 | **3.0 ± 0.6** | 3.1 ± 0.6 | 9.0 ± 1.4 |
@@ -242,12 +252,16 @@ Subscribe/serial ratio: **2.0× → 1.0×** (eliminated entirely).
 | Re-tri & Marg | 2.24 ± 0.20 | 2.0 ± 0.7 | **1.5 ± 0.2** | 1.6 ± 0.1 | 2.2 ± 0.2 |
 | **Total** | **16.43 ± 4.53** | **20.8 ± 4.5** | **10.4 ± 2.9** | **11.2 ± 3.3** | **17.8 ± 3.5** |
 
+p99 per-frame totals: Worker sub 19.2 ms, Serial wall 17.1 ms — both within the 50 ms @ 20 Hz budget.
+
 *Source: Paper column from Semenova et al. 2024 Table 4; Old dispatch from `results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`; Worker from `results/timing/x86/subscribe/bench_persistent_worker/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`; Serial from `results/timing/x86/serial/bench_persistent_worker/V2_02_medium_4thr_{wall,cpu,thread}.txt`*
 
 ¹ Semenova et al. 2024, Table 4 — subscribe mode, wall clock
 ² Paper combines SLAM Update + SLAM Delayed; our values shown combined for comparison
 
 #### Per-component comparison with paper: V2_02, 1 OpenCV thread (ms)
+
+**Clock:** all wall (paper methodology). Cells are `mean ± std`.
 
 | Component | Paper¹ (sub, wall) | Old dispatch (sub, wall) | **Worker (sub, wall)** | Serial (wall) |
 |-----------|-------------------|-------------------------|----------------------|--------------|
@@ -260,7 +274,10 @@ Subscribe/serial ratio: **2.0× → 1.0×** (eliminated entirely).
 
 *Source: Paper column from Semenova et al. 2024 Table 4; Old dispatch from `results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_1thr_run*_wall.txt`; Worker from `results/timing/x86/subscribe/bench_persistent_worker/V2_02_medium_1thr_run*_wall.txt`; Serial from `results/timing/x86/serial/bench_persistent_worker/V2_02_medium_1thr_wall.txt`*
 
-#### Cross-run variability (subscribe, wall clock, 5 repetitions)
+#### Cross-run variability (subscribe, 5 repetitions)
+
+**Clock:** wall. Mean/std/CV here are computed across the 5 per-run totals
+(each per-run total is itself a mean over ~2800 per-frame wall-clock values).
 
 | Sequence | Config | Mean (ms) | Std (ms) | CV | Range (ms) |
 |----------|--------|----------|---------|-----|-----------|
