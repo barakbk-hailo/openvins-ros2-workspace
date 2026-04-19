@@ -326,83 +326,12 @@ within the normal run-to-run variability.
 
 ---
 
-## 8. RPi5 projections
+## 8. RPi5 — see separate doc
 
-### Methodology and caveats
-
-We project RPi5 timing by scaling x86 serial measurements:
-- **CPU factor: 3.5x** — combines clock (1.5x), IPC (1.3x), SIMD width (2x AVX2
-  vs NEON), and cache (1.5x 12MB L3 vs 2MB L2). The multiplicative product is
-  5.85x but real-world scaling is lower due to memory-bound stages not scaling
-  linearly with compute. We use 3.5x as a central estimate in the 3-4x range.
-  **This is a rough projection — actual RPi5 measurements will replace it.**
-- **Subscribe factor: 1.85x** — from our Phase 3 V1_01 measurement (20.9 vs 11.3ms).
-  May differ on RPi5 (4 cores, no HT, smaller cache → potentially worse contention).
-
-### Projections (default stereo config, 200 features, max_slam=50)
-
-| Sequence | x86 serial (wall) | RPi5 serial (×3.5) | RPi5 subscribe (×3.5×1.85) | Budget |
-|----------|-------------------|--------------------|-----------------------------|--------|
-| V1_01_easy | 11.3ms | ~40ms | ~73ms | 50ms @20Hz |
-| MH_03_medium | 10.4ms | ~36ms | ~67ms | 50ms @20Hz |
-| V2_02_medium | 10.1ms | ~35ms | ~65ms | 50ms @20Hz |
-
-*Source: x86 serial wall from `results/timing/x86/serial/bench_5rep_3clock/{V1_01_easy,MH_03_medium,V2_02_medium}_4thr_wall.txt`; RPi5 columns are projections (×3.5, ×1.85), not measurements.*
-
-**Serial on RPi5 is projected within budget** with ~10-15ms headroom.
-
-**Subscribe on RPi5 exceeds budget by ~30-45%.** This means subscribe mode on RPi5
-with default config will drop frames or degrade. Mitigation options (from our
-Phase 2 sweep data on V1_01):
-
-| Optimization | x86 serial savings | Projected RPi5 subscribe |
-|-------------|-------------------|------------------------|
-| Reduce to 100 features | -40% (11.3→6.8ms) | ~44ms |
-| Downsample images | -16% (11.3→9.5ms) | ~61ms |
-| Mono mode | -27% (11.3→8.2ms) | ~53ms |
-| 100 features + downsample | ~-50% (est ~5.5ms) | ~36ms |
-
-*Source: x86 serial savings from `results/timing/x86/serial/sweep/{A_downsample,B_num_pts_100}.txt` + `results/timing/x86/serial/mono/V1_01_easy.txt` (baseline: `results/timing/x86/serial/stereo/V1_01_easy.txt`); RPi5 column is the same savings applied to the projected subscribe baseline.*
-
-The most aggressive config (mono + 100 features + downsample) projects to ~26ms —
-comfortably within budget even for 30Hz cameras.
-
-### Per-component RPi5 projection (serial 4-thr, V2_02, ms)
-
-| Component | x86 (wall) | RPi5 (×3.5) | % of total |
-|-----------|-----------|------------|------------|
-| Tracking | 2.8 | ~10 | 28% |
-| SLAM Update | 3.0 | ~11 | 30% |
-| SLAM Delayed | 1.5 | ~5 | 15% |
-| Re-tri & Marg | 1.5 | ~5 | 15% |
-| MSCKF Update | 1.2 | ~4 | 11% |
-| Propagation | 0.2 | ~1 | 2% |
-| **Total** | **10.1** | **~35** | |
-
-*Source: x86 wall column from `results/timing/x86/serial/bench_5rep_3clock/V2_02_medium_4thr_wall.txt`; RPi5 column is a ×3.5 projection (not measured).*
-
-**Caveat on the 3.5x factor:** The scaling is unlikely to be uniform across
-components. Tracking (SIMD-heavy KLT) may scale closer to 2x if ARM NEON is
-well-optimized in OpenCV. SLAM Update (memory-bound dense matrix) may scale
-closer to 4-5x due to RPi5's much smaller cache (2MB L2 vs 12MB L3). These
-component-level factors can only be determined by actual RPi5 measurement.
-
-### Process CPU perspective for RPi5 thermal budget
-
-| Config | x86 proc CPU | RPi5 proc CPU (×3.5) | RPi5 cores used |
-|--------|-------------|---------------------|----------------|
-| Serial 4-thr | 15.6ms | ~55ms | ~1.5 cores avg |
-| Serial 1-thr | 11.2ms | ~39ms | ~1 core |
-| Subscribe 4-thr | 37.1ms | ~130ms | ~2.6 cores avg |
-
-*Source: x86 proc-CPU column from `results/timing/x86/serial/bench_5rep_3clock/V2_02_medium_{1,4}thr_cpu.txt` and `results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_4thr_run1_cpu.txt`; RPi5 column is a ×3.5 projection.*
-
-Subscribe 4-thr on RPi5 would consume ~130ms of CPU per frame at 20Hz (50ms interval),
-meaning the system would be constantly using 2.6 of 4 cores at 100%. This will cause
-thermal throttling from 2.4→1.8 GHz within minutes, adding another ~1.3x factor.
-
-**Recommendation:** For RPi5, use 1 OpenCV thread + reduced features to minimize
-both wall time and thermal load.
+The RPi5 projections that were here have been superseded by actual RPi5
+measurements. See [rpi5-benchmarking.md](rpi5-benchmarking.md) for both the
+original projections (§1) and the measured timing, accuracy, and subscribe
+results (§2-5).
 
 ---
 
@@ -411,12 +340,11 @@ both wall time and thermal load.
 | Claim | Status | Evidence |
 |-------|--------|----------|
 | Serial mode is deterministic | **Verified** | All serial runs produce identical timestamps, SLAM counts, ATE |
-| Subscribe adds ~2x wall overhead | **Verified** | Consistent 2.0-2.1x across 3 sequences, 30 runs |
+| Subscribe adds ~2× wall overhead (pre-fix) | **Verified** | Consistent 2.0-2.1× across 3 sequences, 30 runs on old dispatch |
+| Subscribe adds ~1× wall overhead (post-fix) | **Verified** | See [determinism.md](determinism.md) — persistent worker thread |
 | Subscribe accuracy matches serial | **Verified** | ATE within 0.02m, RPE (8m) within 0.07m across all 30 subscribe runs |
 | SLAM recovery prevents catastrophic divergence | **Verified** | 0/30 runs collapsed (was 30% without recovery) |
 | Overhead is from cache/memory pollution | **Plausible but unverified** | Thread CPU > serial thread CPU, but no `perf stat` cache-miss data |
 | OpenCV parallelism saves ~1ms (4-thr vs 1-thr) | **Verified** | Serial: 10.1 vs 11.2ms. But costs 5.5ms extra process CPU |
-| RPi5 serial within 50ms budget | **Projected** | 10.1ms × 3.5 = ~35ms. Actual measurement needed |
-| RPi5 subscribe exceeds budget | **Projected** | 10.1ms × 3.5 × 1.85 = ~65ms. Config optimization can mitigate |
 | MH_03 has more timing variability than V1_01/V2_02 | **Verified** | 2.4ms range vs 0.2ms for other sequences (4-thr subscribe) |
 | 4→1 thread penalty is ~9-14% | **Verified** | 10.1→11.2ms (V2_02), 11.3→12.3ms (V1_01), 10.4→11.5ms (MH_03) |

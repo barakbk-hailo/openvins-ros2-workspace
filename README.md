@@ -34,5 +34,5 @@ bash install.sh
 | [Determinism](docs/determinism.md) | Subscribe-mode determinism: persistent worker thread root-cause fix + SLAM recovery safety net + other fork changes |
 | [Benchmark Analysis](docs/benchmark-analysis.md) | Paper comparison, 3-clock timing, accuracy, consistency, RPi5 projections (latest data) |
 | [Timing](docs/timing.md) | Per-component timing breakdown, config sensitivity, realtime feasibility, RPi5 projections |
-| [Docker (RPi5)](docs/docker.md) | Containerized build for Raspberry Pi 5 / Debian Trixie |
-| [RPi5 Deployment](docs/rpi5-deployment.md) | Camera, IMU, calibration, live VIO on RPi5 |
+| [RPi5 Setup](docs/rpi5-setup.md) | Build on RPi5 (Docker or native) + run the EuRoC benchmark; live-sensor deployment is WIP |
+| [RPi5 Benchmarking](docs/rpi5-benchmarking.md) | Phase 4 RPi5 timing, accuracy vs x86, config sweeps, subscribe mode, WIP list |
