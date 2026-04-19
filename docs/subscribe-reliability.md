@@ -82,7 +82,21 @@ irrecoverable cascade:
 3. With no features entering the SLAM state, the system runs in MSCKF-only mode
 4. Without persistent SLAM landmarks to anchor the trajectory, drift accumulates
 
-## Fix: SLAM recovery mechanism
+## Root-cause fix: persistent worker thread
+
+The architectural root cause — per-frame `detach()` thread dispatch in
+`callback_inertial` — is addressed by the **persistent worker thread** change
+(see [persistent-worker.md](persistent-worker.md)). That fix eliminates the
+TOCTOU race, dangling reference UB, non-deterministic IMU triggering, and
+per-frame thread churn. With it, subscribe mode runs at serial speed and the
+SLAM collapse no longer occurs.
+
+## Defense-in-depth: SLAM recovery mechanism
+
+The SLAM recovery mechanism below remains as a safety net. With the persistent
+worker thread, it rarely activates — but it protects against edge cases where
+SLAM features might dip due to other factors (difficult sequences, sensor noise,
+real hardware timing).
 
 **File:** `ov_msckf/src/core/VioManager.cpp` (before the `updaterSLAM->delayed_init()` call)
 
