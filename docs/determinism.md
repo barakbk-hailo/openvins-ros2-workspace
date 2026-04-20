@@ -717,12 +717,21 @@ deterministic run (std and range are 0 by construction).
 |-----------|---------------------|----------------|---------------------|----------------|
 | **Serial (deterministic)** | 0.536 ± 0.000° | 0.000° | 42.0 ± 0.0 mm | 0.0 mm |
 | Baseline (PWT only) | 0.700 ± 0.099° | 0.356° | 58.7 ± 14.0 mm | 50.0 mm |
-| + Docker RT flags | 0.695 ± 0.089° | 0.293° | 60.4 ± **9.9** mm | **36.0** mm |
-| + Max-interval 20 ms | 0.688 ± 0.171° | 0.496° | 66.7 ± **5.4** mm | **17.0** mm |
+| + Docker RT flags | 0.695 ± 0.089° | 0.293° | 60.4 ± 9.9 mm | 36.0 mm |
+| + Max-interval 20 ms | 0.688 ± 0.171° | 0.496° | 66.7 ± 5.4 mm | 17.0 mm |
 | + Both combined | 0.778 ± 0.083° | 0.303° | 74.2 ± 12.2 mm | 41.0 mm |
+| Final A: max-interval only | 0.793 ± 0.220° | 0.663° | 77.8 ± 24.5 mm | 70.0 mm |
+| Final B: max-interval + RT flags | 0.764 ± 0.133° | 0.481° | 69.1 ± 18.8 mm | 71.0 mm |
 
-*Source: `results/rpi5/{pwt_baseline,pwt_rtflags,pwt_maxinterval,pwt_combined}/sub_run{1..10}_pose.txt`
+*Source: `results/rpi5/{pwt_baseline,pwt_rtflags,pwt_maxinterval,pwt_combined,pwt_final_maxinterval,pwt_final_combined}/sub_run{1..10}_pose.txt`
 evaluated against `ov_data/euroc_mav/V1_01_easy.txt`.*
+
+The Final A/B pair was run back-to-back (minimizing between-session state drift)
+using the same `openvins-humble-maxinterval` image. Within that single controlled
+comparison, the RT flags appear to help (−23% pos std, −40% ori std). **But the
+same image's pos-std has ranged from 5.4 mm to 24.5 mm across four separate
+sessions**, so the within-session RT flags effect (~25%) sits well inside the
+between-session noise — see Finding 1 below.
 
 **Combined run does not stack the way expected.** Enabling Docker RT flags and
 `setMaxIntervalDuration(0.02)` together produced better orientation variance
@@ -745,13 +754,23 @@ measurable benefit and may introduce its own noise.
 
 ### Findings
 
-1. **Docker RT flags have no measurable effect** beyond sampling noise. The initial
-   Step 2 result suggested a ~30% variance reduction vs baseline, but the Step 4
-   combined run (RT flags + max-interval) produced **worse** position variance than
-   max-interval alone. This is consistent with the flags being no-ops in our
-   pipeline: OpenVINS doesn't call `sched_setscheduler()`, `--cpuset-cpus=0-3` is a
-   no-op on a 4-core RPi5, and `memlock` only matters if the app explicitly requests
-   it. Apparent Step 2 improvement attributed to 10-run sampling noise.
+1. **Docker RT flags effect is within between-session drift.** Three separate rounds
+   of A/B testing produced conflicting signals:
+
+   | Comparison | pos std (no RT flags) | pos std (+ RT flags) | Delta |
+   |------------|-----------------------|----------------------|-------|
+   | Step 1 vs Step 2 (no max-interval) | 14.0 mm | 9.9 mm | −30% |
+   | Step 3 vs Step 4 (with max-interval) | 5.4 mm | 12.2 mm | **+126%** |
+   | Final A vs Final B (with max-interval, back-to-back) | 24.5 mm | 18.8 mm | −23% |
+
+   The same code+image run in different sessions produced pos-std values ranging
+   from 5.4 mm to 24.5 mm for the same "max-interval" condition — a **~5× spread
+   between sessions**. This between-session variance swamps the ~25% within-session
+   effect of the RT flags. 10 reps is insufficient to resolve the RT flags' true
+   effect; that would require a pre-registered N-session, M-rep design with
+   temperature and system-load controls. None of the RT flags address anything
+   OpenVINS explicitly uses (`sched_setscheduler`, CPU pinning to <4 cores, or
+   memlock), which is consistent with the signal being weak.
 
 2. **`setMaxIntervalDuration(0.02)` dramatically reduces position variance** — range
    drops from 50 mm → 17 mm (2.9× reduction), std from 14.0 mm → 5.4 mm (2.6×
@@ -784,10 +803,11 @@ measurable benefit and may introduce its own noise.
 - **Use the `openvins-humble-maxinterval` image** (built from `sync-max-interval-20ms`).
   This is the only intervention with a reproducible, measurable effect.
 - **Docker RT flags (`--cap-add=SYS_NICE --ulimit rtprio=99 --ulimit memlock=-1
-  --cpuset-cpus=0-3`) are NOT recommended.** Initial results suggested a ~30%
-  variance reduction, but the Step 4 combined run with both interventions produced
-  worse position variance than max-interval alone — consistent with the RT flags
-  being no-ops in our pipeline. Skip them.
+  --cpuset-cpus=0-3`) are optional.** Across three A/B comparisons the signal
+  was inconsistent (−30%, +126%, −23% on pos std), all within the observed
+  between-session drift of the same image (5–25 mm pos std). They don't hurt,
+  they might help by ~25%, but they don't address anything OpenVINS is actually
+  using. Include them if you have the option but don't rely on them.
 - **Do not rely on subscribe mode for publishable accuracy comparisons across runs.**
   The remaining variance is inherent to the callback-driven architecture on
   resource-constrained ARM + Docker.
