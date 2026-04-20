@@ -661,8 +661,13 @@ stereo in fresh containers per rep (no state leakage between runs). Each rep cap
 wall, process-CPU and thread-CPU timing, feature counts, and the saved trajectory.
 Results are aggregated via `~/workspace/catkin_ws_ov/scripts/aggregate_pwt.py`.
 
-Three matched runs were executed, with results saved under
-`results/rpi5/{pwt_baseline,pwt_rtflags,pwt_maxinterval}/`.
+Four matched runs were executed, with results saved under
+`results/rpi5/{pwt_baseline,pwt_rtflags,pwt_maxinterval,pwt_combined}/`:
+
+1. **pwt_baseline** — persistent-worker-thread fork, stock Docker flags
+2. **pwt_rtflags** — PWT + `--cap-add=SYS_NICE --ulimit rtprio=99 --ulimit memlock=-1 --cpuset-cpus=0-3`
+3. **pwt_maxinterval** — PWT + `setMaxIntervalDuration(0.02)` on the stereo synchronizer
+4. **pwt_combined** — PWT + RT flags + `setMaxIntervalDuration(0.02)` (all interventions stacked)
 
 ### Cross-run timing variability (subscribe, 10 reps)
 
@@ -674,21 +679,30 @@ variability — complements the per-frame std seen in §3's tables).
 | Baseline (PWT only) | 22.97 | 0.105 | 0.46% | 22.79 – 23.17 |
 | + Docker RT flags | 23.03 | 0.061 | 0.26% | 22.91 – 23.13 |
 | + Max-interval 20 ms | 23.02 | 0.072 | 0.31% | 22.94 – 23.17 |
+| + Both combined | 23.36 | 0.070 | 0.30% | 23.23 – 23.43 |
 
-*Source: `results/rpi5/{pwt_baseline,pwt_rtflags,pwt_maxinterval}/sub_run{1..10}_wall.txt`.*
+*Source: `results/rpi5/{pwt_baseline,pwt_rtflags,pwt_maxinterval,pwt_combined}/sub_run{1..10}_wall.txt`.*
 
 Timing stability is ≤0.5% CV across all conditions — comparable to the x86 target
 (CV < 1.3%). The persistent worker alone is sufficient to stabilize timing on RPi5.
 
 ### SLAM feature health (avg features in state, max_slam=50)
 
+| Condition | Serial (run 1 / run 2) | Subscribe (10 reps) | Subscribe mean |
+|-----------|------------------------|---------------------|----------------|
+| Baseline (PWT only) | 46.32 / 46.32 | 45.59 – 46.12 | 45.79 |
+| + Docker RT flags | 46.32 / 46.32 | 45.83 – 46.36 | 46.04 |
+| + Max-interval 20 ms | 46.32 / 46.32 | 45.70 – 46.50 | 45.97 |
+| + Both combined | 46.32 / 46.32 | 45.48 – 46.22 | 45.99 |
+
+*Source: column 1 (slam_feats_in_state) averaged across all frames per run,
+from `results/rpi5/{pwt_baseline,pwt_rtflags,pwt_maxinterval,pwt_combined}/{serial_run*,sub_run*}_feats.txt`.*
+
+Cross-platform comparison vs x86 (baseline condition only, matches the format in §3):
+
 | Sequence | x86 Serial | x86 Subscribe (5 reps) | **RPi5 Serial** | **RPi5 Subscribe** (10 reps, baseline) |
 |----------|-----------|----------------------|-----------------|----------------------------------------|
 | V1_01_easy | 46.3 | 46.1 – 46.4 | **46.32** | **45.59 – 46.12** (mean 45.79) |
-
-*Source: RPi5 columns from
-`results/rpi5/pwt_baseline/{serial_run*,sub_run*}_feats.txt`, column 1 (slam_feats_in_state)
-averaged across all frames per run.*
 
 RPi5 subscribe SLAM health tracks serial within 1.1%. **SLAM feature collapse is NOT
 the mechanism behind RPi5 subscribe accuracy degradation** — the filter is
@@ -705,17 +719,39 @@ deterministic run (std and range are 0 by construction).
 | Baseline (PWT only) | 0.700 ± 0.099° | 0.356° | 58.7 ± 14.0 mm | 50.0 mm |
 | + Docker RT flags | 0.695 ± 0.089° | 0.293° | 60.4 ± **9.9** mm | **36.0** mm |
 | + Max-interval 20 ms | 0.688 ± 0.171° | 0.496° | 66.7 ± **5.4** mm | **17.0** mm |
+| + Both combined | 0.778 ± 0.083° | 0.303° | 74.2 ± 12.2 mm | 41.0 mm |
 
-*Source: `results/rpi5/{pwt_baseline,pwt_rtflags,pwt_maxinterval}/sub_run{1..10}_pose.txt`
+*Source: `results/rpi5/{pwt_baseline,pwt_rtflags,pwt_maxinterval,pwt_combined}/sub_run{1..10}_pose.txt`
 evaluated against `ov_data/euroc_mav/V1_01_easy.txt`.*
+
+**Combined run does not stack the way expected.** Enabling Docker RT flags and
+`setMaxIntervalDuration(0.02)` together produced better orientation variance
+than either alone (0.303° range vs 0.496° max-interval-only and 0.293° RT
+flags-only) but **worse position variance than max-interval alone** (17 mm →
+41 mm range, 5.4 mm → 12.2 mm std). The per-run values include position
+outliers (97 mm, 85 mm) not present in the max-interval-only run.
+
+Most likely explanation: the Docker RT flags have no real effect in our
+pipeline (OpenVINS doesn't call `sched_setscheduler`, `--cpuset-cpus=0-3` is a
+no-op on a 4-core RPi5, `memlock` only matters if requested). The "~30%
+variance reduction" initially attributed to RT flags was likely within the
+10-run sampling noise. With that interpretation, both "RT flags" and "combined"
+represent the same underlying distribution as "baseline" and "max-interval"
+respectively, and the observed differences are draws from that distribution.
+
+**Conclusion: `setMaxIntervalDuration(0.02)` is the only intervention with a
+consistent, reproducible effect.** Adding Docker RT flags on top provides no
+measurable benefit and may introduce its own noise.
 
 ### Findings
 
-1. **Docker RT flags help moderately** (~30% variance reduction in position RMSE, 18%
-   in orientation range). Memory locking and CPU pinning reduce some scheduling
-   jitter, but they're not the dominant cause of RPi5 subscribe variance. (OpenVINS
-   doesn't call `sched_setscheduler()` anywhere, so `rtprio=99` is only relevant if
-   the app explicitly requests RT priority.)
+1. **Docker RT flags have no measurable effect** beyond sampling noise. The initial
+   Step 2 result suggested a ~30% variance reduction vs baseline, but the Step 4
+   combined run (RT flags + max-interval) produced **worse** position variance than
+   max-interval alone. This is consistent with the flags being no-ops in our
+   pipeline: OpenVINS doesn't call `sched_setscheduler()`, `--cpuset-cpus=0-3` is a
+   no-op on a 4-core RPi5, and `memlock` only matters if the app explicitly requests
+   it. Apparent Step 2 improvement attributed to 10-run sampling noise.
 
 2. **`setMaxIntervalDuration(0.02)` dramatically reduces position variance** — range
    drops from 50 mm → 17 mm (2.9× reduction), std from 14.0 mm → 5.4 mm (2.6×
@@ -745,11 +781,13 @@ evaluated against `ov_data/euroc_mav/V1_01_easy.txt`.*
   `e57e88d`) and brings RPi5 position variance to within 3× of serial — acceptable
   for most VIO applications. The `barakbk-hailo/open_vins` fork exposes this as a
   default.
-- **Recommended full deployment configuration**: use the
-  `openvins-humble-maxinterval` image (built from `sync-max-interval-20ms`) with
-  Docker flags
-  `--cap-add=SYS_NICE --ulimit rtprio=99 --ulimit memlock=-1 --cpuset-cpus=0-3`
-  for a further ~30% variance reduction beyond max-interval alone.
+- **Use the `openvins-humble-maxinterval` image** (built from `sync-max-interval-20ms`).
+  This is the only intervention with a reproducible, measurable effect.
+- **Docker RT flags (`--cap-add=SYS_NICE --ulimit rtprio=99 --ulimit memlock=-1
+  --cpuset-cpus=0-3`) are NOT recommended.** Initial results suggested a ~30%
+  variance reduction, but the Step 4 combined run with both interventions produced
+  worse position variance than max-interval alone — consistent with the RT flags
+  being no-ops in our pipeline. Skip them.
 - **Do not rely on subscribe mode for publishable accuracy comparisons across runs.**
   The remaining variance is inherent to the callback-driven architecture on
   resource-constrained ARM + Docker.
