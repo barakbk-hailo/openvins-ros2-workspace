@@ -93,6 +93,48 @@ commit before the persistent-worker-thread branch was merged.
 
 ## 4. (Optional) Visualize in RViz
 
+### Prerequisite: a reachable display
+
+RViz and `rqt_image_view` are Qt GUI apps and need `$DISPLAY` (or Wayland)
+pointing at a running compositor. If you are SSH'd in without X forwarding
+you'll see:
+
+```
+qt.qpa.xcb: could not connect to display
+This application failed to start because no Qt platform plugin could be initialized.
+```
+
+Pick **one** of the following, depending on where you want the window:
+
+**A) Show the GUI on the machine's own monitor** (most common — user already
+logged into GNOME/Wayland on the laptop, SSH'd in from elsewhere):
+
+```bash
+# Confirm a session exists for your UID (look for an Xwayland or Xorg process
+# and an X socket owned by you)
+ls /tmp/.X11-unix/                           # expect X0 owned by your user
+pgrep -af 'Xwayland|Xorg'                    # note the -auth <path> argument
+
+export DISPLAY=:0
+export XAUTHORITY=$(pgrep -af Xwayland | grep -oE '/run/user/[0-9]+/\.mutter-Xwaylandauth\.[^ ]+' | head -1)
+```
+
+The `XAUTHORITY` path is regenerated each login session, so re-run the export
+line after a reboot or logout.
+
+**B) Forward the GUI to your SSH client** (only works if the client runs an
+X server — XQuartz on macOS, VcXsrv/WSLg on Windows, a Linux desktop, etc.):
+
+```bash
+ssh -X hailo@<host>      # or -Y for trusted forwarding
+# $DISPLAY is now set automatically; skip the exports above
+```
+
+Don't mix A and B — pick one per shell. Once either is set, `echo $DISPLAY`
+should print a non-empty value before you run any GUI command below.
+
+### Ogre / rviz2 config
+
 Two one-time setup steps are required on Intel integrated graphics:
 
 **1. Force Ogre to use the GL3Plus render system:**
