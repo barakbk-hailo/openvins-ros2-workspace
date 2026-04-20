@@ -145,7 +145,7 @@ results directory.
 Results are analyzed with the `ov_eval` package (built as part of the workspace):
 
 ```bash
-source /opt/ros/humble/setup.bash && source ~/workspace/catkin_ws_ov/install/setup.bash
+source /opt/ros/jazzy/setup.bash && source ~/workspace/catkin_ws_ov/install/setup.bash  # or /opt/ros/humble on 22.04
 
 # Per-run stats: mean, std, p99, max for each component
 ros2 run ov_eval timing_flamegraph <file.txt>

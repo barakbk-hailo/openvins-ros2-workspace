@@ -1,5 +1,9 @@
 # Running OpenVINS
 
+> **ROS 2 distro:** commands below use `jazzy` (Ubuntu 24.04 / Noble) as the default.
+> On Ubuntu 22.04 / Jammy, substitute `humble`:
+> `source /opt/ros/jazzy/setup.bash` instead of `source /opt/ros/jazzy/setup.bash`.
+
 Two ways to run the VIO pipeline:
 
 - **Serial mode** (`ros2_serial_msckf`) — reads a bag file directly, processes
@@ -41,7 +45,7 @@ produces identical output on every run for a given platform.
 
 ```bash
 cd ~/workspace/catkin_ws_ov
-source /opt/ros/humble/setup.bash && source install/setup.bash
+source /opt/ros/jazzy/setup.bash && source install/setup.bash
 
 ros2 launch ov_msckf serial.launch.py \
     config_path:=$PWD/src/open_vins/config/euroc_mav/estimator_config.yaml \
@@ -70,14 +74,14 @@ terminals.
 
 ```bash
 cd ~/workspace/catkin_ws_ov
-source /opt/ros/humble/setup.bash && source install/setup.bash
+source /opt/ros/jazzy/setup.bash && source install/setup.bash
 ros2 launch ov_msckf subscribe.launch.py config:=euroc_mav
 ```
 
 **Terminal 2 — play the bag:**
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 cd ~/datasets/euroc
 ros2 bag play V1_01_easy
 ```
@@ -113,7 +117,7 @@ it is already in the repo.
 Then in Terminal 3:
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 source ~/workspace/catkin_ws_ov/install/setup.bash
 ros2 run rqt_image_view rqt_image_view &
 rviz2 -d ~/workspace/catkin_ws_ov/src/open_vins/ov_msckf/launch/display.rviz
