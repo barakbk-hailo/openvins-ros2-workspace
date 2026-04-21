@@ -34,9 +34,9 @@ Pre-converted ROS 2 bags are stored in `~/datasets/euroc/` (see
 
 ## Goal
 
-Understand which parts of the OpenVINS VIO algorithm take how long, what can be
-optimized, and whether realtime operation is feasible on Raspberry Pi 5. This is the
-x86 baseline — the same scripts will be reused on RPi5 hardware in Phase 4.
+Understand which parts of the OpenVINS VIO algorithm take how long and what can
+be optimized. This document is the x86 baseline; embedded-platform numbers live
+in [rpi5-benchmarking.md](rpi5-benchmarking.md).
 
 ## Background: the two runners
 
@@ -178,7 +178,7 @@ V1_01_easy is also the sequence used for our accuracy benchmarks (see
 mono modes (6 runs total). Serial mode reads the bag directly — no `ros2 bag play`
 needed.
 
-**Script:** `run_timing_benchmark.sh`
+**Script:** `run_full_benchmark.sh -m serial -c both -r 1`
 Loops over sequences × {stereo, mono}, runs `ros2 launch ov_msckf serial.launch.py`
 with `max_cameras:=2 use_stereo:=true` (or `1`/`false` for mono), and copies the
 timing CSV to the results directory. Skips runs whose output already exists (safe to
@@ -254,7 +254,7 @@ Frames processed: V1_01=2799, MH_03=2310, V1_03=2004
 ## Phase 2: Config sensitivity sweeps
 
 **What we ran:** 5 config variants on V1_01_easy (stereo, serial mode) to find which
-knobs matter most for RPi5 optimization.
+knobs matter most when optimizing runtime.
 
 **Script:** `run_timing_sweep.sh`
 For each variant, copies `estimator_config.yaml` to a temp file in the **same
@@ -271,7 +271,7 @@ Cleans up the temp file after all runs.
 | B: 100 features | `num_pts: 100` (from 200) | Fewer features means less work everywhere — tracking, triangulation, and EKF updates all scale with feature count. |
 | C: 300 features | `num_pts: 300` (from 200) | Upper bound test — shows the cost of more features if accuracy demands it. |
 | D: No SLAM | `max_slam: 0, max_slam_in_update: 0` | Since SLAM update is the dominant component (Phase 1 finding), what happens if we eliminate it entirely? Features that would become SLAM landmarks go through MSCKF instead. |
-| E: 1 OpenCV thread | `num_opencv_threads: 1` (from 4) | RPi5 has 4 cores with no hyperthreading. How much does OpenCV parallelism actually help? Should we save those cores for ROS2 instead? |
+| E: 1 OpenCV thread | `num_opencv_threads: 1` (from 4) | How much does OpenCV parallelism actually help? Worth knowing before contending with ROS 2 executor threads for cores. |
 
 ### Results (all times in ms, V1_01_easy stereo)
 
@@ -310,8 +310,8 @@ Cleans up the temp file after all runs.
 4. **1 OpenCV thread** (+1.0ms, **+9%**): Only tracking is affected (2.6ms -> 3.7ms,
    +42%). SLAM/MSCKF updates don't use OpenCV threading at all.
    *Key insight:* OpenCV parallelism gives only moderate benefit for this workload.
-   On RPi5, dedicating cores to the ROS2 executor may be more valuable than giving
-   them to OpenCV.
+   On core-constrained machines, dedicating cores to the ROS 2 executor can pay
+   off more than giving them to OpenCV.
 
 5. **300 features** (+3.0ms, **+27%**): Diminishing returns. 50% more features
    costs 27% more total time. MSCKF update more than doubles (+119%) since more
@@ -331,7 +331,8 @@ reduce it:
 
 Going from 4 threads to 1 thread costs only +1ms (+9%). This means:
 - KLT tracking is not heavily parallelized in OpenCV for 200 features at 752x480
-- RPi5's 4 Cortex-A76 cores are better used for the ROS2 executor + VIO thread
+- On machines with limited cores, prefer dedicating them to the ROS 2 executor
+  + VIO thread rather than widening OpenCV's pool
 - Don't over-optimize `num_opencv_threads` — the savings are elsewhere
 
 ---
@@ -515,7 +516,7 @@ All scripts are in the workspace root. They skip runs whose output already exist
 
 | Script | Phase | What it does |
 |--------|-------|-------------|
-| `run_timing_benchmark.sh` | 1 | Runs serial mode on 3 sequences x {stereo, mono}. |
+| `run_full_benchmark.sh -m serial -c both -r 1` | 1 | Runs serial mode on 3 sequences x {stereo, mono}. |
 | `run_timing_sweep.sh` | 2 | Runs 5 config variants on V1_01_easy (serial mode). |
 | `run_timing_subscribe.sh [rate]` | 3 | Subscribe mode + bag playback at given rate. |
 

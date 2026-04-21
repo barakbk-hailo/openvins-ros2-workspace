@@ -220,8 +220,7 @@ amounts of SLAM/MSCKF work per frame depending on which features survive in each
 *Source: `results/timing/x86/subscribe/bench_5rep_3clock/{V1_01_easy,MH_03_medium,V2_02_medium}_4thr_run{1..5}_cpu.txt`*
 
 The process CPU overhead (executor threads) is stable. The 37ms process CPU on V2_02
-means the system consumes ~37ms of total CPU per frame across all threads — relevant
-for thermal budgeting on RPi5.
+means the system consumes ~37ms of total CPU per frame across all threads.
 
 ---
 
