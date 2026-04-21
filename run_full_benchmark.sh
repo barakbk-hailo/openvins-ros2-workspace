@@ -224,6 +224,10 @@ fi
 # SUBSCRIBE: N reps per sequence × thread (stereo only — mono untested)
 # ══════════════════════════════════════════════════════════════════════
 if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
+  if [[ "$CAMERAS" == "mono" ]]; then
+    echo "NOTE: mono+subscribe is not supported by this script — skipping subscribe block."
+    echo ""
+  else
   echo "==================== SUBSCRIBE MODE ===================="
   for seq in "${SEQUENCES[@]}"; do
     for thr in "${THREADS[@]}"; do
@@ -260,6 +264,7 @@ if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
     done
   done
   echo ""
+  fi
 fi
 
 # ══════════════════════════════════════════════════════════════════════
