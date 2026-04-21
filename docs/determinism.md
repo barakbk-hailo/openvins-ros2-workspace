@@ -388,9 +388,10 @@ Actual RPi5 measurements confirming this projection are in
 
 The persistent worker thread removes the architectural cause of the SLAM
 collapse. The SLAM recovery mechanism below remains as a safety net. With the
-persistent worker in place, it rarely activates — but it protects against edge
-cases where SLAM features might dip due to other factors (difficult sequences,
-sensor noise, real hardware timing).
+persistent worker in place, it rarely activates on easy sequences — but it
+protects against edge cases where SLAM features might dip due to other factors
+(difficult sequences, sensor noise, real hardware timing, or deliberately
+overloaded subscribe-mode playback).
 
 **File:** `ov_msckf/src/core/VioManager.cpp` (before the `updaterSLAM->delayed_init()` call)
 
@@ -404,10 +405,12 @@ configured value.
 ```cpp
 // SLAM recovery: relax chi-squared gate when SLAM state is critically low
 double original_chi2 = updaterSLAM->_options_slam.chi2_multipler;
-int slam_recovery_threshold = state->_options.max_slam_features / 4;
-if (state->_options.max_slam_features > 0 &&
-    (int)state->_features_SLAM.size() < slam_recovery_threshold) {
-  updaterSLAM->_options_slam.chi2_multipler = original_chi2 * 3.0;
+if (params.slam_chi2_recovery) {
+  int slam_recovery_threshold = state->_options.max_slam_features / 4;
+  if (state->_options.max_slam_features > 0 &&
+      (int)state->_features_SLAM.size() < slam_recovery_threshold) {
+    updaterSLAM->_options_slam.chi2_multipler = original_chi2 * 3.0;
+  }
 }
 updaterSLAM->delayed_init(state, feats_slam_DELAYED);
 updaterSLAM->_options_slam.chi2_multipler = original_chi2;
@@ -417,7 +420,29 @@ This is a conservative change:
 - Only activates when the SLAM state is critically low (<25% of max)
 - Only affects the `delayed_init` gate, not the SLAM update itself
 - Automatically deactivates once features recover
-- Does not change behavior in serial mode (SLAM state never drops that low)
+- Default on; opt-out via the `slam_chi2_recovery: false` YAML key (see below)
+
+### Configuration
+
+The recovery is exposed as a boolean in `estimator_config.yaml`:
+
+```yaml
+slam_chi2_recovery: true # relax chi2 gate 3x when SLAM<max_slam/4
+```
+
+Default `true` in the shipped `euroc_mav` config. Other dataset configs inherit
+the C++ default (`true`) automatically — `parse_config` preserves the default
+when a key is absent, so behavior is unchanged for configs that don't mention
+it. Set to `false` when you need **bit-identical replay against the pre-`64cfe59`
+reference trajectories** (e.g. the committed `results/stereo/estimate_V1_01_easy.txt`);
+you lose the stress-path safety net in exchange for historical reproducibility.
+
+Verified locally (V1_01_easy, stereo serial, this machine):
+
+| Flag | Trajectory md5 |
+|---|---|
+| `slam_chi2_recovery: true` (default) | `ab2d29d70669fc79420a8eabc8b05d47` |
+| `slam_chi2_recovery: false` | `ea1e69b232f1e9d11d3add828d323264` (matches committed reference) |
 
 ### Validation
 
@@ -453,6 +478,50 @@ per configuration (see [benchmark-analysis.md](benchmark-analysis.md) for detail
 
 The recovery mechanism maintains accuracy identical to serial mode as measured by
 both global trajectory error (ATE) and local consistency (RPE at 8-40m segments).
+
+#### Stress test — reproducing the failure mode
+
+The default-on argument rests on showing that disabling recovery makes the
+estimator *diverge* under stress — not just differ slightly. Ad-hoc A/B on this
+machine, April 2026: for each (sequence, rate, flag) cell, subscribe mode was
+run 3 times (chi2 relaxation toggled via source edit + rebuild). Per-run
+`slam_feats_in_state` was recorded from `traj_features.txt`; final ATE was
+posyaw-aligned against the ov_data ground truth.
+
+| Scenario | `slam_chi2_recovery: true` — ATE pos (3 runs) | `slam_chi2_recovery: false` — ATE pos (3 runs) | Verdict |
+|---|---|---|---|
+| V1_01_easy @ rate=1.0 | 0.053 m (5-run mean) | 0.053 m (equivalent within run-to-run spread) | cosmetic (~0.002° ATE ori diff) |
+| V1_01_easy @ rate=2.0 | 0.119 / 0.072 / 0.073 m | 0.056 / 0.119 / 0.068 m | both recover; flag not load-bearing |
+| V1_03_difficult @ rate=1.0 | 0.068 / 0.077 / 0.092 m | 0.080 / 0.085 / 0.071 m | both recover; modest SLAM-dip reduction with recovery |
+| **V1_03_difficult @ rate=2.0** | **0.420 / 0.402 / 3.717 m** (SLAM mean 22–26) | **1284.6 / 56.3 / 1.235 m** (SLAM mean 1.2 / 12.2 / 17.6) | **2 of 3 runs collapse without recovery** |
+
+The rate=2.0 / V1_03_difficult row is the minimal reproducer: with the flag
+off, one of the three runs ended with a mean SLAM feature count of 1.2 across
+95% of the trajectory and a final position error of over a kilometer. With the
+flag on at the same conditions, the worst run was 3.7 m ATE pos and SLAM stayed
+healthy at ~22–26 features. This is the "empty-state feedback loop" the
+recovery is designed to break: once SLAM drops to zero, every new candidate
+fails the strict chi-squared gate (its residual looks anomalous relative to an
+unanchored state), so the state can never repopulate — until you loosen the
+gate temporarily.
+
+Why rate=2.0 triggers it: at 2× real-time, the subscribe DDS queues start
+shedding messages under QoS pressure. A burst of IMU or camera drops starves
+the propagator and tracker of consistent measurements for long enough that the
+strict chi2 gate rejects the next wave of candidates, and the state collapses.
+The persistent worker thread (§3) helps — but on difficult imagery under that
+much drop rate, it isn't sufficient on its own.
+
+Practical implication: keep the default on for any subscribe workload that
+could be CPU-bound (e.g. low-power SBCs running VIO + perception at the same
+time, or real-time playback of a hard sequence). Only flip it off for strict
+benchmark reproducibility against the pre-`64cfe59` numbers.
+
+*Source: raw `_est.txt` / `_feats.txt` files from an A/B on this machine, April
+2026, not archived under `results/`. Re-derive by following the Verification
+section of the plan: edit `VioManager.cpp` to bypass the `if
+(params.slam_chi2_recovery)` block (or set the flag via YAML), rebuild, and run
+3 subscribe reps at `--rate 2.0` on V1_03_difficult.*
 
 ---
 
