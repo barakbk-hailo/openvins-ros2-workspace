@@ -22,11 +22,19 @@ REPS="${3:-10}"
 shift 3 || true
 EXTRA_DOCKER=("$@")
 
-RESULTS="/home/openhd/workspace/catkin_ws_ov/results/rpi5/$SUBDIR"
+RESULTS="$HOME/workspace/catkin_ws_ov/results/rpi5/$SUBDIR"
 SEQ=V1_01_easy
 
-sudo mkdir -p "$RESULTS"
-sudo chown -R "$(id -u):$(id -g)" "$RESULTS" 2>/dev/null || true
+mkdir -p "$RESULTS"
+
+# Kill any stray containers from this image on interrupt/exit so the orchestrator
+# doesn't leak a running container if aborted mid-rep.
+cleanup() {
+  local stale
+  stale=$(docker ps -q --filter "ancestor=$IMAGE" 2>/dev/null || true)
+  [ -n "$stale" ] && docker kill $stale >/dev/null 2>&1 || true
+}
+trap cleanup EXIT INT TERM
 
 echo "==========================================================="
 echo "  PWT benchmark v2"
@@ -42,6 +50,7 @@ run_in_container() {
   local TAG=$2       # e.g. serial_run1, sub_run3
 
   docker run --rm --network host --privileged \
+    --user "$(id -u):$(id -g)" \
     -v /dev:/dev -v ~/workspace:/workspace -v ~/datasets:/datasets \
     "${EXTRA_DOCKER[@]}" \
     "$IMAGE" bash -c '

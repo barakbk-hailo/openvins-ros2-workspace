@@ -434,10 +434,12 @@ Things still pending on RPi5:
   more tracking work).
 - **Subscribe mode on MH_03 and V1_03.** Phase 4c tested only V1_01 at 1×/2×/5×.
   MH_03 divergence issue may also affect subscribe mode — untested.
-- **Persistent-worker-thread benchmarks on RPi5.** All Phase 4c data is from
-  the old `detach()` dispatch. With the persistent worker
-  ([determinism.md](determinism.md)), subscribe overhead should still be 1.00×
-  on RPi5 (projecting from x86 behavior) but this needs direct measurement.
+- **Persistent-worker-thread benchmarks on RPi5** — *measured*, see
+  [determinism.md §6](determinism.md#6-rpi5-follow-up-why-accuracy-variance-doesnt-transfer).
+  Summary: subscribe overhead is ~1.05× serial on RPi5 post-fix (timing and
+  SLAM health transfer cleanly), but accuracy variance does not transfer —
+  see that section for the three-intervention comparison
+  (baseline / RT flags / max-interval).
 - **Live camera at 30 Hz.** RPi5 + Raspicam2 at 30 Hz with the downsample
   config has not been exercised end-to-end — see [rpi5-setup.md](rpi5-setup.md)
   §"Live-sensor deployment (future work)" for the wiring.

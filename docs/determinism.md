@@ -772,11 +772,19 @@ measurable benefit and may introduce its own noise.
    OpenVINS explicitly uses (`sched_setscheduler`, CPU pinning to <4 cores, or
    memlock), which is consistent with the signal being weak.
 
-2. **`setMaxIntervalDuration(0.02)` dramatically reduces position variance** — range
-   drops from 50 mm → 17 mm (2.9× reduction), std from 14.0 mm → 5.4 mm (2.6×
-   reduction). Frame count is unchanged (2800 per run), confirming the ±20 ms
-   constraint doesn't drop EuRoC's hardware-synced stereo pairs. **This confirms
-   `ApproximateTime` unbounded pairing was the dominant cause of position variance.**
+2. **`setMaxIntervalDuration(0.02)` reduces position variance — magnitude noisy,
+   range effect robust.** Initial comparison (Step 2→Step 3) showed std dropping
+   14.0 mm → 5.4 mm (2.6×). But the same max-interval image re-run across three
+   later sessions produced pos-std values of 12.2, 24.5, and 18.8 mm — so the
+   "2.6×" figure is the best-case single session; session-averaged max-interval
+   std is closer to 15 mm, comparable to the single-session baseline. The
+   **range** reduction (50 mm → 17 mm in the initial comparison, 71 mm → 17 mm
+   when comparing best-cases) is the more robust signal — it persists across
+   sessions, whereas absolute std is dominated by between-session drift (see
+   Finding 1). Frame count is unchanged (2800 per run), confirming the ±20 ms
+   constraint doesn't drop EuRoC's hardware-synced stereo pairs. **The fix's
+   direction is clear; its magnitude is uncertain beyond "a robust range
+   reduction."**
 
 3. **Orientation variance is bimodal across runs.** Median rmse_ori is lowest with
    max-interval (0.625° vs 0.686° baseline), but the std/range are dominated by
@@ -785,11 +793,12 @@ measurable benefit and may introduce its own noise.
    IMU-callback interleaving jitter at the start of runs, before the filter
    converges.
 
-4. **No intervention closes the gap to x86.** x86 position RMSE std is ~1 mm; best
-   RPi5 (max-interval) is 5.4 mm. The gap is narrower (5× vs 17×), but the platform
-   clearly has an additional source of non-determinism we didn't isolate. The
-   OpenVINS docs' warning that Docker "is not real-time in nature" appears to apply
-   beyond what `--cap-add=SYS_NICE` alone can fix.
+4. **No intervention closes the gap to x86.** x86 position RMSE std is ~1 mm; our
+   best-case RPi5 max-interval session was 5.4 mm, but the session-averaged RPi5
+   max-interval std is ~15 mm. Either way the gap is large and we did not isolate
+   the remaining source of non-determinism. The OpenVINS docs' warning that
+   Docker "is not real-time in nature" appears to apply beyond what
+   `--cap-add=SYS_NICE` alone can fix.
 
 ### Recommendation for RPi5 deployment
 
@@ -848,6 +857,11 @@ Branched from `persistent-worker-thread` at `0fe81a6`:
 Diff summary: 2 commits, 2 files changed, 5 insertions, 1 deletion. The code
 change is additive only (no behavior is removed or altered for existing users
 who explicitly set a different max interval).
+
+> **After pulling this branch**, run `git submodule update --init --recursive`
+> to sync the `src/open_vins` pointer to `f12c80e`. Without this the workspace
+> will still build against the old-dispatch submodule and you won't get the
+> max-interval fix.
 
 ### Open question
 

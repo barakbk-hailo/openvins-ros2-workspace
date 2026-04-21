@@ -6,7 +6,7 @@ Parses:
   serial_run{1,2}_{wall,cpu,thread,feats,pose}.txt
   sub_run{1..N}_{wall,cpu,thread,feats,pose}.txt
 
-Produces tables matching persistent-worker.md format:
+Produces tables matching determinism.md §6 format:
   - Cross-run timing variability (mean, std, CV, range)
   - Process-CPU / Wall ratio
   - SLAM features in state (mean per run, across runs)
@@ -19,10 +19,14 @@ import argparse
 import csv
 import glob
 import os
+import re
 import statistics
 import subprocess
 import sys
 from pathlib import Path
+
+# Strip all ANSI CSI escapes (color codes) from ov_eval output.
+_ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
 
 
 def parse_timing_csv(path):
@@ -65,7 +69,10 @@ def summary(values, unit_scale=1.0, unit_name=""):
         return None
     scaled = [v * unit_scale for v in values]
     mean = statistics.mean(scaled)
-    std = statistics.pstdev(scaled) if len(scaled) > 1 else 0.0
+    # Sample stdev (N-1 divisor) to match the convention used elsewhere in the
+    # docs. Guards n<2: returns 0.0 rather than raising — the caller still sees
+    # the single value via `mean`.
+    std = statistics.stdev(scaled) if len(scaled) > 1 else 0.0
     return {
         "mean": mean,
         "std": std,
@@ -86,8 +93,7 @@ def run_ate(gt, pose):
             capture_output=True, text=True, timeout=60,
         )
         for line in result.stdout.splitlines():
-            # Strip ANSI codes
-            clean = line.replace("\x1b[0m", "").replace("\x1b[95m", "").strip()
+            clean = _ANSI_RE.sub("", line).strip()
             if clean.startswith("rmse_ori"):
                 # Format: rmse_ori = 0.536 | rmse_pos = 0.042
                 parts = clean.split("|")
