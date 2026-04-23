@@ -22,17 +22,24 @@ Reference: https://docs.openvins.com/gs-tutorial.html
 
 ## 1. Download the dataset
 
-Install `gdown` to download from Google Drive. On Ubuntu 24.04 (Noble),
-system Python is PEP 668-protected, so use `pipx` — it puts `gdown` in its
-own venv and symlinks the CLI into `~/.local/bin`:
+Install `gdown` (to fetch from Google Drive) and `unzip`. On Ubuntu 24.04
+(Noble), system Python is PEP 668-protected, so use `pipx` for `gdown` — it
+puts the tool in its own venv and symlinks the CLI into `~/.local/bin`:
 
 ```bash
-sudo apt install -y pipx
-pipx ensurepath   # may require a new shell for ~/.local/bin to be on PATH
+sudo apt install -y pipx unzip
+pipx ensurepath
 pipx install gdown
 ```
 
-On older systems where `pip install gdown` still works, that also fine.
+`pipx ensurepath` only affects **new** shells. For the current terminal,
+either open a new one or run:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+On older systems where `pip install gdown` still works, that is also fine.
 Avoid `pip install --break-system-packages` on Noble — it bypasses the
 protection but leaves untracked files under system Python that can
 collide with future apt upgrades.

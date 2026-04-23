@@ -54,7 +54,8 @@ sudo apt install -y \
   libeigen3-dev cmake \
   libgoogle-glog-dev libgflags-dev libatlas-base-dev libsuitesparse-dev libceres-dev \
   python3-dev python3-matplotlib python3-numpy python3-psutil python3-tk \
-  build-essential gcc g++ gdb clang
+  build-essential gcc g++ gdb clang \
+  unzip
 
 echo "=== [3/4] Building the workspace ==="
 # Jazzy's setup scripts reference unset vars; disable nounset around sourcing.
