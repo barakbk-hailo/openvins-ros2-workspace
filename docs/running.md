@@ -22,13 +22,20 @@ Reference: https://docs.openvins.com/gs-tutorial.html
 
 ## 1. Download the dataset
 
-Install `gdown` to download from Google Drive:
+Install `gdown` to download from Google Drive. On Ubuntu 24.04 (Noble),
+system Python is PEP 668-protected, so use `pipx` — it puts `gdown` in its
+own venv and symlinks the CLI into `~/.local/bin`:
 
 ```bash
-pip install gdown
-# In Docker (where pip packages may not persist), use pipx instead:
-#   sudo apt install -y pipx && pipx ensurepath && pipx install gdown
+sudo apt install -y pipx
+pipx ensurepath   # may require a new shell for ~/.local/bin to be on PATH
+pipx install gdown
 ```
+
+On older systems where `pip install gdown` still works, that also fine.
+Avoid `pip install --break-system-packages` on Noble — it bypasses the
+protection but leaves untracked files under system Python that can
+collide with future apt upgrades.
 
 Download and extract the EuRoC V1_01_easy ROS 2 bag (~900 MB, already converted):
 
