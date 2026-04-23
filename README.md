@@ -3,7 +3,8 @@
 This repo ([barakbk-hailo/openvins-ros2-workspace](https://github.com/barakbk-hailo/openvins-ros2-workspace))
 is a deployment workspace for our fork of OpenVINS
 ([barakbk-hailo/open_vins](https://github.com/barakbk-hailo/open_vins)) running with ROS 2 Humble
-on Ubuntu 22.04. No GPU required — OpenVINS is a CPU-based MSCKF/EKF algorithm using OpenCV and Eigen.
+on Ubuntu 22.04 or ROS 2 Jazzy on Ubuntu 24.04. No GPU required — OpenVINS is a CPU-based MSCKF/EKF
+algorithm using OpenCV and Eigen.
 
 Our fork adds:
 - **Serial deterministic VIO node** (`ros2_serial_msckf`) — ROS 2 port of the ROS 1 serial reader. Processes bag frames sequentially with blocking updates, eliminating message drops from ROS 2 middleware. Produces bit-identical results between runs on the same platform.
@@ -29,7 +30,7 @@ bash install.sh
 ```
 catkin_ws_ov/
 ├── src/open_vins/              fork submodule (algorithm + nodes + launch files)
-├── install.sh                  one-shot Ubuntu 22.04 setup
+├── install.sh                  one-shot Ubuntu 22.04 / 24.04 setup (auto-detects)
 ├── record_poses.py             subscribe-mode pose recorder (used by evaluation)
 ├── run_full_benchmark.sh       flexible benchmark orchestrator (serial + subscribe)
 ├── run_timing_subscribe.sh     Phase 3: subscribe at configurable bag-playback rates
@@ -51,7 +52,7 @@ Follow the flow top-to-bottom — each doc builds on the previous ones.
 
 | Guide | Description |
 |---|---|
-| [Installation](docs/installation.md) | Native build on Ubuntu 22.04 (ROS 2 Humble) |
+| [Installation](docs/installation.md) | Native build on Ubuntu 22.04 (ROS 2 Humble) or Ubuntu 24.04 (ROS 2 Jazzy) |
 | [Running](docs/running.md) | Run the VIO pipeline on EuRoC — serial (deterministic) and subscribe (realtime) modes |
 | [Evaluation](docs/evaluation.md) | ATE/RPE benchmarks vs the OpenVINS paper + reproduction script |
 | [Determinism](docs/determinism.md) | Subscribe-mode determinism: persistent worker thread root-cause fix + SLAM recovery safety net + other fork changes |

@@ -1,5 +1,9 @@
 # Evaluation (ATE / RPE)
 
+> **ROS 2 distro:** the `source /opt/ros/...` commands below auto-detect the
+> installed distro — `jazzy` on Ubuntu 24.04 (Noble), `humble` on Ubuntu 22.04
+> (Jammy). The same one-liner works on both.
+
 ## Real-time dependency and reproducibility
 
 The ROS 2 `subscribe` node processes messages as they arrive from `ros2 bag play`.
@@ -28,7 +32,7 @@ message regardless of CPU speed, and is the recommended way to run benchmarks.
 **Terminal 1 — start the recorder first** (so no poses are missed):
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash
 mkdir -p ~/results && cd ~/results
 python3 ~/workspace/catkin_ws_ov/record_poses.py
 ```
@@ -37,7 +41,7 @@ python3 ~/workspace/catkin_ws_ov/record_poses.py
 
 ```bash
 cd ~/workspace/catkin_ws_ov
-source /opt/ros/humble/setup.bash && source install/setup.bash
+source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash && source install/setup.bash
 ros2 launch ov_msckf serial.launch.py \
     config:=euroc_mav \
     path_bag:=$HOME/datasets/euroc/V1_01_easy
@@ -58,7 +62,7 @@ This saves `state_estimate.txt` and `state_groundtruth.txt` in `~/results`.
 **Terminal 1 — start the recorder first:**
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash
 mkdir -p ~/results && cd ~/results
 python3 ~/workspace/catkin_ws_ov/record_poses.py
 ```
@@ -67,14 +71,14 @@ python3 ~/workspace/catkin_ws_ov/record_poses.py
 
 ```bash
 cd ~/workspace/catkin_ws_ov
-source /opt/ros/humble/setup.bash && source install/setup.bash
+source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash && source install/setup.bash
 ros2 launch ov_msckf subscribe.launch.py config:=euroc_mav
 ```
 
 **Terminal 3 — play the bag at reduced rate** (minimises message drops):
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash
 cd ~/datasets/euroc
 ros2 bag play V1_01_easy --rate 0.1   # 10× slower than real-time
 ```
@@ -459,7 +463,7 @@ for f in *.zip; do unzip -o "$f"; done
 Run the serial node over every sequence in both stereo and mono modes:
 
 ```bash
-source /opt/ros/humble/setup.bash && source ~/workspace/catkin_ws_ov/install/setup.bash
+source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash && source ~/workspace/catkin_ws_ov/install/setup.bash
 export MPLBACKEND=Agg   # prevent error_singlerun from blocking on plt.show()
 GT_DIR=~/workspace/catkin_ws_ov/src/open_vins/ov_data/euroc_mav
 mkdir -p ~/results

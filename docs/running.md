@@ -1,5 +1,9 @@
 # Running OpenVINS
 
+> **ROS 2 distro:** the `source /opt/ros/...` commands below auto-detect the
+> installed distro — `jazzy` on Ubuntu 24.04 (Noble), `humble` on Ubuntu 22.04
+> (Jammy). The same one-liner works on both.
+
 Two ways to run the VIO pipeline:
 
 - **Serial mode** (`ros2_serial_msckf`) — reads a bag file directly, processes
@@ -41,7 +45,7 @@ produces identical output on every run for a given platform.
 
 ```bash
 cd ~/workspace/catkin_ws_ov
-source /opt/ros/humble/setup.bash && source install/setup.bash
+source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash && source install/setup.bash
 
 ros2 launch ov_msckf serial.launch.py \
     config_path:=$PWD/src/open_vins/config/euroc_mav/estimator_config.yaml \
@@ -70,14 +74,14 @@ terminals.
 
 ```bash
 cd ~/workspace/catkin_ws_ov
-source /opt/ros/humble/setup.bash && source install/setup.bash
+source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash && source install/setup.bash
 ros2 launch ov_msckf subscribe.launch.py config:=euroc_mav
 ```
 
 **Terminal 2 — play the bag:**
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash
 cd ~/datasets/euroc
 ros2 bag play V1_01_easy
 ```
@@ -88,6 +92,8 @@ collapse. If you want to reproduce the pre-fix failure modes, check out a
 commit before the persistent-worker-thread branch was merged.
 
 ## 4. (Optional) Visualize in RViz
+
+### Ogre / rviz2 config
 
 Two one-time setup steps are required on Intel integrated graphics:
 
@@ -113,7 +119,7 @@ it is already in the repo.
 Then in Terminal 3:
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash
 source ~/workspace/catkin_ws_ov/install/setup.bash
 ros2 run rqt_image_view rqt_image_view &
 rviz2 -d ~/workspace/catkin_ws_ov/src/open_vins/ov_msckf/launch/display.rviz

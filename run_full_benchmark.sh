@@ -115,7 +115,9 @@ STD_TMP="/tmp/ov_estimate_std.txt"
 
 # ROS setup scripts reference unset vars on first load; guard them from set -u.
 set +u
-source /opt/ros/humble/setup.bash
+for _distro in jazzy humble; do
+  if [ -f "/opt/ros/$_distro/setup.bash" ]; then source "/opt/ros/$_distro/setup.bash"; break; fi
+done
 source "$WS_DIR/install/setup.bash"
 set -u
 

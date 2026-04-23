@@ -31,7 +31,9 @@ CONFIG_DIR="$WS_DIR/src/open_vins/config/euroc_mav"
 BASE_CONFIG="$CONFIG_DIR/estimator_config.yaml"
 TMP_CONFIG="$CONFIG_DIR/estimator_config_sweep.yaml"
 
-source /opt/ros/humble/setup.bash
+for _distro in jazzy humble; do
+  if [ -f "/opt/ros/$_distro/setup.bash" ]; then source "/opt/ros/$_distro/setup.bash"; break; fi
+done
 source "$WS_DIR/install/setup.bash"
 
 mkdir -p "$RESULTS_DIR"
