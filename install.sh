@@ -33,6 +33,19 @@ sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] \
   http://packages.ros.org/ros2/ubuntu ${UBUNTU_CODENAME} main" \
   | sudo tee /etc/apt/sources.list.d/ros2.list
+
+# Some noble images (notably Raspberry Pi OS-for-desktop) ship with only
+# `noble` + `noble-security` enabled. The security pocket pulls in newer
+# runtime libs (libbz2-1.0, libdrm2, libicu74, …) while the matching -dev
+# headers live in `noble-updates`; without that pocket apt can't satisfy
+# libbz2-dev/libdrm-dev/etc. below and aborts with "unmet dependencies".
+UBUNTU_SOURCES="/etc/apt/sources.list.d/ubuntu.sources"
+if [ "$UBUNTU_CODENAME" = "noble" ] && [ -f "$UBUNTU_SOURCES" ] \
+    && ! grep -qE '^Suites:.*\bnoble-updates\b' "$UBUNTU_SOURCES"; then
+  echo "=== Enabling noble-updates pocket in ${UBUNTU_SOURCES} ==="
+  sudo sed -i 's/^Suites: noble$/Suites: noble noble-updates/' "$UBUNTU_SOURCES"
+fi
+
 sudo apt update
 
 echo "=== [2/4] Installing ROS 2 ${ROS_DISTRO} + dependencies ==="
@@ -41,7 +54,8 @@ sudo apt install -y \
   libeigen3-dev cmake \
   libgoogle-glog-dev libgflags-dev libatlas-base-dev libsuitesparse-dev libceres-dev \
   python3-dev python3-matplotlib python3-numpy python3-psutil python3-tk \
-  build-essential gcc g++ gdb clang
+  build-essential gcc g++ gdb clang \
+  unzip
 
 echo "=== [3/4] Building the workspace ==="
 # Jazzy's setup scripts reference unset vars; disable nounset around sourcing.
@@ -49,7 +63,20 @@ set +u
 source /opt/ros/${ROS_DISTRO}/setup.bash
 set -u
 cd "$SCRIPT_DIR"
-colcon build --symlink-install
+
+# Throttle parallelism on memory-constrained hosts (Raspberry Pi 5).
+# Boost math template instantiations in StateHelper.cpp can push a single
+# cc1plus over 1.5 GB; 4-way parallel builds OOM-kill on an 8 GB Pi with
+# no swap. Cap to one compile at a time when total RAM <= 8 GB.
+TOTAL_MEM_KB=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+COLCON_EXTRA=()
+if [ "${TOTAL_MEM_KB:-0}" -le $((8 * 1024 * 1024)) ]; then
+  echo "=== Low RAM detected ($((TOTAL_MEM_KB / 1024)) MB) — serialising build to avoid OOM ==="
+  export MAKEFLAGS="-j1"
+  COLCON_EXTRA=(--parallel-workers 1 --executor sequential)
+fi
+
+colcon build --symlink-install "${COLCON_EXTRA[@]}"
 
 echo ""
 echo "Done. Source the workspace in each new terminal with:"
