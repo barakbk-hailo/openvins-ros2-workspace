@@ -52,6 +52,13 @@ This saves `state_estimate.txt` and `state_groundtruth.txt` in `~/results`.
 
 ### Option B — Subscribe node with reduced rate (legacy)
 
+> **Note:** Option B predates the persistent-worker fix
+> ([determinism.md §3](determinism.md#3-root-cause-fix-persistent-worker-thread)).
+> With the current fork you can run subscribe at `--rate 1.0` and still get
+> bit-close accuracy on V1_01_easy — see the numbers in determinism.md §3.
+> The `--rate 0.1` reference table below reflects the pre-fix ROS 1-style
+> throttled path and is kept for historical reproduction only.
+
 **Terminal 1 — start the recorder first:**
 
 ```bash
@@ -125,7 +132,12 @@ seg 32 - median_ori = 0.565 | median_pos = 0.051 (1401 samples)
 seg 40 - median_ori = 0.600 | median_pos = 0.038 (1079 samples)
 ```
 
-### Subscribe node (`run_subscribe_msckf`, `--rate 0.1`)
+### Subscribe node (`run_subscribe_msckf`, `--rate 0.1`) — pre-fix reference
+
+These numbers were taken against the upstream detach-dispatch subscribe path
+(before the persistent-worker fix). They are preserved for historical
+reproduction; for the current subscribe behaviour and accuracy, see
+[determinism.md §3](determinism.md#3-root-cause-fix-persistent-worker-thread).
 
 ```
 ======================================

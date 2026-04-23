@@ -66,17 +66,21 @@ The rest of this doc is the actual measurements.
 
 ## 2. Phase 4: Serial baseline (actual hardware)
 
-### Stereo timing results (mean total time in ms)
+### Stereo timing results (ms)
+
+**Clock:** wall (the RPi5 runs predate our 3-clock instrumentation — thread
+CSVs not available for these sequences yet; re-measurement with thread clock is
+tracked in §7 WIP). Format: `mean ± std (p99: N)`. **4 OpenCV threads.**
 
 | Component | V1_01_easy | MH_03_medium | V1_03_difficult |
 |-----------|-----------|-------------|----------------|
-| tracking | 6.9 (p99: 10.4, max: 25.4) | 6.6 (p99: 9.6, max: 24.2) | 8.0 (p99: 13.6, max: 29.2) |
-| propagation | 0.4 (p99: 0.8) | 0.4 (p99: 0.6) | 0.4 (p99: 0.6) |
-| msckf update | 2.8 (p99: 13.0, max: 41.0) | 2.0 (p99: 9.9, max: 29.2) | 2.0 (p99: 8.0, max: 27.5) |
-| slam update | 7.3 (p99: 11.4, max: 17.7) | 5.9 (p99: 10.9, max: 20.3) | 3.4 (p99: 9.0, max: 15.2) |
-| slam delayed | 1.6 (p99: 8.5, max: 30.6) | 2.2 (p99: 11.0, max: 37.7) | 2.6 (p99: 10.9, max: 23.6) |
-| re-tri & marg | 5.1 (p99: 6.5, max: 20.3) | 4.9 (p99: 6.1, max: 12.4) | 5.2 (p99: 6.5, max: 11.2) |
-| **total** | **24.2** (p99: 38.8, max: 64.5) | **22.0** (p99: 36.4, max: 59.3) | **21.6** (p99: 35.4, max: 61.4) |
+| tracking | 6.9 ± 1.5 (p99: 12.7) | 6.6 ± 1.3 (p99: 11.1) | 8.0 ± 2.4 (p99: 20.0) |
+| propagation | 0.4 ± 0.2 (p99: 0.7) | 0.4 ± 0.1 (p99: 0.6) | 0.4 ± 0.1 (p99: 0.6) |
+| msckf update | 2.8 ± 4.4 (p99: 19.1) | 2.0 ± 3.4 (p99: 15.4) | 2.0 ± 2.6 (p99: 14.2) |
+| slam update | 7.3 ± 1.8 (p99: 13.3) | 5.9 ± 2.2 (p99: 9.8) | 3.4 ± 2.4 (p99: 8.6) |
+| slam delayed | 1.6 ± 3.0 (p99: 13.8) | 2.2 ± 3.8 (p99: 16.7) | 2.6 ± 3.5 (p99: 17.1) |
+| re-tri & marg | 5.1 ± 0.6 (p99: 7.9) | 4.9 ± 0.5 (p99: 7.1) | 5.2 ± 0.5 (p99: 7.5) |
+| **total** | **24.2 ± 6.3** (p99: 44.5) | **22.0 ± 6.2** (p99: 43.0) | **21.6 ± 5.9** (p99: 40.6) |
 
 *Source: `results/timing/rpi5/serial/stereo/{V1_01_easy,MH_03_medium_bagstart5,V1_03_difficult}.txt`*
 
@@ -89,17 +93,19 @@ filter. The diverged run (`MH_03_medium.txt` in the results directory) shows
 artificially low times (14.5 ms total) because the filter runs idle with
 near-zero SLAM/MSCKF updates.
 
-### Mono timing results (mean total time in ms)
+### Mono timing results (ms)
+
+**Clock:** wall. Format: `mean ± std (p99: N)`. **4 OpenCV threads.**
 
 | Component | V1_01_easy | MH_03_medium | V1_03_difficult |
 |-----------|-----------|-------------|----------------|
-| tracking | 4.7 (p99: 7.1, max: 16.7) | 4.6 (p99: 7.1, max: 20.1) | 5.5 (p99: 10.9, max: 30.8) |
-| propagation | 0.5 (p99: 0.6) | 0.4 (p99: 0.6) | 0.4 (p99: 0.6) |
-| msckf update | 3.3 (p99: 9.3, max: 16.4) | 2.6 (p99: 8.0, max: 14.0) | 2.0 (p99: 6.7, max: 13.0) |
-| slam update | 4.2 (p99: 6.2, max: 14.8) | 3.5 (p99: 6.2, max: 17.4) | 2.2 (p99: 5.5, max: 8.3) |
-| slam delayed | 1.1 (p99: 4.7, max: 11.2) | 1.6 (p99: 6.0, max: 14.1) | 2.0 (p99: 7.2, max: 27.1) |
-| re-tri & marg | 3.2 (p99: 4.1, max: 10.1) | 3.1 (p99: 4.0, max: 8.7) | 2.9 (p99: 4.1, max: 20.8) |
-| **total** | **17.1** (p99: 25.3, max: 51.8) | **15.8** (p99: 24.9, max: 51.0) | **15.0** (p99: 25.4, max: 44.5) |
+| tracking | 4.7 ± 1.0 (p99: 8.7) | 4.6 ± 1.1 (p99: 8.8) | 5.5 ± 2.3 (p99: 14.9) |
+| propagation | 0.5 ± 0.1 (p99: 0.6) | 0.4 ± 0.1 (p99: 0.6) | 0.4 ± 0.1 (p99: 0.5) |
+| msckf update | 3.3 ± 2.6 (p99: 10.6) | 2.6 ± 2.3 (p99: 9.6) | 2.0 ± 2.0 (p99: 8.8) |
+| slam update | 4.2 ± 0.9 (p99: 6.7) | 3.5 ± 1.2 (p99: 5.8) | 2.2 ± 1.4 (p99: 5.0) |
+| slam delayed | 1.1 ± 1.5 (p99: 6.6) | 1.6 ± 1.9 (p99: 8.4) | 2.0 ± 2.3 (p99: 9.3) |
+| re-tri & marg | 3.2 ± 0.4 (p99: 4.4) | 3.1 ± 0.4 (p99: 4.3) | 2.9 ± 0.5 (p99: 3.9) |
+| **total** | **17.1 ± 3.5** (p99: 26.9) | **15.8 ± 3.9** (p99: 27.3) | **15.0 ± 4.5** (p99: 28.3) |
 
 *Source: `results/timing/rpi5/serial/mono/{V1_01_easy,MH_03_medium,V1_03_difficult}.txt`*
 
@@ -226,16 +232,19 @@ All runs are stereo, serial mode, default config (200 features, max_slam=50).
 Same 5 config variants as timing.md Phase 2, run on V1_01_easy (stereo,
 serial mode) on RPi5.
 
-### Results (all times in ms, V1_01_easy stereo)
+### Results (ms, V1_01_easy stereo serial)
 
-| Variant | Tracking | Propagation | MSCKF upd | SLAM upd | SLAM delay | Re-tri/marg | **Total** | **p99** | **max** |
-|---------|----------|-------------|-----------|----------|------------|-------------|-----------|---------|---------|
-| **Baseline** (200 pts, full-res, 4 thr) | 6.9 | 0.4 | 2.8 | 7.3 | 1.6 | 5.1 | **24.2** | **38.8** | **64.5** |
-| **A: Downsample** | 4.6 | 0.5 | 2.6 | 7.5 | 1.8 | 1.9 | **18.8** | **29.1** | **48.0** |
-| **B: 100 features** | 5.9 | 0.4 | 0.3 | 4.4 | 1.0 | 5.6 | **17.6** | **28.4** | **61.5** |
-| **C: 300 features** | 10.1 | 0.5 | 6.2 | 7.9 | 2.0 | 6.4 | **33.1** | **48.5** | **68.4** |
-| **D: No SLAM** | 8.2 | 0.2 | 5.3 | — | — | 5.3 | **19.1** | **32.3** | **53.8** |
-| **E: 1 OpenCV thread** | 10.6 | 0.5 | 2.9 | 7.4 | 1.7 | 5.6 | **28.6** | **43.1** | **64.8** |
+**Clock:** wall. Per-component cells are mean; **Total** is `mean ± std` and
+**p99** is the per-frame 99th percentile of the total.
+
+| Variant | Tracking | Propagation | MSCKF upd | SLAM upd | SLAM delay | Re-tri/marg | **Total (mean ± std)** | **p99** |
+|---------|----------|-------------|-----------|----------|------------|-------------|------------------------|---------|
+| **Baseline** (200 pts, full-res, 4 thr) | 6.9 | 0.4 | 2.8 | 7.3 | 1.6 | 5.1 | **24.2 ± 6.3** | **44.5** |
+| **A: Downsample** | 4.6 | 0.5 | 2.6 | 7.5 | 1.8 | 1.9 | **18.8 ± 4.4** | **32.5** |
+| **B: 100 features** | 5.9 | 0.4 | 0.3 | 4.4 | 1.0 | 5.6 | **17.6 ± 4.6** | **39.7** |
+| **C: 300 features** | 10.1 | 0.5 | 6.2 | 7.9 | 2.0 | 6.4 | **33.1 ± 6.6** | **54.1** |
+| **D: No SLAM** | 8.2 | 0.2 | 5.3 | — | — | 5.3 | **19.1 ± 5.7** | **38.7** |
+| **E: 1 OpenCV thread** | 10.6 | 0.5 | 2.9 | 7.4 | 1.7 | 5.6 | **28.6 ± 6.2** | **48.4** |
 
 *Source: `results/timing/rpi5/serial/sweep/{A_downsample,B_num_pts_100,C_num_pts_300,D_no_slam,E_opencv_1thread}.txt`; baseline row from `results/timing/rpi5/serial/stereo/V1_01_easy.txt`*
 
@@ -307,17 +316,21 @@ On x86, all three rates processed ~2800 frames (zero real drops even at 5×).
 On RPi5, 1× and 2× are fine but **5× causes 53% frame loss** — the VIO
 pipeline cannot keep up at 100 Hz effective camera rate.
 
-### Per-component timing: subscribe vs serial
+### Per-component timing: subscribe vs serial (ms)
 
-| Component | Serial (ms) | Subscribe 1× (ms) | Subscribe 2× (ms) | Subscribe 5× (ms) |
-|-----------|------------|-------------------|-------------------|-------------------|
+**Clock:** wall. Per-component cells are mean; totals shown as
+`mean ± std` with separate p99 row.
+
+| Component | Serial | Subscribe 1× | Subscribe 2× | Subscribe 5× |
+|-----------|--------|--------------|--------------|--------------|
 | tracking | 6.9 | 7.3 | 7.7 | 11.8 |
 | propagation | 0.4 | 0.4 | 0.2 | 0.2 |
 | msckf update | 2.8 | 2.8 | 0.3 | 0.3 |
 | slam update | 7.3 | 7.0 | 0.3 | 0.0 |
 | slam delayed | 1.6 | 1.7 | 0.9 | 0.6 |
 | re-tri & marg | 5.1 | 4.9 | 5.0 | 6.3 |
-| **total** | **24.2** | **24.1** | **14.5** | **19.3** |
+| **total (mean ± std)** | **24.2 ± 6.3** | **24.1 ± 6.6** | **14.5 ± 4.2** | **19.3 ± 5.6** |
+| **total p99** | **44.5** | **47.2** | **32.2** | **40.8** |
 
 *Source: `results/timing/rpi5/subscribe/V1_01_easy_rate{1.0,2.0,5.0}.txt`; serial column from `results/timing/rpi5/serial/stereo/V1_01_easy.txt`*
 
@@ -421,10 +434,12 @@ Things still pending on RPi5:
   more tracking work).
 - **Subscribe mode on MH_03 and V1_03.** Phase 4c tested only V1_01 at 1×/2×/5×.
   MH_03 divergence issue may also affect subscribe mode — untested.
-- **Persistent-worker-thread benchmarks on RPi5.** All Phase 4c data is from
-  the old `detach()` dispatch. With the persistent worker
-  ([determinism.md](determinism.md)), subscribe overhead should still be 1.00×
-  on RPi5 (projecting from x86 behavior) but this needs direct measurement.
+- **Persistent-worker-thread benchmarks on RPi5** — *measured*, see
+  [determinism.md §6](determinism.md#6-rpi5-follow-up-why-accuracy-variance-doesnt-transfer).
+  Summary: subscribe overhead is ~1.05× serial on RPi5 post-fix (timing and
+  SLAM health transfer cleanly), but accuracy variance does not transfer —
+  see that section for the three-intervention comparison
+  (baseline / RT flags / max-interval).
 - **Live camera at 30 Hz.** RPi5 + Raspicam2 at 30 Hz with the downsample
   config has not been exercised end-to-end — see [rpi5-setup.md](rpi5-setup.md)
   §"Live-sensor deployment (future work)" for the wiring.

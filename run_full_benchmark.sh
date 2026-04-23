@@ -2,41 +2,9 @@
 #
 # Flexible benchmark orchestrator: serial + subscribe on the EuRoC dataset.
 # Supersedes run_timing_benchmark.sh and run_timing_combined.sh — their
-# scopes are covered by the CLI options below.
-#
-# Default behavior (no options): all 3 sequences × {4-thr, 1-thr} × stereo,
-# serial (1 rep each) + subscribe (5 reps each). ~2.5 hours total.
-#
-# Usage:
-#   bash run_full_benchmark.sh [OPTIONS]
-#
-# Options:
-#   -m, --mode <serial|subscribe|both>   default: both
-#   -s, --sequences <csv>                default: V1_01_easy,MH_03_medium,V2_02_medium
-#   -t, --threads <csv>                  default: 4,1
-#   -c, --cameras <stereo|mono|both>     default: stereo
-#                                        (mono is only measured in serial mode;
-#                                         subscribe+mono is currently untested)
-#   -r, --reps <N>                       default: 5 (subscribe reps; serial is always 1)
-#       --tag <name>                     default: bench_YYYYMMDD_HHMMSS
-#       --results-base <dir>             default: $HOME/results/timing/x86
-#       --quick                          shortcut: -m serial -s V1_01_easy -t 4 -c stereo -r 1
-#   -h, --help                           show this help and exit
-#
-# Examples:
-#   # Full default suite (equivalent to old: bash run_full_benchmark.sh 5 bench)
-#   bash run_full_benchmark.sh
-#
-#   # Subsumes run_timing_benchmark.sh (serial, 3 seqs, stereo+mono, 1 rep)
-#   bash run_full_benchmark.sh -m serial -c both -r 1
-#
-#   # Subsumes run_timing_combined.sh V2_02_medium 5
-#   bash run_full_benchmark.sh -m subscribe -s V2_02_medium -r 5
-#
-#   # Quick smoke test
-#   bash run_full_benchmark.sh --quick
+# scopes are covered by the CLI options below. See usage() for full flags.
 
-set -o pipefail
+set -u -o pipefail
 
 # ── Defaults ──
 WS_DIR="$HOME/workspace/catkin_ws_ov"
@@ -54,7 +22,41 @@ SUBSCRIBE_REPS=5
 BENCH_TAG="bench_$(date +%Y%m%d_%H%M%S)"
 
 usage() {
-  sed -n '2,32p' "$0" | sed 's/^# \?//'
+  cat <<'EOF'
+Flexible benchmark orchestrator: serial + subscribe on the EuRoC dataset.
+
+Default behavior (no options): all 3 sequences × {4-thr, 1-thr} × stereo,
+serial (1 rep each) + subscribe (5 reps each). ~2.5 hours total.
+
+Usage:
+  bash run_full_benchmark.sh [OPTIONS]
+
+Options:
+  -m, --mode <serial|subscribe|both>   default: both
+  -s, --sequences <csv>                default: V1_01_easy,MH_03_medium,V2_02_medium
+  -t, --threads <csv>                  default: 4,1
+  -c, --cameras <stereo|mono|both>     default: stereo
+                                       (mono is only measured in serial mode;
+                                        mono+subscribe is skipped)
+  -r, --reps <N>                       default: 5 (subscribe reps; serial is always 1)
+      --tag <name>                     default: bench_YYYYMMDD_HHMMSS
+      --results-base <dir>             default: $HOME/results/timing/x86
+      --quick                          shortcut: -m serial -s V1_01_easy -t 4 -c stereo -r 1
+  -h, --help                           show this help and exit
+
+Examples:
+  # Full default suite
+  bash run_full_benchmark.sh
+
+  # Serial mode, 3 sequences, stereo+mono, 1 rep (old run_timing_benchmark.sh)
+  bash run_full_benchmark.sh -m serial -c both -r 1
+
+  # Subscribe mode, single sequence, 5 reps (old run_timing_combined.sh)
+  bash run_full_benchmark.sh -m subscribe -s V2_02_medium -r 5
+
+  # Quick smoke test
+  bash run_full_benchmark.sh --quick
+EOF
 }
 
 # ── CLI parsing ──
@@ -83,8 +85,14 @@ done
 # ── Validate ──
 case "$MODE" in serial|subscribe|both) ;; *) echo "ERROR: --mode must be serial|subscribe|both (got: $MODE)" >&2; exit 2 ;; esac
 case "$CAMERAS" in stereo|mono|both) ;; *) echo "ERROR: --cameras must be stereo|mono|both (got: $CAMERAS)" >&2; exit 2 ;; esac
-if [[ "$CAMERAS" != "stereo" && ( "$MODE" == "subscribe" || "$MODE" == "both" ) ]]; then
-  echo "NOTE: mono cameras currently only run in serial mode; mono+subscribe will be skipped." >&2
+# Subscribe mode only runs stereo. Fail fast on pure mono+subscribe; warn on both+subscribe.
+if [[ "$MODE" == "subscribe" && "$CAMERAS" == "mono" ]]; then
+  echo "ERROR: --cameras mono --mode subscribe is not supported (mono+subscribe is untested)." >&2
+  echo "       Use --cameras stereo, or --mode serial if you need mono measurements." >&2
+  exit 2
+fi
+if [[ "$CAMERAS" == "both" && ( "$MODE" == "subscribe" || "$MODE" == "both" ) ]]; then
+  echo "NOTE: subscribe mode will run stereo only; mono+subscribe is skipped." >&2
 fi
 
 IFS=',' read -ra SEQUENCES <<< "$SEQUENCES_CSV"
@@ -105,10 +113,13 @@ FEATS_TMP="/tmp/traj_features.txt"
 EST_TMP="/tmp/ov_estimate.txt"
 STD_TMP="/tmp/ov_estimate_std.txt"
 
+# ROS setup scripts reference unset vars on first load; guard them from set -u.
+set +u
 for _distro in jazzy humble; do
   if [ -f "/opt/ros/$_distro/setup.bash" ]; then source "/opt/ros/$_distro/setup.bash"; break; fi
 done
 source "$WS_DIR/install/setup.bash"
+set -u
 
 cleanup_stale() {
   pkill -9 -f "run_subscribe_msckf" 2>/dev/null || true
@@ -202,9 +213,9 @@ if [[ "$MODE" == "serial" || "$MODE" == "both" ]]; then
             filepath_est:="$EST_TMP" \
             filepath_std:="$STD_TMP" 2>&1 | tail -1
         save_results "$DIR" "$TAG"
-        ROWS=$(grep -cv '^#' "$DIR/${TAG}_wall.txt" 2>/dev/null || echo 0)
+        ROWS=$(grep -cv '^#' "$DIR/${TAG}_wall.txt" 2>/dev/null || true)
         SLAM=$(get_slam_avg "$DIR/${TAG}_feats.txt")
-        echo "  -> $ROWS frames, avg SLAM=$SLAM"
+        echo "  -> ${ROWS:-0} frames, avg SLAM=$SLAM"
       done
     done
   done
@@ -215,6 +226,10 @@ fi
 # SUBSCRIBE: N reps per sequence × thread (stereo only — mono untested)
 # ══════════════════════════════════════════════════════════════════════
 if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
+  if [[ "$CAMERAS" == "mono" ]]; then
+    echo "NOTE: mono+subscribe is not supported by this script — skipping subscribe block."
+    echo ""
+  else
   echo "==================== SUBSCRIBE MODE ===================="
   for seq in "${SEQUENCES[@]}"; do
     for thr in "${THREADS[@]}"; do
@@ -231,6 +246,7 @@ if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
 
         ros2 launch ov_msckf subscribe.launch.py \
             config_path:="$CFG" \
+            max_cameras:=2 use_stereo:=true \
             save_total_state:=true \
             filepath_est:="$EST_TMP" \
             filepath_std:="$STD_TMP" &>/dev/null &
@@ -243,13 +259,14 @@ if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
         cleanup_stale
 
         save_results "$DIR" "$TAG"
-        ROWS=$(grep -cv '^#' "$DIR/${TAG}_wall.txt" 2>/dev/null || echo 0)
+        ROWS=$(grep -cv '^#' "$DIR/${TAG}_wall.txt" 2>/dev/null || true)
         SLAM=$(get_slam_avg "$DIR/${TAG}_feats.txt")
-        echo "  -> $ROWS frames, avg SLAM=$SLAM"
+        echo "  -> ${ROWS:-0} frames, avg SLAM=$SLAM"
       done
     done
   done
   echo ""
+  fi
 fi
 
 # ══════════════════════════════════════════════════════════════════════
@@ -360,8 +377,8 @@ done
 echo ""
 
 # ── Zombie check ──
-ZOMBIES=$(ps aux | grep "run_subscribe_msckf" | grep -v grep | wc -l || echo 0)
-echo "--- Zombie check: $ZOMBIES stale processes ---"
+ZOMBIES=$(pgrep -cf "run_subscribe_msckf" 2>/dev/null || true)
+echo "--- Zombie check: ${ZOMBIES:-0} stale processes ---"
 echo ""
 echo "================================================================"
 echo "  Done — $(date)"

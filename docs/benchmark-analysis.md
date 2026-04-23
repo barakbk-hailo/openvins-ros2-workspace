@@ -31,17 +31,20 @@ not comparable to the paper (which uses wall clock).
 
 ### V2_02_medium (paper comparison sequence)
 
+All three clocks (wall / proc CPU / thread) captured simultaneously per frame.
+Cells are `mean ± std` over per-frame values; **Total** row includes p99.
+
 **4 OpenCV threads (ms):**
 
 | Component | Wall | Proc CPU | Thread | CPU/Wall |
 |-----------|------|----------|--------|----------|
-| Tracking | 2.8 | **7.5** | 2.7 | **2.7x** |
-| Propagation | 0.2 | 0.2 | 0.2 | 1.0x |
-| MSCKF Update | 1.2 | 1.2 | 1.2 | 1.0x |
-| SLAM Update | 3.0 | 3.0 | 3.0 | 1.0x |
-| SLAM Delayed | 1.5 | 1.5 | 1.5 | 1.0x |
-| Re-tri & Marg | 1.5 | **2.2** | 1.5 | **1.5x** |
-| **Total** | **10.1** | **15.6** | **10.1** | **1.54x** |
+| Tracking | 2.8 ± 0.5 | **7.5 ± 1.2** | 2.7 ± 0.5 | **2.7×** |
+| Propagation | 0.2 ± 0.0 | 0.2 ± 0.0 | 0.2 ± 0.0 | 1.0× |
+| MSCKF Update | 1.2 ± 1.5 | 1.2 ± 1.5 | 1.2 ± 1.5 | 1.0× |
+| SLAM Update | 3.0 ± 1.3 | 3.0 ± 1.3 | 3.0 ± 1.3 | 1.0× |
+| SLAM Delayed | 1.5 ± 2.0 | 1.5 ± 2.0 | 1.5 ± 2.0 | 1.0× |
+| Re-tri & Marg | 1.5 ± 0.2 | **2.2 ± 0.2** | 1.5 ± 0.2 | **1.5×** |
+| **Total** | **10.1 ± 2.9** (p99: 19.3) | **15.6 ± 2.9** (p99: 24.7) | **10.1 ± 2.9** (p99: 19.2) | **1.54×** |
 
 *Source: `results/timing/x86/serial/bench_5rep_3clock/V2_02_medium_4thr_{wall,cpu,thread}.txt`*
 
@@ -49,13 +52,13 @@ not comparable to the paper (which uses wall clock).
 
 | Component | Wall | Proc CPU | Thread | CPU/Wall |
 |-----------|------|----------|--------|----------|
-| Tracking | 3.9 | 3.9 | 3.9 | 1.0x |
-| Propagation | 0.2 | 0.2 | 0.2 | 1.0x |
-| MSCKF Update | 1.2 | 1.2 | 1.2 | 1.0x |
-| SLAM Update | 3.0 | 3.0 | 3.0 | 1.0x |
-| SLAM Delayed | 1.5 | 1.5 | 1.5 | 1.0x |
-| Re-tri & Marg | 1.4 | 1.4 | 1.4 | 1.0x |
-| **Total** | **11.2** | **11.2** | **11.1** | **1.0x** |
+| Tracking | 3.9 ± 0.7 | 3.9 ± 0.7 | 3.9 ± 0.7 | 1.0× |
+| Propagation | 0.2 ± 0.0 | 0.2 ± 0.0 | 0.2 ± 0.0 | 1.0× |
+| MSCKF Update | 1.2 ± 1.4 | 1.2 ± 1.4 | 1.2 ± 1.4 | 1.0× |
+| SLAM Update | 3.0 ± 1.4 | 3.0 ± 1.3 | 3.0 ± 1.3 | 1.0× |
+| SLAM Delayed | 1.5 ± 2.0 | 1.5 ± 2.0 | 1.5 ± 2.0 | 1.0× |
+| Re-tri & Marg | 1.4 ± 0.2 | 1.4 ± 0.2 | 1.4 ± 0.2 | 1.0× |
+| **Total** | **11.2 ± 2.9** (p99: 20.4) | **11.2 ± 2.9** (p99: 20.5) | **11.1 ± 2.9** (p99: 20.4) | **1.0×** |
 
 *Source: `results/timing/x86/serial/bench_5rep_3clock/V2_02_medium_1thr_{wall,cpu,thread}.txt`*
 
@@ -66,18 +69,21 @@ not comparable to the paper (which uses wall clock).
 - 4→1 thread tracking cost: 2.8→3.9ms (+39%), but total only +1.1ms (+11%)
   because EKF stages dominate.
 
-### All sequences comparison (serial, wall clock, 4-thr, ms)
+### All sequences comparison (serial, 4-thr, ms)
+
+**Clock:** wall. Per-component cells are mean; **Total** is `mean ± std`;
+**p99** is the per-frame 99th percentile of the total.
 
 | Component | V1_01_easy | MH_03_medium | V2_02_medium |
 |-----------|-----------|-------------|-------------|
-| Tracking | 2.6 | 2.6 | 2.8 |
-| Propagation | 0.2 | 0.2 | 0.2 |
-| MSCKF Update | 1.6 | 1.2 | 1.2 |
-| SLAM Update | 4.5 | 3.7 | 3.0 |
-| SLAM Delayed | 0.9 | 1.2 | 1.5 |
-| Re-tri & Marg | 1.5 | 1.5 | 1.5 |
-| **Total** | **11.3** | **10.4** | **10.1** |
-| **p99** | **19.2** | **18.3** | **16.9** |
+| Tracking | 2.6 ± 0.4 | 2.6 ± 0.4 | 2.8 ± 0.5 |
+| Propagation | 0.2 ± 0.0 | 0.2 ± 0.0 | 0.2 ± 0.0 |
+| MSCKF Update | 1.6 ± 2.5 | 1.2 ± 1.9 | 1.2 ± 1.5 |
+| SLAM Update | 4.5 ± 1.0 | 3.7 ± 1.3 | 3.0 ± 1.3 |
+| SLAM Delayed | 0.9 ± 1.7 | 1.2 ± 2.2 | 1.5 ± 2.0 |
+| Re-tri & Marg | 1.5 ± 0.1 | 1.5 ± 0.1 | 1.5 ± 0.2 |
+| **Total (mean ± std)** | **11.3 ± 3.4** | **10.4 ± 3.4** | **10.1 ± 2.9** |
+| **Total p99** | **22.7** | **21.7** | **19.3** |
 
 *Source: `results/timing/x86/serial/bench_5rep_3clock/{V1_01_easy,MH_03_medium,V2_02_medium}_4thr_wall.txt`*
 
@@ -93,15 +99,18 @@ tracking dominates because motion blur reduces the feature count.
 
 ### V2_02_medium, 4 OpenCV threads (ms, subscribe run 1)
 
+All three clocks captured simultaneously. Cells are `mean ± std`; ratio
+columns compare this subscribe run against the serial baseline above.
+
 | Component | Wall | Proc CPU | Thread | Sub.Wall / Ser.Wall | Sub.Thread / Ser.Thread |
 |-----------|------|----------|--------|--------------------|-----------------------|
-| Tracking | 8.4 | **23.4** | 8.2 | **3.0x** | **3.0x** |
-| Propagation | 0.4 | 0.4 | 0.4 | 2.0x | 2.0x |
-| MSCKF Update | 2.6 | 2.7 | 2.6 | 2.2x | 2.2x |
-| SLAM Update | 5.1 | 5.3 | 5.0 | 1.7x | 1.7x |
-| SLAM Delayed | 2.3 | 2.4 | 2.3 | 1.5x | 1.5x |
-| Re-tri & Marg | 2.0 | **3.0** | 2.0 | 1.3x | 1.3x |
-| **Total** | **20.8** | **37.1** | **20.6** | **2.1x** | **2.0x** |
+| Tracking | 8.4 ± 2.1 | **23.4 ± 5.3** | 8.2 ± 2.1 | **3.0×** | **3.0×** |
+| Propagation | 0.4 ± 0.1 | 0.4 ± 0.1 | 0.4 ± 0.1 | 2.0× | 2.0× |
+| MSCKF Update | 2.6 ± 2.8 | 2.7 ± 3.0 | 2.6 ± 2.8 | 2.2× | 2.2× |
+| SLAM Update | 5.1 ± 2.8 | 5.3 ± 2.9 | 5.0 ± 2.8 | 1.7× | 1.7× |
+| SLAM Delayed | 2.3 ± 2.6 | 2.4 ± 2.7 | 2.3 ± 2.6 | 1.5× | 1.5× |
+| Re-tri & Marg | 2.0 ± 0.7 | **3.0 ± 0.9** | 2.0 ± 0.7 | 1.3× | 1.3× |
+| **Total** | **20.8 ± 4.5** (p99: 32.1) | **37.1 ± 6.7** (p99: 50.3) | **20.6 ± 4.5** (p99: 31.9) | **2.1×** | **2.0×** |
 
 *Source: `results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`; serial-ratio columns compared against `results/timing/x86/serial/bench_5rep_3clock/V2_02_medium_4thr_{wall,thread}.txt`*
 
@@ -143,6 +152,9 @@ We compare with our subscribe (wall clock) and serial (wall + thread clocks).
 
 ### 4 OpenCV threads (ms)
 
+**Clocks:** Paper and "Our sub" use wall (paper methodology); serial columns
+show both wall and thread. Cells are `mean ± std` over per-frame values.
+
 | Component | Paper (sub, wall) | Our sub (wall) | Our serial (wall) | Our serial (thread) |
 |-----------|------------------|---------------|-------------------|-------------------|
 | Tracking | 6.12 ± 1.13 | 8.4 ± 2.1 | 2.8 ± 0.5 | 2.7 ± 0.5 |
@@ -157,6 +169,8 @@ We compare with our subscribe (wall clock) and serial (wall + thread clocks).
 *Paper combines SLAM Update + SLAM Delayed. Our combined: sub 5.1+2.3=7.4ms, serial 3.0+1.5=4.5ms.
 
 ### 1 OpenCV thread (ms)
+
+**Clocks:** as above. Cells are `mean ± std`.
 
 | Component | Paper (sub, wall) | Our sub (wall) | Our serial (wall) | Our serial (thread) |
 |-----------|------------------|---------------|-------------------|-------------------|
@@ -195,13 +209,17 @@ CPU — again suggesting our larger executor thread pool creates more cache poll
 
 ## 5. Timing consistency across 5 reps
 
-### Subscribe total (wall clock, ms, 5 reps)
+### Subscribe total across reps (ms)
 
-| Sequence | 4-thr reps | Range | 1-thr reps | Range |
-|----------|-----------|-------|-----------|-------|
-| V1_01_easy | 21.2, 21.2, 21.3, 21.3, 21.1 | 0.2ms | 21.7, 21.9, 21.9, 21.9, 21.8 | 0.2ms |
-| MH_03_medium | 20.2, 19.6, 21.3, 19.0, 21.4 | **2.4ms** | 20.8, 20.9, 21.0, 20.7, 21.2 | 0.5ms |
-| V2_02_medium | 20.8, 20.7, 20.6, 20.7, 20.7 | 0.2ms | 21.3, 21.4, 21.1, 21.0, 21.1 | 0.4ms |
+**Clock:** wall. The "reps" columns list each run's mean; the ± after each
+sequence summarises mean ± std *across* the 5 reps (i.e. run-to-run
+variability, distinct from per-frame std in §2-§3).
+
+| Sequence | 4-thr reps | 4-thr mean ± std | 1-thr reps | 1-thr mean ± std |
+|----------|-----------|-----------------|-----------|-----------------|
+| V1_01_easy | 21.2, 21.2, 21.3, 21.3, 21.1 | 21.22 ± 0.08 | 21.7, 21.9, 21.9, 21.9, 21.8 | 21.84 ± 0.09 |
+| MH_03_medium | 20.2, 19.6, 21.3, 19.0, 21.4 | **20.30 ± 1.06** | 20.8, 20.9, 21.0, 20.7, 21.2 | 20.92 ± 0.19 |
+| V2_02_medium | 20.8, 20.7, 20.6, 20.7, 20.7 | 20.70 ± 0.07 | 21.3, 21.4, 21.1, 21.0, 21.1 | 21.18 ± 0.16 |
 
 *Source: `results/timing/x86/subscribe/bench_5rep_3clock/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_wall.txt`*
 
@@ -211,17 +229,19 @@ amounts of SLAM/MSCKF work per frame depending on which features survive in each
 
 ### Process CPU shows same consistency pattern
 
-| Sequence | 4-thr proc CPU reps | Range |
-|----------|-------------------|-------|
-| V1_01_easy | 34.9, 35.0, 35.1, 35.1, 34.9 | 0.2ms |
-| MH_03_medium | 35.1, 34.5, 36.2, 34.5, 36.4 | 1.9ms |
-| V2_02_medium | 37.1, 36.9, 36.7, 36.8, 36.9 | 0.4ms |
+**Clock:** `CLOCK_PROCESS_CPUTIME_ID` (sum of CPU across all threads —
+VIO + executor + OpenCV workers). Mean ± std is across 5 reps.
+
+| Sequence | 4-thr proc CPU reps | Mean ± std |
+|----------|-------------------|-----------|
+| V1_01_easy | 34.9, 35.0, 35.1, 35.1, 34.9 | 35.00 ± 0.10 |
+| MH_03_medium | 35.1, 34.5, 36.2, 34.5, 36.4 | 35.34 ± 0.90 |
+| V2_02_medium | 37.1, 36.9, 36.7, 36.8, 36.9 | 36.88 ± 0.15 |
 
 *Source: `results/timing/x86/subscribe/bench_5rep_3clock/{V1_01_easy,MH_03_medium,V2_02_medium}_4thr_run{1..5}_cpu.txt`*
 
 The process CPU overhead (executor threads) is stable. The 37ms process CPU on V2_02
-means the system consumes ~37ms of total CPU per frame across all threads — relevant
-for thermal budgeting on RPi5.
+means the system consumes ~37ms of total CPU per frame across all threads.
 
 ---
 
