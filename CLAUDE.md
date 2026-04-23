@@ -5,8 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build
 
 ```bash
-# Ubuntu 22.04 (Jammy) → Humble; Ubuntu 24.04 (Noble) → Jazzy
-source /opt/ros/jazzy/setup.bash    # or /opt/ros/humble/setup.bash on 22.04
+# Auto-detect ROS distro: humble on Ubuntu 22.04 (Jammy), jazzy on 24.04 (Noble)
+source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash
 cd ~/workspace/catkin_ws_ov
 colcon build --symlink-install
 source install/setup.bash

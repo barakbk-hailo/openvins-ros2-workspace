@@ -1,8 +1,8 @@
 # Running OpenVINS
 
-> **ROS 2 distro:** commands below use `jazzy` (Ubuntu 24.04 / Noble) as the default.
-> On Ubuntu 22.04 / Jammy, substitute `humble`:
-> `source /opt/ros/jazzy/setup.bash` instead of `source /opt/ros/jazzy/setup.bash`.
+> **ROS 2 distro:** the `source /opt/ros/...` commands below auto-detect the
+> installed distro — `jazzy` on Ubuntu 24.04 (Noble), `humble` on Ubuntu 22.04
+> (Jammy). The same one-liner works on both.
 
 Two ways to run the VIO pipeline:
 
@@ -45,7 +45,7 @@ produces identical output on every run for a given platform.
 
 ```bash
 cd ~/workspace/catkin_ws_ov
-source /opt/ros/jazzy/setup.bash && source install/setup.bash
+source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash && source install/setup.bash
 
 ros2 launch ov_msckf serial.launch.py \
     config_path:=$PWD/src/open_vins/config/euroc_mav/estimator_config.yaml \
@@ -74,14 +74,14 @@ terminals.
 
 ```bash
 cd ~/workspace/catkin_ws_ov
-source /opt/ros/jazzy/setup.bash && source install/setup.bash
+source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash && source install/setup.bash
 ros2 launch ov_msckf subscribe.launch.py config:=euroc_mav
 ```
 
 **Terminal 2 — play the bag:**
 
 ```bash
-source /opt/ros/jazzy/setup.bash
+source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash
 cd ~/datasets/euroc
 ros2 bag play V1_01_easy
 ```
@@ -92,46 +92,6 @@ collapse. If you want to reproduce the pre-fix failure modes, check out a
 commit before the persistent-worker-thread branch was merged.
 
 ## 4. (Optional) Visualize in RViz
-
-### Prerequisite: a reachable display
-
-RViz and `rqt_image_view` are Qt GUI apps and need `$DISPLAY` (or Wayland)
-pointing at a running compositor. If you are SSH'd in without X forwarding
-you'll see:
-
-```
-qt.qpa.xcb: could not connect to display
-This application failed to start because no Qt platform plugin could be initialized.
-```
-
-Pick **one** of the following, depending on where you want the window:
-
-**A) Show the GUI on the machine's own monitor** (most common — user already
-logged into GNOME/Wayland on the laptop, SSH'd in from elsewhere):
-
-```bash
-# Confirm a session exists for your UID (look for an Xwayland or Xorg process
-# and an X socket owned by you)
-ls /tmp/.X11-unix/                           # expect X0 owned by your user
-pgrep -af 'Xwayland|Xorg'                    # note the -auth <path> argument
-
-export DISPLAY=:0
-export XAUTHORITY=$(pgrep -af Xwayland | grep -oE '/run/user/[0-9]+/\.mutter-Xwaylandauth\.[^ ]+' | head -1)
-```
-
-The `XAUTHORITY` path is regenerated each login session, so re-run the export
-line after a reboot or logout.
-
-**B) Forward the GUI to your SSH client** (only works if the client runs an
-X server — XQuartz on macOS, VcXsrv/WSLg on Windows, a Linux desktop, etc.):
-
-```bash
-ssh -X hailo@<host>      # or -Y for trusted forwarding
-# $DISPLAY is now set automatically; skip the exports above
-```
-
-Don't mix A and B — pick one per shell. Once either is set, `echo $DISPLAY`
-should print a non-empty value before you run any GUI command below.
 
 ### Ogre / rviz2 config
 
@@ -159,7 +119,7 @@ it is already in the repo.
 Then in Terminal 3:
 
 ```bash
-source /opt/ros/jazzy/setup.bash
+source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash
 source ~/workspace/catkin_ws_ov/install/setup.bash
 ros2 run rqt_image_view rqt_image_view &
 rviz2 -d ~/workspace/catkin_ws_ov/src/open_vins/ov_msckf/launch/display.rviz
