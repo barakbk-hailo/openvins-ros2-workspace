@@ -204,7 +204,7 @@ agree within ~0.1 ms so the two are equivalent here. Format below is
 | re-tri & marg | 1.5 ± 0.1 (p99: 1.9) | 1.5 ± 0.1 (p99: 1.9) | 1.5 ± 0.3 (p99: 2.5) |
 | **total** | **11.3 ± 3.4** (p99: 22.7) | **10.3 ± 3.4** (p99: 21.6) | **9.8 ± 3.3** (p99: 20.3) |
 
-*Source: `results/timing/x86/serial/bench_5rep_3clock/{V1_01_easy,MH_03_medium}_4thr_thread.txt` and `results/timing/x86/serial/thread_rewrite/V1_03_difficult_4thr_thread.txt`*
+*Source: `results/timing/x86/serial/rerun_2026_04_23/{V1_01_easy,MH_03_medium}_4thr_thread.txt` and `results/timing/x86/serial/thread_rewrite/V1_03_difficult_4thr_thread.txt`*
 
 Frames processed: V1_01=2776, MH_03=2302, V1_03=1991 (out of 2912 in each bag;
 the difference is from the initialization period where no timing is recorded, plus
@@ -294,7 +294,7 @@ and **p99** is the per-frame 99th percentile of the total.
 | **D: No SLAM** | 2.6 | 0.1 | 3.1 | — | — | 1.5 | **7.4 ± 3.2** | **17.9** |
 | **E: 1 OpenCV thread** | 3.7 | 0.2 | 1.6 | 4.6 | 0.9 | 1.5 | **12.5 ± 3.7** | **24.8** |
 
-*Source: `results/timing/x86/serial/sweep/thread_rewrite/{A_downsample,B_num_pts_100,C_num_pts_300,D_no_slam,E_opencv_1thread}_thread.txt`; baseline row from `results/timing/x86/serial/bench_5rep_3clock/V1_01_easy_4thr_thread.txt`*
+*Source: `results/timing/x86/serial/sweep/thread_rewrite/{A_downsample,B_num_pts_100,C_num_pts_300,D_no_slam,E_opencv_1thread}_thread.txt`; baseline row from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_thread.txt`*
 
 ### Phase 2 findings — impact ranking
 
@@ -378,7 +378,7 @@ frames.
 | 5.0× | 2707 | 205 | 7.0% | ~93 real drops — first sign of stress |
 | Serial (reference) | 2776 | 136 | 4.7% | strict ±20 ms stereo sync |
 
-*Source: `results/timing/x86/subscribe/thread_rewrite/V1_01_easy_rate{1.0,2.0,5.0}_thread.txt`; serial reference from `results/timing/x86/serial/bench_5rep_3clock/V1_01_easy_4thr_thread.txt`*
+*Source: `results/timing/x86/subscribe/thread_rewrite/V1_01_easy_rate{1.0,2.0,5.0}_thread.txt`; serial reference from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_thread.txt`*
 
 The ~112-136 baseline "missing" frames at 1× and 2× are **NOT performance-related
 drops**. They come from:
@@ -408,7 +408,7 @@ and **p99** is the per-frame 99th percentile of the total.
 | **total (mean ± std)** | **11.3 ± 3.4** | **12.0 ± 3.9** | **12.9 ± 4.4** | **8.0 ± 3.8** |
 | **total p99** | **22.7** | **25.7** | **28.0** | **23.1** |
 
-*Source: `results/timing/x86/subscribe/thread_rewrite/V1_01_easy_rate{1.0,2.0,5.0}_thread.txt`; serial column from `results/timing/x86/serial/bench_5rep_3clock/V1_01_easy_4thr_thread.txt`*
+*Source: `results/timing/x86/subscribe/thread_rewrite/V1_01_easy_rate{1.0,2.0,5.0}_thread.txt`; serial column from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_thread.txt`*
 
 ### Phase 3 findings
 
@@ -487,7 +487,7 @@ Total: 11.3ms per frame
 | Reduce OpenCV threads | +11% | Modest. Not worth worrying about. |
 | Increase features to 300 | +34% | Diminishing returns. Avoid. |
 
-*Source: derived from `results/timing/x86/serial/bench_5rep_3clock/V1_01_easy_4thr_thread.txt`, `results/timing/x86/serial/thread_rewrite/V1_01_easy_4thr_mono_thread.txt`, and `results/timing/x86/serial/sweep/thread_rewrite/*_thread.txt`*
+*Source: derived from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_thread.txt`, `results/timing/x86/serial/thread_rewrite/V1_01_easy_4thr_mono_thread.txt`, and `results/timing/x86/serial/sweep/thread_rewrite/*_thread.txt`*
 
 Recommended starting configs for RPi5 are listed in
 [rpi5-benchmarking.md](rpi5-benchmarking.md) — those were validated against

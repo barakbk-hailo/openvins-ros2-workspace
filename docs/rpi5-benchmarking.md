@@ -34,7 +34,7 @@ measurements using two factors:
 | MH_03_medium | 10.4 ms | ~36 ms | ~67 ms | 50 ms @20 Hz |
 | V2_02_medium | 10.1 ms | ~35 ms | ~65 ms | 50 ms @20 Hz |
 
-*Source: x86 serial wall from `results/timing/x86/serial/bench_5rep_3clock/{V1_01_easy,MH_03_medium,V2_02_medium}_4thr_wall.txt`; RPi5 columns are projections (×3.5, ×1.85), not measurements.*
+*Source: x86 serial wall from `results/timing/x86/serial/rerun_2026_04_23/{V1_01_easy,MH_03_medium,V2_02_medium}_4thr_wall.txt`; RPi5 columns are projections (×3.5, ×1.85), not measurements.*
 
 **The projection said:** serial is within the 20 Hz budget with 10-15 ms
 headroom; subscribe exceeds budget by 30-45% with default config.

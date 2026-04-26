@@ -50,14 +50,12 @@ ros2 launch ov_msckf serial.launch.py \
 Press Ctrl+C in Terminal 1 after OpenVINS finishes (it exits on its own).
 This saves `state_estimate.txt` and `state_groundtruth.txt` in `~/results`.
 
-### Option B — Subscribe node with reduced rate (legacy)
+### Option B — Subscribe node (realtime)
 
-> **Note:** Option B predates the persistent-worker fix
-> ([determinism.md §3](determinism.md#3-root-cause-fix-persistent-worker-thread)).
-> With the current fork you can run subscribe at `--rate 1.0` and still get
-> bit-close accuracy on V1_01_easy — see the numbers in determinism.md §3.
-> The `--rate 0.1` reference table below reflects the pre-fix ROS 1-style
-> throttled path and is kept for historical reproduction only.
+This is the realtime path used on live sensor deployments. With the
+persistent-worker fix (see [determinism.md §3](determinism.md#3-root-cause-fix-persistent-worker-thread)
+for the design and per-run accuracy tables) subscribe at `--rate 1.0` reproduces
+serial's ATE characteristics with modest per-run variance on V1_01_easy.
 
 **Terminal 1 — start the recorder first:**
 
@@ -75,12 +73,12 @@ source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.ba
 ros2 launch ov_msckf subscribe.launch.py config:=euroc_mav
 ```
 
-**Terminal 3 — play the bag at reduced rate** (minimises message drops):
+**Terminal 3 — play the bag at realtime:**
 
 ```bash
 source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash
 cd ~/datasets/euroc
-ros2 bag play V1_01_easy --rate 0.1   # 10× slower than real-time
+ros2 bag play V1_01_easy --rate 1.0
 ```
 
 Press Ctrl+C in Terminal 1 after the bag finishes.
@@ -108,8 +106,10 @@ ros2 run ov_eval error_singlerun posyaw $GT_DIR/V1_01_easy.txt state_estimate.tx
 
 ## Reference results (V1_01_easy, stereo, Intel Iris Xe)
 
-Both runs are single-run results on this machine. Serial mode is deterministic
-(bit-identical across repeated runs); subscribe mode at `--rate 0.1` is not.
+Single-run results on this machine. Serial mode is deterministic (bit-identical
+across repeated runs); subscribe mode at `--rate 1.0` is bit-close but not
+bit-identical (see [determinism.md §3](determinism.md#3-root-cause-fix-persistent-worker-thread)
+for per-run variability across 5 reps).
 
 ### Serial node (`ros2_serial_msckf`)
 
@@ -132,37 +132,17 @@ seg 32 - median_ori = 0.565 | median_pos = 0.051 (1401 samples)
 seg 40 - median_ori = 0.600 | median_pos = 0.038 (1079 samples)
 ```
 
-### Subscribe node (`run_subscribe_msckf`, `--rate 0.1`) — pre-fix reference
+### Subscribe node (`run_subscribe_msckf`, `--rate 1.0`)
 
-These numbers were taken against the upstream detach-dispatch subscribe path
-(before the persistent-worker fix). They are preserved for historical
-reproduction; for the current subscribe behaviour and accuracy, see
-[determinism.md §3](determinism.md#3-root-cause-fix-persistent-worker-thread).
+Per-run ATE and cross-run variability for subscribe at `--rate 1.0` with the
+persistent worker thread live in [determinism.md §3](determinism.md#3-root-cause-fix-persistent-worker-thread).
 
-```
-======================================
-Absolute Trajectory Error
-======================================
-rmse_ori = 0.731 | rmse_pos = 0.051
-mean_ori = 0.653 | mean_pos = 0.048
-min_ori  = 0.046 | min_pos  = 0.009
-max_ori  = 2.146 | max_pos  = 0.097
-std_ori  = 0.330 | std_pos  = 0.019
-======================================
-Relative Pose Error
-======================================
-seg  8 - median_ori = 0.608 | median_pos = 0.059 (2379 samples)
-seg 16 - median_ori = 0.588 | median_pos = 0.058 (2074 samples)
-seg 24 - median_ori = 0.623 | median_pos = 0.072 (1807 samples)
-seg 32 - median_ori = 0.952 | median_pos = 0.092 (1412 samples)
-seg 40 - median_ori = 0.847 | median_pos = 0.086 (1087 samples)
-```
-
-> **Note on sample counts:** the subscribe node reports slightly more RPE samples
-> than the serial node (e.g. 2379 vs 2361 for seg 8). The serial stereo-sync
-> algorithm discards camera frames where no partner is found within ±0.02 s,
-> while the subscribe node's `message_filters::ApproximateTime` policy is slightly
-> more permissive. The difference is small (~1 %) and does not affect comparability.
+> **Note on sample counts:** the subscribe node typically reports slightly more
+> RPE samples than the serial node (e.g. ~2379 vs 2361 for seg 8 on V1_01_easy).
+> The serial stereo-sync algorithm discards camera frames where no partner is
+> found within ±0.02 s, while the subscribe node's
+> `message_filters::ApproximateTime` policy is slightly more permissive. The
+> difference is small (~1 %) and does not affect comparability.
 
 ## Comparison with the paper (Geneva et al. ICRA 2020)
 

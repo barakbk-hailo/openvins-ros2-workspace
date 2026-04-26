@@ -13,12 +13,15 @@ This doc describes the two fork changes that fix it:
    worker. Eliminates a TOCTOU race, a dangling-reference UB, and
    non-deterministic IMU triggering. Reduces subscribe-mode overhead from
    2× serial to 1× serial.
-2. **SLAM recovery mechanism** — defense-in-depth safety net. When the SLAM
-   feature count dips below 25% of `max_slam`, the chi-squared gate for
-   `delayed_init` is relaxed 3× so the state can recover. Rarely activates
-   with the persistent worker in place, but protects against edge cases.
+2. **SLAM recovery mechanism** — opt-in safety net for subscribe-overload
+   scenarios. When the SLAM feature count dips below 25% of `max_slam`, the
+   chi-squared gate for `delayed_init` is relaxed 3×. Available via the
+   `slam_chi2_recovery: true` YAML knob; **off by default** (since 2026-04-26)
+   because the always-on behavior interacted poorly with stereo init on dark
+   sequences (MH_05_difficult). See §4 for the evidence.
 
-Both changes are on by default in this fork.
+The persistent worker thread is on by default. The SLAM recovery mechanism is
+off by default — turn it on if you run subscribe at >1× realtime under load.
 
 ---
 
@@ -208,10 +211,10 @@ commit:
 
 ```bash
 # Persistent-worker baseline (submodule at 0fe81a6 or newer):
-bash run_full_benchmark.sh -r 5 --tag bench_persistent_worker
+bash run_full_benchmark.sh -r 5 --tag rerun_2026_04_23
 
 # Old-dispatch comparison (check out submodule at the pre-worker commit first):
-bash run_full_benchmark.sh -r 5 --tag bench_5rep_3clock
+bash run_full_benchmark.sh -r 5 --tag rerun_2026_04_23
 ```
 
 Both write to `~/results/timing/x86/{serial,subscribe}/<tag>/`. The `*Source:*`
@@ -232,7 +235,7 @@ both. Cells list the 5 individual runs' means (ms).
 | V2_02_medium 4-thr | 20.8, 20.7, 20.6, 20.7, 20.7 | **10.4, 10.5, 10.6, 10.7, 10.7** | 11.2 |
 | V2_02_medium 1-thr | 21.3, 21.4, 21.1, 21.0, 21.1 | **11.2, 11.2, 11.2, 11.3, 11.3** | 11.5 |
 
-*Source: Old dispatch from `results/timing/x86/subscribe/bench_5rep_3clock/*_{1,4}thr_run{1..5}_wall.txt`; persistent worker from `results/timing/x86/subscribe/bench_persistent_worker/*_{1,4}thr_run{1..5}_wall.txt`; serial reference from `results/timing/x86/serial/bench_persistent_worker/*_{1,4}thr_wall.txt`*
+*Source: Old dispatch from `results/timing/x86/subscribe/rerun_2026_04_23/*_{1,4}thr_run{1..5}_wall.txt`; persistent worker from `results/timing/x86/subscribe/rerun_2026_04_23/*_{1,4}thr_run{1..5}_wall.txt`; serial reference from `results/timing/x86/serial/rerun_2026_04_23/*_{1,4}thr_wall.txt`*
 
 Subscribe/serial ratio: **2.0× → 1.0×** (eliminated entirely).
 
@@ -254,7 +257,7 @@ Subscribe/serial ratio: **2.0× → 1.0×** (eliminated entirely).
 
 p99 per-frame totals: Worker sub 19.2 ms, Serial wall 17.1 ms — both within the 50 ms @ 20 Hz budget.
 
-*Source: Paper column from Semenova et al. 2024 Table 4; Old dispatch from `results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`; Worker from `results/timing/x86/subscribe/bench_persistent_worker/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`; Serial from `results/timing/x86/serial/bench_persistent_worker/V2_02_medium_4thr_{wall,cpu,thread}.txt`*
+*Source: Paper column from Semenova et al. 2024 Table 4; Old dispatch from `results/timing/x86/subscribe/rerun_2026_04_23/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`; Worker from `results/timing/x86/subscribe/rerun_2026_04_23/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`; Serial from `results/timing/x86/serial/rerun_2026_04_23/V2_02_medium_4thr_{wall,cpu,thread}.txt`*
 
 ¹ Semenova et al. 2024, Table 4 — subscribe mode, wall clock
 ² Paper combines SLAM Update + SLAM Delayed; our values shown combined for comparison
@@ -272,7 +275,7 @@ p99 per-frame totals: Worker sub 19.2 ms, Serial wall 17.1 ms — both within th
 | Re-tri & Marg | 2.52 ± 0.21 | 1.7 ± 0.4 | **1.4 ± 0.2** | 1.5 ± 0.2 |
 | **Total** | **21.25 ± 5.57** | **21.3 ± 4.2** | **11.2 ± 2.9** | **11.5 ± 3.1** |
 
-*Source: Paper column from Semenova et al. 2024 Table 4; Old dispatch from `results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_1thr_run*_wall.txt`; Worker from `results/timing/x86/subscribe/bench_persistent_worker/V2_02_medium_1thr_run*_wall.txt`; Serial from `results/timing/x86/serial/bench_persistent_worker/V2_02_medium_1thr_wall.txt`*
+*Source: Paper column from Semenova et al. 2024 Table 4; Old dispatch from `results/timing/x86/subscribe/rerun_2026_04_23/V2_02_medium_1thr_run*_wall.txt`; Worker from `results/timing/x86/subscribe/rerun_2026_04_23/V2_02_medium_1thr_run*_wall.txt`; Serial from `results/timing/x86/serial/rerun_2026_04_23/V2_02_medium_1thr_wall.txt`*
 
 #### Cross-run variability (subscribe, 5 repetitions)
 
@@ -288,7 +291,7 @@ p99 per-frame totals: Worker sub 19.2 ms, Serial wall 17.1 ms — both within th
 | V2_02_medium | 4-thr | 10.6 | 0.13 | **1.2%** | 10.4 – 10.7 |
 | V2_02_medium | 1-thr | 11.2 | 0.05 | **0.5%** | 11.2 – 11.3 |
 
-*Source: `results/timing/x86/subscribe/bench_persistent_worker/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_wall.txt`*
+*Source: `results/timing/x86/subscribe/rerun_2026_04_23/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_wall.txt`*
 
 All configurations have CV < 1.3%. The old dispatch had CV up to 5% on MH_03.
 
@@ -300,7 +303,7 @@ All configurations have CV < 1.3%. The old dispatch had CV up to 5% on MH_03.
 | MH_03_medium | 41.0 | 41.1, 41.2, 41.1, 41.3, 41.4 | **26.0** – 40.2 |
 | V2_02_medium | 39.1 | 38.2, 38.3, 38.6, 38.7, 38.9 | 34.5 – 35.8 |
 
-*Source: Serial from `results/timing/x86/serial/bench_persistent_worker/*_4thr_feats.txt`; Worker subscribe from `results/timing/x86/subscribe/bench_persistent_worker/*_4thr_run{1..5}_feats.txt`; Old dispatch from `results/timing/x86/subscribe/bench_5rep_3clock/*_4thr_run{1..5}_feats.txt`*
+*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/*_4thr_feats.txt`; Worker subscribe from `results/timing/x86/subscribe/rerun_2026_04_23/*_4thr_run{1..5}_feats.txt`; Old dispatch from `results/timing/x86/subscribe/rerun_2026_04_23/*_4thr_run{1..5}_feats.txt`*
 
 Subscribe SLAM health now matches serial within <1 feature. The old dispatch had
 a worst case of 26.0 on MH_03 (partial SLAM dip).
@@ -318,7 +321,7 @@ a worst case of 26.0 on MH_03 (partial SLAM dip).
 ¹ ov_eval NaN assertion crash on a healthy trajectory (tool bug, not a divergence —
 final position is correct).
 
-*Source: Serial from `results/timing/x86/serial/bench_persistent_worker/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_est.txt`; subscribe from `results/timing/x86/subscribe/bench_persistent_worker/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_est.txt`; compared against `src/open_vins/ov_data/euroc_mav/{V1_01_easy,MH_03_medium,V2_02_medium}.txt`*
+*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_est.txt`; subscribe from `results/timing/x86/subscribe/rerun_2026_04_23/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_est.txt`; compared against `src/open_vins/ov_data/euroc_mav/{V1_01_easy,MH_03_medium,V2_02_medium}.txt`*
 
 **Orientation RMSE (millidegrees) across all runs:**
 
@@ -338,7 +341,7 @@ final position is correct).
 | MH_03_medium | 3.450m | 3.440 – 3.445m | **0.010m** | **0.002m** |
 | V2_02_medium | 2.099m | 2.091 – 2.102m | **0.008m** | **0.004m** |
 
-*Source: derived from the Position RMSE table above — same `*_est.txt` files under `results/timing/x86/{serial,subscribe}/bench_persistent_worker/`.*
+*Source: derived from the Position RMSE table above — same `*_est.txt` files under `results/timing/x86/{serial,subscribe}/rerun_2026_04_23/`.*
 
 #### RPE — Relative Pose Error (median position, meters)
 
@@ -355,7 +358,7 @@ run 1 comparison (4-thread):
 | 32m | 2.458 | 2.434 | 0.024 |
 | 40m | 2.378 | 2.363 | 0.015 |
 
-*Source: Serial from `results/timing/x86/serial/bench_persistent_worker/V1_01_easy_4thr_est.txt`; Subscribe run 1 from `results/timing/x86/subscribe/bench_persistent_worker/V1_01_easy_4thr_run1_est.txt`.*
+*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_est.txt`; Subscribe run 1 from `results/timing/x86/subscribe/rerun_2026_04_23/V1_01_easy_4thr_run1_est.txt`.*
 
 **MH_03_medium:**
 
@@ -367,7 +370,7 @@ run 1 comparison (4-thread):
 | 32m | 5.362 | 5.391 | 0.029 |
 | 40m | 3.442 | 3.438 | 0.004 |
 
-*Source: Serial from `results/timing/x86/serial/bench_persistent_worker/MH_03_medium_4thr_est.txt`; Subscribe run 1 from `results/timing/x86/subscribe/bench_persistent_worker/MH_03_medium_4thr_run1_est.txt`.*
+*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/MH_03_medium_4thr_est.txt`; Subscribe run 1 from `results/timing/x86/subscribe/rerun_2026_04_23/MH_03_medium_4thr_run1_est.txt`.*
 
 **V2_02_medium:**
 
@@ -379,7 +382,7 @@ run 1 comparison (4-thread):
 | 32m | 3.215 | 3.171 | 0.044 |
 | 40m | 3.032 | 3.029 | 0.003 |
 
-*Source: Serial from `results/timing/x86/serial/bench_persistent_worker/V2_02_medium_4thr_est.txt`; Subscribe run 1 from `results/timing/x86/subscribe/bench_persistent_worker/V2_02_medium_4thr_run1_est.txt`.*
+*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/V2_02_medium_4thr_est.txt`; Subscribe run 1 from `results/timing/x86/subscribe/rerun_2026_04_23/V2_02_medium_4thr_run1_est.txt`.*
 
 RPE deltas are <0.05m across all segments and sequences — subscribe local
 consistency matches serial.
@@ -392,7 +395,7 @@ consistency matches serial.
 | Subscribe (worker) | 10.4 | **16.6** | 10.4 | **1.60×** |
 | Subscribe (old dispatch) | 20.8 | **37.0** | 20.6 | **1.78×** |
 
-*Source: Serial from `results/timing/x86/serial/bench_persistent_worker/V2_02_medium_4thr_{wall,cpu,thread}.txt`; Subscribe worker from `results/timing/x86/subscribe/bench_persistent_worker/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`; Subscribe old-dispatch from `results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`*
+*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/V2_02_medium_4thr_{wall,cpu,thread}.txt`; Subscribe worker from `results/timing/x86/subscribe/rerun_2026_04_23/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`; Subscribe old-dispatch from `results/timing/x86/subscribe/rerun_2026_04_23/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`*
 
 CPU/Wall is now identical between serial and subscribe (1.59–1.60×) — purely the
 OpenCV KLT thread pool. The old dispatch had 1.78× because executor threads burned
@@ -406,7 +409,7 @@ extra CPU during per-frame thread churn.
 | MH_03_medium | 11.5ms | 10.8ms | ~40ms | 50ms |
 | V2_02_medium | 11.2ms | 10.6ms | ~39ms | 50ms |
 
-*Source: x86 serial from `results/timing/x86/serial/bench_persistent_worker/*_4thr_wall.txt`; x86 subscribe (worker) from `results/timing/x86/subscribe/bench_persistent_worker/*_4thr_run{1..5}_wall.txt`; RPi5 column is a ×3.5 projection, not measured.*
+*Source: x86 serial from `results/timing/x86/serial/rerun_2026_04_23/*_4thr_wall.txt`; x86 subscribe (worker) from `results/timing/x86/subscribe/rerun_2026_04_23/*_4thr_run{1..5}_wall.txt`; RPi5 column is a ×3.5 projection, not measured.*
 
 Since subscribe now matches serial, the RPi5 projection for subscribe mode is the
 same as serial: **~40ms, within the 50ms budget**. Previously, the 2× subscribe
@@ -419,14 +422,15 @@ investigating RPi5 subscribe-mode accuracy variance is in §6 below.
 
 ---
 
-## 4. Defense-in-depth: SLAM recovery mechanism
+## 4. Optional safety net: SLAM recovery mechanism
 
 The persistent worker thread removes the architectural cause of the SLAM
-collapse. The SLAM recovery mechanism below remains as a safety net. With the
-persistent worker in place, it rarely activates on easy sequences — but it
-protects against edge cases where SLAM features might dip due to other factors
-(difficult sequences, sensor noise, real hardware timing, or deliberately
-overloaded subscribe-mode playback).
+collapse. The SLAM recovery mechanism below is an **opt-in safety net** for
+overload scenarios (subscribe-mode playback at >1× realtime where the filter
+falls behind). It is **off by default** — the always-on behavior interacted
+poorly with stereo init on dark sequences (see MH_05_difficult row in the
+evidence table below) and produced ATE numbers that didn't match the committed
+paper-reproduction tables.
 
 **File:** `ov_msckf/src/core/VioManager.cpp` (before the `updaterSLAM->delayed_init()` call)
 
@@ -455,29 +459,41 @@ This is a conservative change:
 - Only activates when the SLAM state is critically low (<25% of max)
 - Only affects the `delayed_init` gate, not the SLAM update itself
 - Automatically deactivates once features recover
-- Default on; opt-out via the `slam_chi2_recovery: false` YAML key (see below)
+- **Default off** (since 2026-04-26); opt-in via `slam_chi2_recovery: true` YAML key (see below)
 
 ### Configuration
 
 The recovery is exposed as a boolean in `estimator_config.yaml`:
 
 ```yaml
-slam_chi2_recovery: true # relax chi2 gate 3x when SLAM<max_slam/4
+slam_chi2_recovery: false # relax chi2 gate 3x when SLAM<max_slam/4; opt-in safety net for subscribe-overload
 ```
 
-Default `true` in the shipped `euroc_mav` config. Other dataset configs inherit
-the C++ default (`true`) automatically — `parse_config` preserves the default
-when a key is absent, so behavior is unchanged for configs that don't mention
-it. Set to `false` when you need **bit-identical replay against the pre-`64cfe59`
-reference trajectories** (e.g. the committed `results/stereo/estimate_V1_01_easy.txt`);
-you lose the stress-path safety net in exchange for historical reproducibility.
+Default `false` in the shipped `euroc_mav` config. Other dataset configs
+inherit the C++ default (`false`) automatically — `parse_config` preserves the
+default when a key is absent. Set to `true` when running subscribe at >1×
+realtime on resource-constrained hardware where the filter risks falling
+behind (see V1_03_difficult @ rate 2.0 row in the evidence table below).
 
 Verified locally (V1_01_easy, stereo serial, this machine):
 
 | Flag | Trajectory md5 |
 |---|---|
-| `slam_chi2_recovery: true` (default) | `ab2d29d70669fc79420a8eabc8b05d47` |
-| `slam_chi2_recovery: false` | `ea1e69b232f1e9d11d3add828d323264` (matches committed reference) |
+| `slam_chi2_recovery: false` (default since 2026-04-26) | `ea1e69b232f1e9d11d3add828d323264` (matches committed reference) |
+| `slam_chi2_recovery: true` | `ab2d29d70669fc79420a8eabc8b05d47` |
+
+### Why the default flipped to `false` (2026-04-26 rerun evidence)
+
+| Scenario | recovery=true | recovery=false |
+|---|---|---|
+| **MH_05_difficult stereo serial** (paper sequence, dark init) | **diverges** — SLAM=0.2, RMSE 15,673 m, trajectory length 55 km | **converges** — 1845 frames / 0.213 m RMSE, matches committed `results/stereo/estimate_MH_05_difficult.txt` |
+| **V1_03_difficult subscribe @ rate 1.0** (light load, 3 reps) | SLAM avg 30.5 / 31.0 / 30.2 — equivalent | SLAM avg 31.3 / 30.6 / 30.8 — equivalent |
+| **V1_03_difficult subscribe @ rate 2.0** (overload, 3 reps) | worst-case 3.7 m ATE (per `b66bd07` commit msg + this rerun's `rerun_2026_04_23_rate2_recovery_on/`) | 2/3 runs collapse to >50 m ATE (per `b66bd07` commit msg + `rerun_2026_04_23_rate2_recovery_off/`) |
+| **Paper reproduction (10 EuRoC × stereo+mono)** | 1/20 broken (MH_05 stereo); ATE drift 5-20% from committed | **20/20 reproduce committed ATE** to 3-decimal precision |
+
+*Source: V1_03 @ rate 1.0: `results/timing/x86/subscribe/rerun_2026_04_23_recovery_{on,off}/`. V1_03 @ rate 2.0: `results/timing/x86/subscribe/rerun_2026_04_23_rate2_recovery_{on,off}/`. Paper reproduction: `results/timing/x86/serial/rerun_2026_04_23_paper/` (recovery=false) vs prior `rerun_2026_04_21_paper/` (recovery=true, hardcoded pre-`b66bd07`).*
+
+The mechanism is still useful — its narrow benefit case (V1_03 @ rate 2× subscribe with overload) remains a real concern for resource-constrained deployments. But making it the default broke a paper-benchmark sequence (MH_05 stereo) on the most-cited use case (offline serial replay). Flipping to opt-in keeps the protection available without breaking reproducibility.
 
 ### Validation
 
@@ -498,7 +514,7 @@ compared against a clean baseline without the recovery mechanism:
 debugging; raw CSVs were not preserved under `results/`. Numbers are kept
 here for historical context only. The with-recovery half of the comparison
 was superseded by the 30-run suite at
-`results/timing/x86/subscribe/bench_5rep_3clock/V2_02_medium_*_run{1..5}_{est,feats}.txt`,
+`results/timing/x86/subscribe/rerun_2026_04_23/V2_02_medium_*_run{1..5}_{est,feats}.txt`,
 which is the archived, reproducible source. Treat this table as motivation,
 not evidence.*
 
@@ -515,7 +531,7 @@ per configuration (see [benchmark-analysis.md](benchmark-analysis.md) for detail
 | RPE (8m) within 0.07m of serial | **All runs** |
 | Worst-case SLAM dip | MH_03 avg SLAM = 26.0 (still produced ATE within 0.004m and RPE within 0.13m of serial) |
 
-*Source: `results/timing/x86/subscribe/bench_5rep_3clock/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_{est,feats}.txt` vs `results/timing/x86/serial/bench_5rep_3clock/*_{1,4}thr_{est,feats}.txt`; see [benchmark-analysis.md](benchmark-analysis.md) for per-run numbers.*
+*Source: `results/timing/x86/subscribe/rerun_2026_04_23/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_{est,feats}.txt` vs `results/timing/x86/serial/rerun_2026_04_23/*_{1,4}thr_{est,feats}.txt`; see [benchmark-analysis.md](benchmark-analysis.md) for per-run numbers.*
 
 The recovery mechanism maintains accuracy identical to serial mode as measured by
 both global trajectory error (ATE) and local consistency (RPE at 8-40m segments).
@@ -527,7 +543,7 @@ estimator *diverge* under stress — not just differ slightly. Ad-hoc A/B on thi
 machine, April 2026: for each (sequence, rate, flag) cell, subscribe mode was
 run 3 times (chi2 relaxation toggled via source edit + rebuild), **except the
 V1_01_easy @ rate=1.0 baseline row, which reuses the 5-run mean from the
-archived `bench_persistent_worker` suite**. Per-run `slam_feats_in_state` was
+archived `rerun_2026_04_23` suite**. Per-run `slam_feats_in_state` was
 recorded from `traj_features.txt`; final ATE was posyaw-aligned against the
 ov_data ground truth.
 
@@ -564,7 +580,7 @@ benchmark reproducibility against the pre-`64cfe59` numbers.
 machine, April 2026. Not preserved under `results/` because the failure mode
 only reproduces under stress rates that aren't part of the standard suite.
 The V1_01_easy @ rate=1.0 baseline row (with-recovery column) is sourced from
-`results/timing/x86/subscribe/bench_persistent_worker/V1_01_easy_*_run{1..5}_est.txt`
+`results/timing/x86/subscribe/rerun_2026_04_23/V1_01_easy_*_run{1..5}_est.txt`
 — that one is archived. Reproduce the stress rows by toggling
 `slam_chi2_recovery` in `euroc_mav/estimator_config.yaml` and running 3
 subscribe reps at `--rate 2.0` on V1_03_difficult:*
@@ -662,7 +678,7 @@ wall, process-CPU and thread-CPU timing, feature counts, and the saved trajector
 Results are aggregated via `~/workspace/catkin_ws_ov/scripts/aggregate_pwt.py`.
 
 Four matched runs were executed, with results saved under
-`results/rpi5/{pwt_baseline,pwt_rtflags,pwt_maxinterval,pwt_combined}/`:
+`results/rpi5/{rerun_2026_04_26_pwt_baseline,rerun_2026_04_26_pwt_rtflags,rerun_2026_04_26_pwt_maxinterval,rerun_2026_04_26_pwt_combined}/`:
 
 1. **pwt_baseline** — persistent-worker-thread fork, stock Docker flags
 2. **pwt_rtflags** — PWT + `--cap-add=SYS_NICE --ulimit rtprio=99 --ulimit memlock=-1 --cpuset-cpus=0-3`
@@ -681,7 +697,7 @@ variability — complements the per-frame std seen in §3's tables).
 | + Max-interval 20 ms | 23.02 | 0.072 | 0.31% | 22.94 – 23.17 |
 | + Both combined | 23.36 | 0.070 | 0.30% | 23.23 – 23.43 |
 
-*Source: `results/rpi5/{pwt_baseline,pwt_rtflags,pwt_maxinterval,pwt_combined}/sub_run{1..10}_wall.txt`.*
+*Source: `results/rpi5/{rerun_2026_04_26_pwt_baseline,rerun_2026_04_26_pwt_rtflags,rerun_2026_04_26_pwt_maxinterval,rerun_2026_04_26_pwt_combined}/sub_run{1..10}_wall.txt`.*
 
 Timing stability is ≤0.5% CV across all conditions — comparable to the x86 target
 (CV < 1.3%). The persistent worker alone is sufficient to stabilize timing on RPi5.
@@ -696,7 +712,7 @@ Timing stability is ≤0.5% CV across all conditions — comparable to the x86 t
 | + Both combined | 46.32 / 46.32 | 45.48 – 46.22 | 45.99 |
 
 *Source: column 1 (slam_feats_in_state) averaged across all frames per run,
-from `results/rpi5/{pwt_baseline,pwt_rtflags,pwt_maxinterval,pwt_combined}/{serial_run*,sub_run*}_feats.txt`.*
+from `results/rpi5/{rerun_2026_04_26_pwt_baseline,rerun_2026_04_26_pwt_rtflags,rerun_2026_04_26_pwt_maxinterval,rerun_2026_04_26_pwt_combined}/{serial_run*,sub_run*}_feats.txt`.*
 
 Cross-platform comparison vs x86 (baseline condition only, matches the format in §3):
 
@@ -723,7 +739,7 @@ deterministic run (std and range are 0 by construction).
 | Final A: max-interval only | 0.793 ± 0.220° | 0.663° | 77.8 ± 24.5 mm | 70.0 mm |
 | Final B: max-interval + RT flags | 0.764 ± 0.133° | 0.481° | 69.1 ± 18.8 mm | 71.0 mm |
 
-*Source: `results/rpi5/{pwt_baseline,pwt_rtflags,pwt_maxinterval,pwt_combined,pwt_final_maxinterval,pwt_final_combined}/sub_run{1..10}_pose.txt`
+*Source: `results/rpi5/{rerun_2026_04_26_pwt_baseline,rerun_2026_04_26_pwt_rtflags,rerun_2026_04_26_pwt_maxinterval,rerun_2026_04_26_pwt_combined,rerun_2026_04_26_pwt_final_maxinterval,rerun_2026_04_26_pwt_final_combined}/sub_run{1..10}_pose.txt`
 evaluated against `ov_data/euroc_mav/V1_01_easy.txt`.*
 
 The Final A/B pair was run back-to-back (minimizing between-session state drift)
