@@ -44,7 +44,17 @@ catkin_ws_ov/
 
 Every committed timing CSV and trajectory estimate is referenced from the
 docs below. Tables that aggregate data from `results/` carry a
-`*Source: ...*` citation line identifying the underlying file(s).
+`*Source: ...*` citation line identifying the underlying file(s); see
+[docs/data-provenance.md](docs/data-provenance.md) for the canonical
+tag → (platform, submodule commit, config) lookup.
+
+## Recent changes
+
+- **`slam_chi2_recovery` default `false`** (in `config/euroc_mav/estimator_config.yaml`). Leave at the default for offline serial replay and paper-repro reproducibility — the always-on chi2 relaxation interfered with stereo init on dark sequences (MH_05_difficult). Set to `true` for subscribe-mode deployment at >1× realtime under load (V1_03_difficult @ rate 2.0 shows ATE 3.7 m with `true` vs >50 m collapse with `false` in 2/3 runs). See [docs/determinism.md §4](docs/determinism.md#4-optional-safety-net-slam-recovery-mechanism).
+- **`--slam-chi2-recovery <true|false>`** CLI flag added to `run_full_benchmark.sh`, `run_timing_sweep.sh`, and `run_timing_subscribe.sh` for ad-hoc overrides without editing the YAML.
+- **Serial-mode timing improved 8-15 %** — the persistent-worker thread is now properly gated on `use_multi_threading_subs`, so it's no longer spawned in serial mode. Also makes serial bit-deterministic across reps.
+- **Paper-reproduction estimates regenerated** under the consolidated `master-candidate` submodule (`results/{stereo,mono}/estimate_*.txt`); ATE values bit-reproduce the prior committed numbers for every sequence × mode.
+- **Latest benchmark tags:** `rerun_2026_04_23` (x86 main suite + paper repro + chi2 A/B) and `rerun_2026_04_26_pwt_*` + `rerun_2026_04_26_paper` (RPi5 PWT variants + cross-platform paper repro). Retired tags (`bench_5rep_3clock`, `bench_persistent_worker`, `pwt_*`) are removed from `results/` but preserved in git history.
 
 ## Documentation
 
@@ -60,3 +70,4 @@ Follow the flow top-to-bottom — each doc builds on the previous ones.
 | [Benchmark Analysis](docs/benchmark-analysis.md) | 3-clock timing, paper comparison, accuracy and consistency under subscribe mode (x86) |
 | [RPi5 Setup](docs/rpi5-setup.md) | Build on RPi5 (Docker or native) + run the EuRoC benchmark; live-sensor deployment is WIP |
 | [RPi5 Benchmarking](docs/rpi5-benchmarking.md) | Phase 4 RPi5 timing, accuracy vs x86 (NEON/AVX determinism caveat), config sweeps, subscribe mode, WIP list |
+| [Data Provenance](docs/data-provenance.md) | Canonical lookup: each `results/` tag → (platform, submodule commit, config, threads, dates). Cross-reference for every `*Source: ...*` citation in the docs above. |

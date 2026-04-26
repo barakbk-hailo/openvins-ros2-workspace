@@ -176,7 +176,7 @@ All runs are stereo, serial mode, default config (200 features, max_slam=50).
 > round-off. This is expected behavior for a nonlinear EKF, not an RPi5 bug.
 > Trajectory-level metrics (ATE, RPE) stay comparable; see the tables below.
 
-### Absolute Trajectory Error
+### Absolute Trajectory Error — 3-sequence subset (with MH_03 bag_start handling)
 
 | Sequence | x86 rmse_ori (deg) | RPi5 rmse_ori (deg) | x86 rmse_pos (m) | RPi5 rmse_pos (m) |
 |----------|--------------------|---------------------|-------------------|-------------------|
@@ -185,7 +185,23 @@ All runs are stereo, serial mode, default config (200 features, max_slam=50).
 | MH_03_medium (bag_start=5) | 1.164 | 1.031 | 0.089 | 0.116 |
 | V1_03_difficult | 2.861 | 2.818 | 0.058 | 0.063 |
 
-*Source: x86 from `results/stereo/estimate_{V1_01_easy,MH_03_medium,MH_03_medium_bagstart5,V1_03_difficult}.txt`; RPi5 from `results/rpi5/stereo/estimate_{V1_01_easy,MH_03_medium_diverged,MH_03_medium_bagstart5,V1_03_difficult}.txt`*
+*Source: x86 from `results/stereo/estimate_{V1_01_easy,MH_03_medium,MH_03_medium_bagstart5,V1_03_difficult}.txt`; RPi5 from `results/rpi5/stereo/estimate_{V1_01_easy,MH_03_medium_diverged,MH_03_medium_bagstart5,V1_03_difficult}.txt`. Provenance: x86 = Latitude 5420 / `master-candidate`/`2a50450` / `slam_chi2_recovery: false`; RPi5 = openhd@192.168.200.81 / Docker `openvins-humble:latest` rebuilt 2026-04-26 / same submodule + config.*
+
+### Absolute Trajectory Error — full 5 Vicon × stereo+mono paper-repro
+
+Cross-platform comparison of all 5 Vicon-room sequences from the paper Table II reproduction. Both columns at default `bag_start=0` and shipping config (`slam_chi2_recovery: false`).
+
+| Sequence | x86 stereo (ori°/pos m) | RPi5 stereo (ori°/pos m) | x86 mono (ori°/pos m) | RPi5 mono (ori°/pos m) |
+|----------|--------------------------|---------------------------|------------------------|-------------------------|
+| V1_01_easy | 0.569 / 0.038 | 0.686 / 0.044 | 0.645 / 0.062 | 0.574 / 0.056 |
+| V1_02_medium | 1.622 / 0.053 | 1.714 / 0.062 | 1.655 / 0.060 | 1.694 / 0.062 |
+| V1_03_difficult | 2.861 / 0.058 | 2.818 / 0.063 | 2.673 / 0.073 | 2.926 / 0.070 |
+| V2_01_easy | 1.250 / 0.063 | 1.097 / 0.067 | 1.314 / 0.163 | 0.942 / 0.126 |
+| V2_02_medium | 1.212 / 0.051 | 1.166 / 0.048 | 1.477 / 0.078 | 1.797 / 0.072 |
+
+*Source: x86 from `results/{stereo,mono}/estimate_{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}{,_mono}.txt` (paper-repro committed estimates, regenerated under master-candidate); RPi5 from `results/rpi5/rerun_2026_04_26_paper/{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}_4thr{,_mono}_pose.txt`. Provenance: same as table above. RPi5 paper-repro collected 2026-04-26 via `serial.launch.py` inside Docker `openvins-humble:latest`.*
+
+**Cross-platform stereo position drift (RPi5 vs x86):** V1_01 +6 mm, V1_02 +9 mm, V1_03 +5 mm, V2_01 +4 mm, V2_02 −3 mm. RPi5 is consistently within ±10 mm of x86 on stereo position, with mixed signs — confirms the NEON-vs-SSE/AVX numerical drift caveat above is real but bounded.
 
 ### Relative Pose Error (median orientation / median position)
 

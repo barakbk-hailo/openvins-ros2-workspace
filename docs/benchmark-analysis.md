@@ -257,15 +257,24 @@ means the system consumes ~37ms of total CPU per frame across all threads.
 
 **V1_01 is naturally stable** — subscribe matches serial closely (44-45 vs 46).
 
-**V2_02 shows the SLAM recovery mechanism working** — all runs at 34-36 (vs 38.4
-serial). The ~4-feature gap vs serial is the recovery cost: features admitted with
-relaxed chi-squared are slightly less well-conditioned, occasionally getting
-marginalized sooner.
+**V2_02 has the most run-to-run variability** — all runs at 34-36 (vs 38.4
+serial). The ~4-feature gap vs serial is from subscribe-mode scheduling jitter
+allowing slightly different feature lifecycles; the persistent worker thread
+keeps SLAM well above zero (no collapse) but can't perfectly reproduce serial
+timing-dependent feature admission decisions.
 
-**MH_03 has the most variation** — two 4-thr runs at 26 and 31, one 1-thr run at 29.
+**MH_03 also dips occasionally** — two 4-thr runs at 26 and 31, one 1-thr run at 29.
 The machine hall sequences have sparser features and longer corridors where feature
-tracks break. The recovery mechanism prevents collapse to 0 but can't prevent dips
-to 26-31. This is acceptable — ATE is still good (see below).
+tracks break. The PWT fix prevents collapse to 0 but can't prevent dips to 26-31.
+This is acceptable — ATE is still good (see below).
+
+> **Note on `slam_chi2_recovery`:** the chi-squared-relaxation mechanism is
+> available as an opt-in YAML knob (default `false`). The data above is at
+> default `false` — the SLAM stability shown is achieved by the persistent
+> worker thread alone, not by the chi2 relaxation. See
+> [determinism.md §4](determinism.md#4-optional-safety-net-slam-recovery-mechanism)
+> for the rationale and the V1_03 @ rate 2.0 evidence where chi2 recovery
+> does help.
 
 ---
 
@@ -307,8 +316,10 @@ consistency if errors cancel over the full trajectory.
 *Source: same `*_est.txt` files as the ATE table (RPE is computed from the same estimates).*
 
 **Subscribe RPE matches serial within ~0.07m on V1_01, ~0.07m on MH_03, and
-~0.02m on V2_02.** The local consistency is preserved — the SLAM recovery mechanism
-does not degrade short-term accuracy.
+~0.02m on V2_02.** The local consistency is preserved — the persistent worker
+thread eliminates the per-frame timing jitter that previously caused subscribe-mode
+SLAM collapse, so subscribe behaves like a noisy version of serial rather than a
+qualitatively different mode.
 
 ### RPE across segment lengths (serial vs subscribe, V2_02, 4-thr)
 
@@ -363,7 +374,7 @@ results (§2-5).
 | Subscribe adds ~2× wall overhead (pre-fix) | **Verified** | Consistent 2.0-2.1× across 3 sequences, 30 runs on old dispatch |
 | Subscribe adds ~1× wall overhead (post-fix) | **Verified** | See [determinism.md](determinism.md) — persistent worker thread |
 | Subscribe accuracy matches serial | **Verified** | ATE within 0.02m, RPE (8m) within 0.07m across all 30 subscribe runs |
-| SLAM recovery prevents catastrophic divergence | **Verified** | 0/30 runs collapsed (was 30% without recovery) |
+| Persistent worker thread prevents catastrophic SLAM collapse | **Verified** | 0/30 subscribe runs collapsed at default `slam_chi2_recovery: false`. The PWT fix is the architectural cause; the chi2-recovery YAML knob is an additional opt-in safety net for subscribe-overload scenarios (see [determinism.md §4](determinism.md#4-optional-safety-net-slam-recovery-mechanism) for the V1_03 @ rate 2.0 evidence). |
 | Overhead is from cache/memory pollution | **Plausible but unverified** | Thread CPU > serial thread CPU, but no `perf stat` cache-miss data |
 | OpenCV parallelism saves ~1ms (4-thr vs 1-thr) | **Verified** | Serial: 10.1 vs 11.2ms. But costs 5.5ms extra process CPU |
 | MH_03 has more timing variability than V1_01/V2_02 | **Verified** | 2.4ms range vs 0.2ms for other sequences (4-thr subscribe) |

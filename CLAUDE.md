@@ -115,7 +115,7 @@ Both use `ROS2Visualizer` to publish odometry, point clouds, and TF.
 
 - **Serial VIO node** (`ov_msckf/src/ros2_serial_msckf.cpp`) — deterministic offline bag processing for reproducible benchmarking
 - **Persistent worker thread** (`ov_msckf/src/ros/ROS2Visualizer.{h,cpp}`) — replaces the upstream per-frame `detach()` dispatch with a single long-lived worker. Eliminates TOCTOU race, dangling-reference UB, and non-deterministic IMU triggering. Reduces subscribe overhead from 2× serial to 1× serial. Details in [docs/determinism.md](docs/determinism.md).
-- **SLAM recovery** — when SLAM features drop below 25% of `max_slam`, chi-squared gate relaxes 3× to prevent irrecoverable feature collapse in subscribe mode (defense-in-depth safety net)
+- **SLAM recovery** — when SLAM features drop below 25% of `max_slam`, chi-squared gate relaxes 3× to admit features in spite of elevated residuals. Off by default (`slam_chi2_recovery: false`) since 2026-04-26 because the always-on behavior interfered with stereo init on dark sequences (MH_05_difficult); opt-in via the YAML knob or the `--slam-chi2-recovery <true|false>` flag on the orchestrator scripts. See [docs/determinism.md §4](docs/determinism.md#4-optional-safety-net-slam-recovery-mechanism).
 - **3-clock timing** — wall clock, process CPU, and thread CPU instrumentation in `VioManager::track_image_and_update()`
 - **Feature count recording** — per-frame MSCKF/SLAM/tracking feature counts
 

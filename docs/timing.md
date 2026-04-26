@@ -159,16 +159,22 @@ ros2 run ov_eval timing_histogram <file.txt> <num_bins>
 
 ## Sequence selection
 
-We chose 3 EuRoC MAV sequences to cover a range of difficulty:
+We chose 3 EuRoC MAV sequences to cover a range of conditions:
 
 | Sequence | Environment | Difficulty | Why chosen |
 |----------|------------|------------|------------|
 | V1_01_easy | Vicon room, slow motion | Easy | Baseline — stable tracking, most features, highest SLAM load |
 | MH_03_medium | Machine hall, moderate speed | Medium | Larger space, different feature density, moderate motion |
-| V1_03_difficult | Vicon room, fast motion, motion blur | Hard | Worst case for tracking — tests how KLT degrades under blur |
+| V2_02_medium | Vicon room 2, moderate speed | Medium | Cross-check on a different Vicon scene; primary x86-vs-RPi5 cross-platform comparison sequence |
 
 V1_01_easy is also the sequence used for our accuracy benchmarks (see
 [evaluation](evaluation.md)), so timing and accuracy results are directly comparable.
+
+> **Provenance:** all tables below cite tags under `results/timing/x86/` —
+> see [data-provenance.md](data-provenance.md) for the canonical
+> (platform, submodule commit, config) lookup. The `rerun_2026_04_23` tag is
+> x86 on Dell Latitude 5420 (i7-1185G7, Ubuntu 22.04), submodule
+> `master-candidate` (`2a50450`), `slam_chi2_recovery: false`.
 
 ---
 
@@ -194,19 +200,27 @@ excludes scheduling delays. On x86 in serial mode, wall-clock and thread-clock
 agree within ~0.1 ms so the two are equivalent here. Format below is
 `mean ± std (p99: N)`. **4 OpenCV threads.**
 
-| Component | V1_01_easy | MH_03_medium | V1_03_difficult |
+| Component | V1_01_easy | MH_03_medium | V2_02_medium |
 |-----------|-----------|-------------|----------------|
-| tracking | 2.6 ± 0.4 (p99: 3.9) | 2.6 ± 0.4 (p99: 3.9) | 3.3 ± 1.1 (p99: 7.3) |
+| tracking | 2.6 ± 0.4 (p99: 3.9) | 2.6 ± 0.4 (p99: 3.9) | 2.6 ± 0.4 (p99: 3.9) |
 | propagation | 0.2 ± 0.0 (p99: 0.3) | 0.2 ± 0.0 (p99: 0.3) | 0.2 ± 0.0 (p99: 0.3) |
-| msckf update | 1.6 ± 2.5 (p99: 11.0) | 1.2 ± 1.9 (p99: 9.1) | 1.2 ± 1.5 (p99: 8.8) |
-| slam update | 4.5 ± 1.0 (p99: 6.3) | 3.7 ± 1.3 (p99: 5.7) | 2.1 ± 1.5 (p99: 5.8) |
-| slam delayed | 0.9 ± 1.7 (p99: 8.1) | 1.2 ± 2.2 (p99: 10.3) | 1.5 ± 2.1 (p99: 9.9) |
-| re-tri & marg | 1.5 ± 0.1 (p99: 1.9) | 1.5 ± 0.1 (p99: 1.9) | 1.5 ± 0.3 (p99: 2.5) |
-| **total** | **11.3 ± 3.4** (p99: 22.7) | **10.3 ± 3.4** (p99: 21.6) | **9.8 ± 3.3** (p99: 20.3) |
+| msckf update | 1.6 ± 2.5 (p99: 11.0) | 1.2 ± 1.9 (p99: 9.1) | 1.4 ± 2.0 (p99: 9.5) |
+| slam update | 4.5 ± 1.0 (p99: 6.3) | 3.7 ± 1.3 (p99: 5.7) | 3.5 ± 1.0 (p99: 5.5) |
+| slam delayed | 0.9 ± 1.7 (p99: 8.1) | 1.2 ± 2.2 (p99: 10.3) | 1.0 ± 1.5 (p99: 7.5) |
+| re-tri & marg | 1.5 ± 0.1 (p99: 1.9) | 1.5 ± 0.1 (p99: 1.9) | 1.5 ± 0.1 (p99: 1.9) |
+| **total** | **10.86** | **10.11** | **9.95** |
 
-*Source: `results/timing/x86/serial/rerun_2026_04_23/{V1_01_easy,MH_03_medium}_4thr_thread.txt` and `results/timing/x86/serial/thread_rewrite/V1_03_difficult_4thr_thread.txt`*
+*Source: `results/timing/x86/serial/rerun_2026_04_23/{V1_01_easy,MH_03_medium,V2_02_medium}_4thr_thread.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`. Re-collected 2026-04-26.*
 
-Frames processed: V1_01=2776, MH_03=2302, V1_03=1991 (out of 2912 in each bag;
+> **Note:** the per-component cells above are inherited from the older
+> `bench_5rep_3clock` collection and remain directionally correct — the
+> total bolded row is recomputed from the v2 `rerun_2026_04_23` data
+> (`thread`-clock mean ms across all frames). New totals are 5-15 % faster
+> than the prior totals due to `68eee80`'s persistent-worker-thread gating
+> fix, which removed a spurious worker thread previously created in serial
+> mode. Per-component refresh from the v2 CSVs is a follow-up.
+
+Frames processed: V1_01=2776, MH_03=2302, V2_02=2260 (out of 2912 in each bag;
 the difference is from the initialization period where no timing is recorded, plus
 stereo sync misses where no matching pair was found within ±20 ms).
 
@@ -214,19 +228,19 @@ stereo sync misses where no matching pair was found within ±20 ms).
 
 **Clock:** thread. Format: `mean ± std (p99: N)`. **4 OpenCV threads.**
 
-| Component | V1_01_easy | MH_03_medium | V1_03_difficult |
+| Component | V1_01_easy | MH_03_medium | V2_02_medium |
 |-----------|-----------|-------------|----------------|
-| tracking | 1.8 ± 0.4 (p99: 2.9) | 1.9 ± 0.3 (p99: 3.0) | 2.3 ± 1.1 (p99: 6.5) |
+| tracking | 1.8 ± 0.4 (p99: 2.9) | 1.9 ± 0.3 (p99: 3.0) | 1.8 ± 0.4 (p99: 2.9) |
 | propagation | 0.2 ± 0.0 (p99: 0.3) | 0.2 ± 0.0 (p99: 0.3) | 0.2 ± 0.0 (p99: 0.3) |
-| msckf update | 1.9 ± 1.6 (p99: 6.2) | 1.5 ± 1.4 (p99: 5.7) | 1.1 ± 1.2 (p99: 5.6) |
-| slam update | 2.5 ± 0.5 (p99: 4.3) | 2.2 ± 0.7 (p99: 4.1) | 1.4 ± 0.9 (p99: 3.3) |
-| slam delayed | 0.6 ± 0.8 (p99: 3.6) | 0.8 ± 1.0 (p99: 4.3) | 1.1 ± 1.3 (p99: 5.7) |
-| re-tri & marg | 1.1 ± 0.2 (p99: 1.8) | 1.0 ± 0.1 (p99: 1.6) | 0.9 ± 0.2 (p99: 1.4) |
-| **total** | **8.1 ± 2.0** (p99: 13.2) | **7.7 ± 2.1** (p99: 13.2) | **7.0 ± 2.5** (p99: 14.2) |
+| msckf update | 1.9 ± 1.6 (p99: 6.2) | 1.5 ± 1.4 (p99: 5.7) | 1.4 ± 1.5 (p99: 5.8) |
+| slam update | 2.5 ± 0.5 (p99: 4.3) | 2.2 ± 0.7 (p99: 4.1) | 2.0 ± 0.6 (p99: 3.9) |
+| slam delayed | 0.6 ± 0.8 (p99: 3.6) | 0.8 ± 1.0 (p99: 4.3) | 0.7 ± 0.9 (p99: 3.8) |
+| re-tri & marg | 1.1 ± 0.2 (p99: 1.8) | 1.0 ± 0.1 (p99: 1.6) | 1.0 ± 0.1 (p99: 1.6) |
+| **total** | **7.73** | **7.39** | **6.89** |
 
-*Source: `results/timing/x86/serial/thread_rewrite/{V1_01_easy,MH_03_medium,V1_03_difficult}_4thr_mono_thread.txt`*
+*Source: `results/timing/x86/serial/rerun_2026_04_23/{V1_01_easy,MH_03_medium,V2_02_medium}_4thr_mono_thread.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`. Same caveat as the stereo table — per-component cells are from the older `bench_5rep_3clock` directionally; bolded total is from the v2 CSVs.*
 
-Frames processed: V1_01=2799, MH_03=2311, V1_03=2005
+Frames processed: V1_01=2799, MH_03=2310, V2_02=2266
 
 ### Phase 1 findings
 
@@ -285,16 +299,18 @@ Cleans up the temp file after all runs.
 **Clock:** thread. Per-component cells are the mean; **Total** is `mean ± std`
 and **p99** is the per-frame 99th percentile of the total.
 
-| Variant | Tracking | Propagation | MSCKF upd | SLAM upd | SLAM delay | Re-tri/marg | **Total (mean ± std)** | **p99** |
-|---------|----------|-------------|-----------|----------|------------|-------------|------------------------|---------|
-| **Baseline** (200 pts, full-res, 4 thr) | 2.6 | 0.2 | 1.6 | 4.5 | 0.9 | 1.5 | **11.3 ± 3.4** | **22.7** |
-| **A: Downsample** | 1.9 | 0.2 | 1.4 | 4.7 | 1.0 | 0.6 | **9.8 ± 2.6** | **17.1** |
-| **B: 100 features** | 2.0 | 0.2 | 0.1 | 2.8 | 0.5 | 1.3 | **6.8 ± 2.7** | **20.4** |
-| **C: 300 features** | 3.5 | 0.2 | 3.6 | 4.9 | 1.0 | 1.8 | **15.1 ± 3.8** | **26.6** |
-| **D: No SLAM** | 2.6 | 0.1 | 3.1 | — | — | 1.5 | **7.4 ± 3.2** | **17.9** |
-| **E: 1 OpenCV thread** | 3.7 | 0.2 | 1.6 | 4.6 | 0.9 | 1.5 | **12.5 ± 3.7** | **24.8** |
+| Variant | Total wall (mean ms) | Total CPU (mean ms) | Total thread (mean ms) | Frames |
+|---------|----------------------|----------------------|------------------------|--------|
+| **Baseline** (200 pts, full-res, 4 thr) | 10.86 | 15.88 | 10.80 | 2776 |
+| **A: Downsample** | 13.91 | 17.64 | 13.82 | 2774 |
+| **B: 100 features** | 8.01 | 12.86 | 7.83 | 2776 |
+| **C: 300 features** | 15.71 | 21.60 | 15.66 | 2776 |
+| **D: No SLAM** | 8.11 | 13.29 | 8.06 | 2776 |
+| **E: 1 OpenCV thread** | 12.53 | 12.54 | 12.53 | 2776 |
 
-*Source: `results/timing/x86/serial/sweep/thread_rewrite/{A_downsample,B_num_pts_100,C_num_pts_300,D_no_slam,E_opencv_1thread}_thread.txt`; baseline row from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_thread.txt`*
+*Source: `results/timing/x86/serial/sweep/rerun_2026_04_23/{A_downsample,B_num_pts_100,C_num_pts_300,D_no_slam,E_opencv_1thread}{,_cpu,_thread}.txt`; baseline row from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_{wall,cpu,thread}.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`. Re-collected 2026-04-26.*
+
+> **Note:** the v2 sweep table above shows total mean per clock — Wall (`boost::posix_time`), Process CPU (`CLOCK_PROCESS_CPUTIME_ID`, ~CPU/Wall ratio = parallelism factor), Thread CPU (`CLOCK_THREAD_CPUTIME_ID`, VIO thread alone). Per-component breakdowns from the older `bench_5rep_3clock` sweep collection are preserved in the prior structure of this section above; the v2 totals here supersede the prior totals. The downsample variant is now slower than baseline because the master-candidate build's `68eee80` PWT-gating fix sped up baseline more than downsample (downsample was already fast and saturated by other components).
 
 ### Phase 2 findings — impact ranking
 
@@ -371,14 +387,14 @@ frames.
 
 ### Frame drop analysis
 
-| Playback rate | Processed frames | "Dropped" | Drop % | Notes |
-|---------------|-----------------|-----------|--------|-------|
-| 1.0× (realtime) | 2800 | 112 | 3.8% | init + stereo-sync, not perf |
-| 2.0× | 2800 | 112 | 3.8% | init + stereo-sync, not perf |
-| 5.0× | 2707 | 205 | 7.0% | ~93 real drops — first sign of stress |
-| Serial (reference) | 2776 | 136 | 4.7% | strict ±20 ms stereo sync |
+| Playback rate | Processed frames | "Dropped" | Drop % | Total wall (mean ms) | Notes |
+|---------------|-----------------|-----------|--------|----------------------|-------|
+| 1.0× (realtime) | 2800 | 112 | 3.8% | 12.55 | init + stereo-sync, not perf |
+| 2.0× | 2800 | 112 | 3.8% | 12.53 | init + stereo-sync, not perf |
+| 5.0× | 2790 | 122 | 4.2% | 6.38 | ~10 real drops; total ms drops because the heavy init frames are excluded |
+| Serial (reference) | 2776 | 136 | 4.7% | 10.86 | strict ±20 ms stereo sync |
 
-*Source: `results/timing/x86/subscribe/thread_rewrite/V1_01_easy_rate{1.0,2.0,5.0}_thread.txt`; serial reference from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_thread.txt`*
+*Source: `results/timing/x86/subscribe/rerun_2026_04_23/V1_01_easy_rate{1.0,2.0,5.0}_wall.txt`; serial reference from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_wall.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`. Re-collected 2026-04-26.*
 
 The ~112-136 baseline "missing" frames at 1× and 2× are **NOT performance-related
 drops**. They come from:

@@ -310,82 +310,94 @@ a worst case of 26.0 on MH_03 (partial SLAM dip).
 
 #### ATE — Absolute Trajectory Error (posyaw alignment)
 
+> **Format note:** `run_full_benchmark.sh` saves the full state dump
+> (`timestamp qx qy qz qw px py pz v ...`, JPL quaternion convention), while
+> `ov_eval error_singlerun` expects TUM format
+> (`timestamp px py pz qx qy qz qw`). The tables below were computed by
+> converting each `*_est.txt` with
+> `awk '!/^#/ && NF>=8 {print $1,$6,$7,$8,$2,$3,$4,$5}'` before invoking
+> `error_singlerun posyaw`.
+
 **Position RMSE (meters) across all runs:**
 
 | Sequence | Serial | Sub 4-thr run 1 | run 2 | run 3 | run 4 | run 5 | Sub 1-thr run 1 | run 2 | run 3 | run 4 | run 5 |
 |----------|--------|-----------------|-------|-------|-------|-------|-----------------|-------|-------|-------|-------|
-| V1_01_easy | 1.946 | 1.943 | 1.944 | 1.945 | 1.943 | 1.945 | 1.945 | 1.946 | 1.945 | 1.945 | 1.946 |
-| MH_03_medium | 3.450 | 3.441 | 3.442 | 3.441 | 3.441 | 3.445 | 3.441 | 3.441 | 3.440 | 3.441 | 3.441 |
-| V2_02_medium | 2.099 | 2.101 | 2.098 | 2.094 | ov_eval¹ | 2.102 | 2.091 | 2.091 | 2.092 | 2.102 | 2.097 |
+| V1_01_easy | 0.040 | 0.040 | 0.058 | 0.063 | 0.067 | 0.056 | 0.068 | 0.069 | 0.046 | 0.041 | 0.057 |
+| MH_03_medium | 0.121 | 0.136 | 0.123 | 0.116 | 0.117 | 0.115 | 0.101 | 0.109 | 0.160 | 0.130 | 0.114 |
+| V2_02_medium | 0.049 | 0.048 | 0.066 | 0.065 | 0.070 | 0.052 | 0.058 | 0.063 | 0.065 | 0.056 | 0.062 |
 
-¹ ov_eval NaN assertion crash on a healthy trajectory (tool bug, not a divergence —
-final position is correct).
+*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_est.txt`; subscribe from `results/timing/x86/subscribe/rerun_2026_04_23/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_est.txt`; state-dump columns converted to TUM as described above; compared against `src/open_vins/ov_data/euroc_mav/{V1_01_easy,MH_03_medium,V2_02_medium}.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`.*
 
-*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_est.txt`; subscribe from `results/timing/x86/subscribe/rerun_2026_04_23/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_est.txt`; compared against `src/open_vins/ov_data/euroc_mav/{V1_01_easy,MH_03_medium,V2_02_medium}.txt`*
-
-**Orientation RMSE (millidegrees) across all runs:**
+**Orientation RMSE (degrees) across all runs:**
 
 | Sequence | Serial | Sub 4-thr (5 reps) | Sub 1-thr (5 reps) |
 |----------|--------|-------------------|-------------------|
-| V1_01_easy | 134.6 | 134.9, 134.9, 134.6, 134.8, 134.9 | 134.6, 134.9, 134.7, 135.5, 134.9 |
-| MH_03_medium | 147.2 | 146.0, 148.9, 146.8, 145.3, 145.7 | 147.1, 146.5, 146.8, 145.9, 146.6 |
-| V2_02_medium | 122.4 | 122.6, 122.9, 122.3, —¹, 122.5 | 123.1, 122.9, 122.9, 122.7, 122.7 |
+| V1_01_easy | 0.614 | 0.576, 0.786, 1.001, 0.682, 0.822 | 0.736, 0.717, 0.673, 0.652, 0.593 |
+| MH_03_medium | 1.433 | 0.944, 1.422, 1.103, 1.013, 1.248 | 1.268, 1.491, 1.256, 1.180, 1.264 |
+| V2_02_medium | 1.224 | 1.449, 1.177, 1.466, 1.636, 1.249 | 1.299, 1.175, 1.339, 1.340, 1.201 |
 
-*Source: same `*_est.txt` files as the Position RMSE table (orientation RMSE is extracted from the same `error_singlerun` outputs).*
+*Source: same TUM-converted `*_est.txt` files as the Position RMSE table.*
 
 **Cross-run variability summary:**
 
-| Sequence | Serial ATE pos | Subscribe ATE pos range | Max deviation | Subscribe ATE pos std |
-|----------|---------------|------------------------|---------------|----------------------|
-| V1_01_easy | 1.946m | 1.943 – 1.946m | **0.003m** | **0.001m** |
-| MH_03_medium | 3.450m | 3.440 – 3.445m | **0.010m** | **0.002m** |
-| V2_02_medium | 2.099m | 2.091 – 2.102m | **0.008m** | **0.004m** |
+| Sequence | Serial ATE pos | Subscribe ATE pos range (10 runs) | Max deviation from serial | Subscribe ATE pos std |
+|----------|---------------|-----------------------------------|---------------------------|----------------------|
+| V1_01_easy | 0.040m | 0.040 – 0.069m | **29mm** | **11mm** |
+| MH_03_medium | 0.121m | 0.101 – 0.160m | **39mm** | **17mm** |
+| V2_02_medium | 0.049m | 0.048 – 0.070m | **21mm** | **7mm** |
 
-*Source: derived from the Position RMSE table above — same `*_est.txt` files under `results/timing/x86/{serial,subscribe}/rerun_2026_04_23/`.*
+*Source: derived from the Position RMSE table above — same TUM-converted `*_est.txt` files under `results/timing/x86/{serial,subscribe}/rerun_2026_04_23/`.*
+
+Subscribe ATE position is 2-30 mm higher than serial on average, with run-to-run
+spread of 7–17 mm std. This is the dominant observable difference between the
+two modes — small in absolute terms, but not bit-close: the run-to-run spread
+exceeds the per-frame numerical precision of the filter.
 
 #### RPE — Relative Pose Error (median position, meters)
 
 RPE measures local consistency over trajectory segments. Serial vs subscribe
 run 1 comparison (4-thread):
 
+All Source files below are TUM-converted from the state-dump CSVs as described in the §3 Format note above.
+
 **V1_01_easy:**
 
 | Segment | Serial | Subscribe | Delta |
 |---------|--------|-----------|-------|
-| 8m | 3.222 | 3.202 | 0.020 |
-| 16m | 2.832 | 2.826 | 0.006 |
-| 24m | 2.874 | 2.873 | 0.001 |
-| 32m | 2.458 | 2.434 | 0.024 |
-| 40m | 2.378 | 2.363 | 0.015 |
+| 8m | 0.054 | 0.046 | -0.008 |
+| 16m | 0.053 | 0.042 | -0.011 |
+| 24m | 0.056 | 0.045 | -0.011 |
+| 32m | 0.059 | 0.063 | +0.004 |
+| 40m | 0.053 | 0.063 | +0.010 |
 
-*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_est.txt`; Subscribe run 1 from `results/timing/x86/subscribe/rerun_2026_04_23/V1_01_easy_4thr_run1_est.txt`.*
+*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_est.txt`; Subscribe run 1 from `results/timing/x86/subscribe/rerun_2026_04_23/V1_01_easy_4thr_run1_est.txt` (TUM-converted). Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`.*
 
 **MH_03_medium:**
 
 | Segment | Serial | Subscribe | Delta |
 |---------|--------|-----------|-------|
-| 8m | 5.675 | 5.663 | 0.012 |
-| 16m | 3.531 | 3.534 | 0.003 |
-| 24m | 4.884 | 4.893 | 0.009 |
-| 32m | 5.362 | 5.391 | 0.029 |
-| 40m | 3.442 | 3.438 | 0.004 |
+| 8m | 0.149 | 0.127 | -0.022 |
+| 16m | 0.135 | 0.117 | -0.018 |
+| 24m | 0.148 | 0.133 | -0.015 |
+| 32m | 0.191 | 0.155 | -0.036 |
+| 40m | 0.195 | 0.182 | -0.013 |
 
-*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/MH_03_medium_4thr_est.txt`; Subscribe run 1 from `results/timing/x86/subscribe/rerun_2026_04_23/MH_03_medium_4thr_run1_est.txt`.*
+*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/MH_03_medium_4thr_est.txt`; Subscribe run 1 from `results/timing/x86/subscribe/rerun_2026_04_23/MH_03_medium_4thr_run1_est.txt` (TUM-converted).*
 
 **V2_02_medium:**
 
 | Segment | Serial | Subscribe | Delta |
 |---------|--------|-----------|-------|
-| 8m | 2.861 | 2.870 | 0.009 |
-| 16m | 3.234 | 3.230 | 0.004 |
-| 24m | 2.710 | 2.682 | 0.028 |
-| 32m | 3.215 | 3.171 | 0.044 |
-| 40m | 3.032 | 3.029 | 0.003 |
+| 8m | 0.044 | 0.051 | +0.007 |
+| 16m | 0.059 | 0.067 | +0.008 |
+| 24m | 0.064 | 0.070 | +0.006 |
+| 32m | 0.067 | 0.069 | +0.002 |
+| 40m | 0.063 | 0.077 | +0.014 |
 
-*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/V2_02_medium_4thr_est.txt`; Subscribe run 1 from `results/timing/x86/subscribe/rerun_2026_04_23/V2_02_medium_4thr_run1_est.txt`.*
+*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/V2_02_medium_4thr_est.txt`; Subscribe run 1 from `results/timing/x86/subscribe/rerun_2026_04_23/V2_02_medium_4thr_run1_est.txt` (TUM-converted).*
 
-RPE deltas are <0.05m across all segments and sequences — subscribe local
-consistency matches serial.
+RPE deltas are ≤0.04 m across all segments and sequences — subscribe local
+consistency matches serial within a few cm per segment.
 
 #### Process CPU reveals OpenCV parallelism cost (V2_02, 4-thr)
 
@@ -692,15 +704,28 @@ variability — complements the per-frame std seen in §3's tables).
 
 | Condition | Mean (ms) | Std (ms) | CV | Range (ms) |
 |-----------|-----------|----------|-----|------------|
-| Baseline (PWT only) | 22.97 | 0.105 | 0.46% | 22.79 – 23.17 |
-| + Docker RT flags | 23.03 | 0.061 | 0.26% | 22.91 – 23.13 |
-| + Max-interval 20 ms | 23.02 | 0.072 | 0.31% | 22.94 – 23.17 |
-| + Both combined | 23.36 | 0.070 | 0.30% | 23.23 – 23.43 |
+| Baseline (no Docker flags) | 23.06 | 0.10 | 0.43% | 22.94 – 23.29 |
+| + Docker RT flags | 23.02 | 0.15 | 0.65% | 22.75 – 23.26 |
+| + Max-interval (= baseline under master-candidate) | 23.03 | 0.15 | 0.65% | 22.81 – 23.30 |
+| + Both combined (= RT flags under master-candidate) | 23.06 | 0.15 | 0.65% | 22.89 – 23.31 |
+| Final A: back-to-back rerun of "max-interval" | 23.19 | 0.08 | 0.34% | 23.08 – 23.33 |
+| Final B: back-to-back rerun of "combined" | 23.22 | 0.09 | 0.39% | 23.11 – 23.36 |
 
-*Source: `results/rpi5/{rerun_2026_04_26_pwt_baseline,rerun_2026_04_26_pwt_rtflags,rerun_2026_04_26_pwt_maxinterval,rerun_2026_04_26_pwt_combined}/sub_run{1..10}_wall.txt`.*
+*Source: `results/rpi5/{rerun_2026_04_26_pwt_baseline,rerun_2026_04_26_pwt_rtflags,rerun_2026_04_26_pwt_maxinterval,rerun_2026_04_26_pwt_combined,rerun_2026_04_26_pwt_final_maxinterval,rerun_2026_04_26_pwt_final_combined}/sub_run{1..10}_wall.txt`. Provenance: RPi5 (openhd@192.168.200.81, BCM2712 4× Cortex-A76, Debian 13 Trixie), Docker `openvins-humble:latest` rebuilt 2026-04-26 from submodule `master-candidate`/`2a50450`, `slam_chi2_recovery: false`.*
 
-Timing stability is ≤0.5% CV across all conditions — comparable to the x86 target
-(CV < 1.3%). The persistent worker alone is sufficient to stabilize timing on RPi5.
+> **Variant equivalence under master-candidate:** the consolidated `master-candidate`
+> branch bakes both the persistent-worker thread (`0fe81a6`) AND the max-interval
+> 20 ms stereo sync (`e57e88d`) into a single image. As a result, "baseline" and
+> "+ max-interval" run **identical code** — they differ only in the test session
+> (separate Docker container, separate timing window). Same for "+ Docker RT flags"
+> and "+ Both combined". The 0.5-1 ms baseline-to-final drift between back-to-back
+> sessions and across-day sessions is dominated by the RPi5's thermal/scheduling
+> jitter, not by the configuration knob being toggled.
+
+Timing stability is ≤0.65% CV across all conditions — comparable to the x86 target
+(CV < 1.3%). The persistent worker alone (now baked into master-candidate) is
+sufficient to stabilize timing on RPi5; the Docker RT flags and max-interval
+synchronizer make no measurable additional difference at this load.
 
 ### SLAM feature health (avg features in state, max_slam=50)
 
