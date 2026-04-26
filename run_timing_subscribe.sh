@@ -4,10 +4,12 @@
 # Runs OpenVINS in subscribe mode while playing a bag at various rates.
 #
 # Usage:
-#   bash run_timing_subscribe.sh [rate] [--tag <name>]
+#   bash run_timing_subscribe.sh [rate] [--tag <name>] [--slam-chi2-recovery true|false]
 #
 # --tag routes output under $HOME/results/timing/x86/subscribe/<tag>/
 # so reruns don't clobber earlier results.
+# --slam-chi2-recovery overrides the YAML key in the temp config
+# (default: leave estimator_config.yaml's value alone — shipping default is false).
 
 set -eo pipefail
 
@@ -17,10 +19,12 @@ sleep 1
 
 RATE="1.0"
 TAG=""
+SLAM_CHI2_RECOVERY=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --tag) TAG="$2"; shift 2 ;;
-    -h|--help) sed -n '2,9p' "$0" | sed 's/^# \?//'; exit 0 ;;
+    --slam-chi2-recovery) SLAM_CHI2_RECOVERY="$2"; shift 2 ;;
+    -h|--help) sed -n '2,11p' "$0" | sed 's/^# \?//'; exit 0 ;;
     *) RATE="$1"; shift ;;
   esac
 done
@@ -45,6 +49,9 @@ cp "$CONFIG_DIR/estimator_config.yaml" "$TMP_CONFIG"
 sed -i 's/^record_timing_information: false/record_timing_information: true/' "$TMP_CONFIG"
 sed -i 's/^record_timing_cpu_time: false/record_timing_cpu_time: true/' "$TMP_CONFIG"
 sed -i 's/^record_timing_thread_time: false/record_timing_thread_time: true/' "$TMP_CONFIG"
+if [ -n "${SLAM_CHI2_RECOVERY:-}" ]; then
+  sed -i "s/^slam_chi2_recovery: .*/slam_chi2_recovery: ${SLAM_CHI2_RECOVERY} # overridden via --slam-chi2-recovery/" "$TMP_CONFIG"
+fi
 trap 'rm -f "$TMP_CONFIG"' EXIT
 
 mkdir -p "$RESULTS_DIR"

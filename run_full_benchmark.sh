@@ -20,6 +20,7 @@ THREADS_CSV="4,1"
 CAMERAS="stereo"
 SUBSCRIBE_REPS=5
 BENCH_TAG="bench_$(date +%Y%m%d_%H%M%S)"
+SLAM_CHI2_RECOVERY=""  # empty = leave config value alone (shipping default is false)
 
 usage() {
   cat <<'EOF'
@@ -41,6 +42,8 @@ Options:
   -r, --reps <N>                       default: 5 (subscribe reps; serial is always 1)
       --tag <name>                     default: bench_YYYYMMDD_HHMMSS
       --results-base <dir>             default: $HOME/results/timing/x86
+      --slam-chi2-recovery <true|false>  override slam_chi2_recovery in the temp config
+                                       (default: leave config's value alone)
       --quick                          shortcut: -m serial -s V1_01_easy -t 4 -c stereo -r 1
   -h, --help                           show this help and exit
 
@@ -69,6 +72,7 @@ while [[ $# -gt 0 ]]; do
     -r|--reps)         SUBSCRIBE_REPS="$2"; shift 2 ;;
     --tag)             BENCH_TAG="$2"; shift 2 ;;
     --results-base)    RESULTS_BASE="$2"; shift 2 ;;
+    --slam-chi2-recovery) SLAM_CHI2_RECOVERY="$2"; shift 2 ;;
     --quick)
       MODE="serial"; SEQUENCES_CSV="V1_01_easy"; THREADS_CSV="4"
       CAMERAS="stereo"; SUBSCRIBE_REPS=1
@@ -137,6 +141,9 @@ make_config() {
   sed -i 's/^record_feature_counts: false/record_feature_counts: true/' "$TMP"
   if [ "$THREADS" = "1" ]; then
     sed -i 's/^num_opencv_threads: 4/num_opencv_threads: 1/' "$TMP"
+  fi
+  if [ -n "${SLAM_CHI2_RECOVERY:-}" ]; then
+    sed -i "s/^slam_chi2_recovery: .*/slam_chi2_recovery: ${SLAM_CHI2_RECOVERY} # overridden via --slam-chi2-recovery/" "$TMP"
   fi
   echo "$TMP"
 }

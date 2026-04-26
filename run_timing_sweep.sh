@@ -4,18 +4,22 @@
 # Tests which config knobs matter most for RPi5 optimization.
 #
 # Usage:
-#   bash run_timing_sweep.sh [--tag <name>]
+#   bash run_timing_sweep.sh [--tag <name>] [--slam-chi2-recovery true|false]
 #
 # --tag routes output under $HOME/results/timing/x86/serial/sweep/<tag>/
 # so reruns don't clobber earlier results.
+# --slam-chi2-recovery overrides the YAML key in each variant's temp config
+# (default: leave estimator_config.yaml's value alone — shipping default is false).
 
 set -eo pipefail
 
 TAG=""
+SLAM_CHI2_RECOVERY=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --tag) TAG="$2"; shift 2 ;;
-    -h|--help) sed -n '2,9p' "$0" | sed 's/^# \?//'; exit 0 ;;
+    --slam-chi2-recovery) SLAM_CHI2_RECOVERY="$2"; shift 2 ;;
+    -h|--help) sed -n '2,11p' "$0" | sed 's/^# \?//'; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
@@ -57,6 +61,9 @@ run_sweep() {
   for sedexpr in "$@"; do
     sed -i "$sedexpr" "$TMP_CONFIG"
   done
+  if [ -n "${SLAM_CHI2_RECOVERY:-}" ]; then
+    sed -i "s/^slam_chi2_recovery: .*/slam_chi2_recovery: ${SLAM_CHI2_RECOVERY} # overridden via --slam-chi2-recovery/" "$TMP_CONFIG"
+  fi
 
   rm -f "$TIMING_TMP" "$TIMING_TMP_CPU" "$TIMING_TMP_THREAD"
 
