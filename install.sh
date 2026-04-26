@@ -55,6 +55,7 @@ sudo apt install -y \
   libgoogle-glog-dev libgflags-dev libatlas-base-dev libsuitesparse-dev libceres-dev \
   python3-dev python3-matplotlib python3-numpy python3-psutil python3-tk \
   build-essential gcc g++ gdb clang \
+  ccache \
   unzip
 
 echo "=== [3/4] Building the workspace ==="
@@ -76,7 +77,8 @@ if [ "${TOTAL_MEM_KB:-0}" -le $((8 * 1024 * 1024)) ]; then
   COLCON_EXTRA=(--parallel-workers 1 --executor sequential)
 fi
 
-colcon build --symlink-install "${COLCON_EXTRA[@]}"
+colcon build --symlink-install "${COLCON_EXTRA[@]}" \
+  --cmake-args -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
 echo ""
 echo "Done. Source the workspace in each new terminal with:"
