@@ -26,7 +26,8 @@ binaries, so a native install requires building ROS from source (~1-2 h). The
 simpler path is Docker with a pre-built ROS image.
 
 A `Dockerfile_ros2_humble_jammy` is committed in the fork. All the benchmark
-results under `results/timing/rpi5/` were produced inside this container.
+results under `results/timing/rpi5/` and `results/rpi5/rerun_2026_04_26_*/`
+were produced inside this container.
 
 ### 1a. Install Docker on RPi5
 
@@ -37,27 +38,133 @@ sudo usermod -aG docker $USER   # re-login after this
 
 ### 1b. Build the image
 
+The Dockerfile clones the OpenVINS fork into `/opt/ros_ws/src/open_vins/`
+and builds it inside the image, so the resulting `openvins-humble:latest`
+ships a pre-compiled `/opt/ros_ws/install/` ready to run.
+
 ```bash
-cd ~/workspace
-git clone git@github.com:barakbk-hailo/open_vins.git
-cd open_vins
+git clone git@github.com:barakbk-hailo/openvins-ros2-workspace.git ~/workspace/catkin_ws_ov
+cd ~/workspace/catkin_ws_ov
+git submodule update --init --recursive
+
+cd src/open_vins
 docker build -t openvins-humble -f Dockerfile_ros2_humble_jammy .
 ```
 
-### 1c. Run the container
+Build takes ~25-40 min on RPi5 ARM; the resulting image is ~7 GB. Reclaim
+the transient build cache afterwards if the rootfs is tight:
+
+```bash
+docker builder prune -af   # frees ~5-10 GB
+```
+
+### 1c. Run the container — interactive shell
+
+For development or one-off runs:
 
 ```bash
 docker run -it --rm \
   --network host --privileged \
+  --user "$(id -u):$(id -g)" -e HOME=/tmp \
   -v /dev:/dev \
   -v ~/workspace:/workspace \
   -v ~/datasets:/datasets \
   openvins-humble
 ```
 
-Inside the container, ROS 2 and the workspace are already sourced.
+Two flags that are **not optional** for runtime correctness:
 
-### 1d. Persistent setup (optional)
+- `--user "$(id -u):$(id -g)"` — files written to host-mounted volumes
+  (`/workspace`, `/datasets`) come back owned by the host user, not by root.
+  Without this, every benchmark output ends up `root:root` on the host and
+  later runs hit "Permission denied" on `~/workspace/catkin_ws_ov/results/`.
+- `-e HOME=/tmp` — `--user` makes the container user have no entry in
+  `/etc/passwd`, so `HOME` defaults to empty. ros2's `rcl_logging_spdlog`
+  then fails to create `~/.ros/log` (resolves to `/.ros/log`) and `ros2 run`
+  exits 1 immediately. Setting `HOME=/tmp` lets logging initialise. (The
+  `/tmp` choice is arbitrary — anything writable works.)
+
+Inside the container, ROS 2 + the **baked-in** workspace are sourced:
+
+```bash
+echo $AMENT_PREFIX_PATH
+# /opt/ros_ws/install/<pkg>/...:/opt/ros/humble/...
+```
+
+### 1d. Run the container — non-interactive (benchmark scripts)
+
+The benchmark orchestrators (`run_pwt_benchmark_v2.sh`,
+`run_full_benchmark.sh`) invoke docker non-interactively. The call pattern
+they use, mirrored here for ad-hoc runs:
+
+```bash
+docker run --rm --network host --privileged \
+  --user "$(id -u):$(id -g)" -e HOME=/tmp \
+  -v /dev:/dev \
+  -v ~/workspace:/workspace \
+  -v ~/datasets:/datasets \
+  openvins-humble bash -c '
+    set -e
+    source /opt/ros_ws/install/setup.bash
+
+    # Use a temp config in the SAME DIRECTORY as the source estimator_config.yaml
+    # — the YAML uses relative paths to kalibr_imu_chain.yaml and
+    # kalibr_imucam_chain.yaml, so a temp config under /tmp would fail to find
+    # those siblings.
+    CFG=/workspace/catkin_ws_ov/src/open_vins/config/euroc_mav/estimator_config.yaml
+    TMP=/workspace/catkin_ws_ov/src/open_vins/config/euroc_mav/estimator_config_run.yaml
+    cp $CFG $TMP
+    sed -i "s/record_timing_information: false/record_timing_information: true/" $TMP
+    sed -i "s/record_timing_cpu_time: false/record_timing_cpu_time: true/" $TMP
+    sed -i "s/record_timing_thread_time: false/record_timing_thread_time: true/" $TMP
+
+    ros2 run ov_msckf ros2_serial_msckf --ros-args \
+      -p config_path:=$TMP \
+      -p path_bag:=/datasets/euroc/V1_01_easy \
+      -p max_cameras:=2 -p use_stereo:=true \
+      -p save_total_state:=true \
+      -p filepath_est:=/tmp/est.txt -p filepath_std:=/tmp/std.txt
+
+    # Copy outputs to the host-mounted volume
+    cp /tmp/traj_timing.txt /workspace/catkin_ws_ov/results/rpi5/run1_wall.txt
+    cp /tmp/est.txt          /workspace/catkin_ws_ov/results/rpi5/run1_est.txt
+
+    rm -f $TMP
+  '
+```
+
+Add Docker flags between `--rm` and `openvins-humble` to mirror specific
+benchmark variants:
+
+| Variant | Extra Docker flags |
+|---|---|
+| `pwt_baseline` | (none beyond the defaults above) |
+| `pwt_rtflags` (RT scheduling, pinned cores) | `--cap-add=SYS_NICE --ulimit rtprio=99 --ulimit memlock=-1 --cpuset-cpus=0-3` |
+
+Under `master-candidate`, persistent worker thread + max-interval are baked
+into a single image, so `pwt_baseline ≡ pwt_maxinterval` and
+`pwt_rtflags ≡ pwt_combined`. See
+[determinism.md §6](determinism.md#6-rpi5-follow-up-why-accuracy-variance-doesnt-transfer)
+for the cross-run variability tables.
+
+### 1e. `/opt/ros_ws` vs `/workspace` — which wins for what
+
+The image has a workspace baked in at `/opt/ros_ws/`, and the benchmark
+flow also bind-mounts the host's workspace at `/workspace/`. The split:
+
+| Path | Source | Authoritative for | Notes |
+|---|---|---|---|
+| `/opt/ros_ws/install/` | image (built at `docker build` time) | `ros2 run`, `ros2 launch` — these find binaries here via `AMENT_PREFIX_PATH` | Rebuild the image to pick up new C++ code (slow on RPi5 ARM) |
+| `/opt/ros_ws/src/open_vins/` | image (cloned at `docker build` time) | the *baked* config + ground-truth files | `git rev-parse HEAD` here tells you which submodule commit the binary was built from |
+| `/workspace/catkin_ws_ov/` | host (bind-mounted) | YAML configs the benchmark scripts pass to the binary; output destination | The benchmark scripts read `config_path:=/workspace/catkin_ws_ov/src/open_vins/config/...`, so the *host* submodule's YAML controls runtime parameters even though the binary is from `/opt/ros_ws` |
+| `/datasets/euroc/` | host (bind-mounted) | the EuRoC bags | `gdown`/`unzip` happens host-side |
+
+**The split that matters most:** for runtime knobs (e.g.
+`slam_chi2_recovery`, `num_pts`, `record_timing_information`), edit the
+host's `~/workspace/catkin_ws_ov/src/open_vins/config/euroc_mav/estimator_config.yaml`
+— no rebuild needed. For C++ code changes, rebuild the image.
+
+### 1f. Persistent setup (optional)
 
 `pipx` packages and any container-local state do not persist across
 `docker run --rm` invocations. For a persistent setup:
@@ -157,31 +264,53 @@ gdown 1LFrdiMU6UBjtFfXPHzjJ4L7iDIXcdhvh -O V1_01_easy.zip && unzip V1_01_easy.zi
 
 ### 3b. Serial mode (recommended for benchmarking)
 
-Reads the bag directly, deterministic, blocks per frame:
-```bash
-cd /workspace/catkin_ws_ov
-source /opt/ros/humble/setup.bash && source install/setup.bash
+Inside the Docker container — the binary lives in `/opt/ros_ws/install/`
+(baked) but the YAML configs come from the host-mounted submodule:
 
+```bash
+# (already in the Docker container started per §1c)
+source /opt/ros_ws/install/setup.bash   # baked-in workspace, NOT /workspace/...
+
+CFG=/workspace/catkin_ws_ov/src/open_vins/config/euroc_mav/estimator_config.yaml
 ros2 launch ov_msckf serial.launch.py \
-    config_path:=$PWD/src/open_vins/config/euroc_mav/estimator_config.yaml \
+    config_path:=$CFG \
     path_bag:=/datasets/euroc/V1_01_easy \
     max_cameras:=2 use_stereo:=true
 ```
 
-To reproduce the Phase 4 RPi5 timing numbers, enable per-frame CSV output
-via the config's `record_timing_information: true` flag, or use
-`run_full_benchmark.sh` from the workspace root (adjust the `RESULTS_BASE`
-path at the top to write under `~/results/timing/rpi5/`).
+> The image's `.bashrc` already runs `source /opt/ros/humble/setup.bash` and
+> `source /opt/ros_ws/install/setup.bash` when you open an interactive shell,
+> so the `source` line above is redundant for `docker run -it`. It's only
+> needed when you spawn a `bash -c '...'` non-interactively (where `.bashrc`
+> isn't sourced) — that's why the benchmark script `run_pwt_benchmark_v2.sh`
+> always sources it explicitly inside its `docker run ... bash -c '...'`
+> invocation.
+
+To reproduce the Phase 4 RPi5 timing numbers, use `run_pwt_benchmark_v2.sh`
+from the **host** (not from inside the container — the script itself spawns
+its own docker containers per rep):
+
+```bash
+# On the RPi5 host shell, NOT inside docker:
+cd ~/workspace/catkin_ws_ov
+bash run_pwt_benchmark_v2.sh my_baseline openvins-humble 10 -e HOME=/tmp
+```
+
+The first three positional args are `<results_subdir> <image_tag> <num_subscribe_reps>`;
+extra args after that are forwarded as docker flags. **Always include `-e HOME=/tmp`** —
+without it, the container's `--user $(id -u):$(id -g)` strips `HOME` and ros2 fails
+to create `~/.ros/log` on first launch.
 
 ### 3c. Subscribe mode (realtime test)
 
-Terminal 1:
+Inside the Docker container, terminal 1:
 ```bash
-ros2 launch ov_msckf subscribe.launch.py \
-    config_path:=$PWD/src/open_vins/config/euroc_mav/estimator_config.yaml
+source /opt/ros_ws/install/setup.bash
+CFG=/workspace/catkin_ws_ov/src/open_vins/config/euroc_mav/estimator_config.yaml
+ros2 launch ov_msckf subscribe.launch.py config_path:=$CFG
 ```
 
-Terminal 2:
+Terminal 2 (host or another container shell with the same dataset mount):
 ```bash
 ros2 bag play /datasets/euroc/V1_01_easy --rate 1.0
 ```
@@ -193,12 +322,27 @@ frame, comfortably within the 50 ms @ 20 Hz budget. See
 
 ### 3d. Evaluate accuracy
 
+Inside the Docker container (the host doesn't have `ov_eval` installed
+unless you also did the native build of §2):
+
 ```bash
-source ~/workspace/catkin_ws_ov/install/setup.bash
-GT_DIR=~/workspace/catkin_ws_ov/src/open_vins/ov_data/euroc_mav
+source /opt/ros_ws/install/setup.bash
+GT_DIR=/opt/ros_ws/src/open_vins/ov_data/euroc_mav
 ros2 run ov_eval error_singlerun posyaw \
   $GT_DIR/V1_01_easy.txt state_estimate.txt 8 16 24 32 40
 ```
+
+> **Format note:** `serial.launch.py` with `save_total_state:=true` writes
+> the state-dump format (`timestamp qx qy qz qw px py pz vx ...`, JPL
+> quaternion convention), but `error_singlerun` expects TUM
+> (`timestamp px py pz qx qy qz qw`). Convert with `awk` first:
+> ```bash
+> awk '!/^#/ && NF>=8 {print $1,$6,$7,$8,$2,$3,$4,$5}' state_estimate.txt > pose.tum
+> ros2 run ov_eval error_singlerun posyaw $GT_DIR/V1_01_easy.txt pose.tum 8 16 24 32 40
+> ```
+> See [determinism.md §3](determinism.md#3-root-cause-fix-persistent-worker-thread)
+> "Format note" for details. Skipping this conversion produces wildly
+> inflated ATE (~50× the correct value).
 
 Expected RPi5 numbers for V1_01_easy stereo (serial, default config):
 rmse_pos ≈ 0.044 m, rmse_ori ≈ 0.686°. See
