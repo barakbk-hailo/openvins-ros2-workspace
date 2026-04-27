@@ -7,7 +7,7 @@ cover the x86 side.
 
 | | |
 |---|---|
-| **Date** | 2026-04-12 |
+| **Date** | 2026-04-26 |
 | **Host** | Raspberry Pi 5 (BCM2712, 4× Cortex-A76 @ 2.4 GHz, 8 GB RAM) |
 | **OS** | Debian 13 (Trixie), Docker container running Ubuntu 22.04 / ROS 2 Humble |
 | **Build** | `colcon build --symlink-install` inside Docker (same source as x86) |
@@ -402,7 +402,7 @@ for planning.
 
 ## Real-time scheduling flags tested
 
-The PWT investigation (see [docs/determinism.md §6](determinism.md#6-rpi5-deployment-investigation))
+The PWT investigation (see [docs/determinism.md §6](determinism.md#6-rpi5-follow-up-why-accuracy-variance-doesnt-transfer))
 compared timing variability with vs without Docker real-time scheduling flags.
 The flags tested were:
 

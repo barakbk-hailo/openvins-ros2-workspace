@@ -2,6 +2,33 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Repository layout — submodule
+
+`src/open_vins/` is a **git submodule** (fork: `NadavHHailo/open_vins`, working
+branch `master-candidate`) and is where most of the actual code lives — all of
+`ov_core`, `ov_init`, `ov_eval`, `ov_msckf`, and `config/{dataset}/` are inside
+it. The outer repo (`catkin_ws_ov`) holds the workspace, scripts, docs, and
+results.
+
+**Always check both repos when working.** A change to a launch file, source
+file, or config almost always lands inside the submodule, not the outer repo.
+
+- **Exploring/searching**: searches must descend into `src/open_vins/` — don't
+  assume the outer repo holds the code being asked about.
+- **Editing**: edits to `ov_*` packages or `config/` files modify the submodule.
+- **Status / diff**: run `git status` and `git diff` in **both** the outer repo
+  and `src/open_vins/` before reporting state. The outer repo only shows the
+  submodule SHA pointer; it won't show file-level changes inside.
+- **Committing**: commit submodule changes first (inside `src/open_vins/`),
+  then commit the bumped submodule pointer in the outer repo. Mention both
+  commits when reporting back.
+- **Pushing**: push the submodule to its `fork` remote (`NadavHHailo/open_vins`,
+  not `origin` which points at upstream `rpng/open_vins`) **before** pushing
+  the outer repo, otherwise the outer repo's submodule pointer will reference
+  an unreachable commit.
+- **Branching**: the outer repo and submodule track branches independently.
+  Confirm both are on the intended branch before starting work.
+
 ## Build
 
 ```bash
@@ -86,7 +113,9 @@ bash scripts/run_full_benchmark.sh -m subscribe -s V2_02_medium -r 5 --tag bench
 ```
 
 Results go to `~/results/timing/x86/{serial,subscribe}/<tag>/`. File naming:
-`{SEQUENCE}_{THREADS}thr_run{N}_{wall|cpu|thread|feats|est}.txt` (subscribe),
+`{SEQUENCE}_{THREADS}thr[_rate<R>]_run{N}_{wall|cpu|thread|feats|est}.txt`
+(subscribe — the `_rate<R>` segment is inserted only when rate ≠ 1.0, so
+existing rate=1.0 citations stay valid),
 `{SEQUENCE}_{THREADS}thr_{wall|cpu|thread|feats|est}.txt` (serial). Mono runs
 append `_mono` to the tag.
 

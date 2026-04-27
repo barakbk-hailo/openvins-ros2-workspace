@@ -170,7 +170,7 @@ to **1.0× serial** (i.e., subscribe now runs at serial speed).
     1. lock camera_queue_mtx                   ← mutex B
     2. push frame to queue, sort
     3. unlock camera_queue_mtx
-    4. notify worker_cv
+    (no notify — the worker is woken by the next IMU @ 200 Hz, ≤5 ms later)
 ```
 
 Two mutexes, each protecting a distinct resource:

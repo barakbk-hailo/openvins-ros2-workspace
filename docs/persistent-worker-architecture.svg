@@ -28,7 +28,7 @@
   <text x="290" y="152" fill="#a70">2. lock camera_queue_mtx</text>
   <text x="290" y="170" fill="#a70">3. push + sort queue</text>
   <text x="290" y="188" fill="#a70">4. unlock</text>
-  <text x="290" y="212" fill="#07a">5. notify worker_cv</text>
+  <text x="290" y="212" fill="#888" font-size="10">(no notify — next IMU wakes worker)</text>
 
   <!-- Worker thread box -->
   <rect x="560" y="50" width="320" height="450" rx="6" fill="#f0fff0" stroke="#2a9d2a" stroke-width="1.5"/>
@@ -40,7 +40,7 @@
   <line x1="580" y1="125" x2="860" y2="125" stroke="#ccc"/>
 
   <text x="590" y="148" fill="#07a">1. wait on worker_cv</text>
-  <text x="605" y="166" fill="#888" font-size="10">sleeps until IMU or camera notifies</text>
+  <text x="605" y="166" fill="#888" font-size="10">sleeps until IMU notify (200 Hz)</text>
 
   <text x="590" y="192" fill="#c44">2. lock worker_mtx</text>
   <text x="590" y="210" fill="#c44">3. read latest_imu_ts</text>
@@ -74,9 +74,6 @@
   <!-- IMU notify arrow -->
   <path d="M260,230 C380,230 430,148 578,148" fill="none" stroke="#07a" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arrowG)"/>
   <text x="400" y="178" fill="#07a" font-size="10" text-anchor="middle">notify</text>
-
-  <!-- Camera notify arrow -->
-  <path d="M500,212 C530,212 540,148 578,148" fill="none" stroke="#07a" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arrowG)"/>
 
   <!-- Mutex legend -->
   <rect x="20" y="290" width="500" height="90" rx="6" fill="#fafafa" stroke="#ddd" stroke-width="1"/>
