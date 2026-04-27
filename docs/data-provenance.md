@@ -44,7 +44,7 @@ is given here so individual citations stay short.
 
 | Tag (under `results/rpi5/`) | Submodule | Outer commit | Date | chi2_recovery | Docker flags | Notes |
 |---|---|---|---|---|---|---|
-| `rerun_2026_04_26_pwt_baseline/` | `master-candidate` / `2a50450` (via Docker `openvins-humble:latest` rebuilt 2026-04-26) | `8424c9e` | 2026-04-26 | `false` | (none, only `-e HOME=/tmp` for `~/.ros/log` workaround — applied automatically by `docker_wrap`) | 10 subscribe reps × V1_01_easy stereo. Originally produced by the now-deleted `run_pwt_benchmark_v2.sh`; reproduce with the consolidated orchestrator: `bash scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy -t 4 -r 10 --docker openvins-humble:latest --tag rerun_2026_04_26_pwt_baseline` |
+| `rerun_2026_04_26_pwt_baseline/` | `master-candidate` / `2a50450` (via Docker `openvins-humble:latest` rebuilt 2026-04-26) | `8424c9e` | 2026-04-26 | `false` | (none, only `-e HOME=/tmp` for `~/.ros/log` workaround — applied automatically by `docker_wrap`) | 2 serial reps + 10 subscribe reps × V1_01_easy stereo. The 2 serial reps were a determinism check (consumed by `docs/determinism.md` §6 to confirm bit-identical output across reps); under the consolidated orchestrator serial is 1 rep by design (deterministic-by-construction) so a re-run produces 1 serial + 10 subscribe. Originally produced by the now-deleted `run_pwt_benchmark_v2.sh`; reproduce with: `bash scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy -t 4 -r 10 --docker openvins-humble:latest --tag rerun_2026_04_26_pwt_baseline` (omit `-m subscribe` for the equivalent serial sanity rep). |
 | `rerun_2026_04_26_pwt_rtflags/` | same | same | 2026-04-26 | `false` | `--cap-add=SYS_NICE --ulimit rtprio=99 --ulimit memlock=-1 --cpuset-cpus=0-3` | Same as baseline plus RT scheduling flags. Reproduce: `bash scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy -t 4 -r 10 --docker openvins-humble:latest --docker-flags '--cap-add=SYS_NICE --ulimit rtprio=99 --ulimit memlock=-1 --cpuset-cpus=0-3' --tag rerun_2026_04_26_pwt_rtflags` |
 | `rerun_2026_04_26_pwt_maxinterval/` | same | same | 2026-04-26 | `false` | (same as baseline) | **Identical code/flags to `pwt_baseline` under `master-candidate`** (max-interval is baked into the consolidated branch); kept as a separate-session run for cross-session stability comparison. Same invocation as `pwt_baseline`, different `--tag`. |
 | `rerun_2026_04_26_pwt_combined/` | same | same | 2026-04-26 | `false` | (same as `pwt_rtflags`) | **Identical to `pwt_rtflags`** under `master-candidate`; cross-session comparison. Same invocation as `pwt_rtflags`, different `--tag`. |
@@ -77,6 +77,29 @@ Every benchmark run writes 5 CSVs per rep:
 | `_est.txt` (x86) / `_pose.txt` (RPi5 PWT) | `_est.txt` is full state dump (`timestamp qx qy qz qw px py pz vx vy vz bgx ...`); `_pose.txt` is TUM (`timestamp tx ty tz qx qy qz qw`) | trajectory estimate. Convert state-dump to TUM with `awk '!/^#/ && NF>=8 {print $1,$6,$7,$8,$2,$3,$4,$5}'` before invoking `ros2 run ov_eval error_singlerun`. |
 
 The TUM conversion is critical — feeding the state-dump format directly to `error_singlerun` reads quaternion components as if they were position, producing wildly inflated ATE values (e.g. 1.94 m instead of 0.04 m for V1_01_easy). See [determinism.md §3](determinism.md#3-root-cause-fix-persistent-worker-thread) "Format note".
+
+## Pre-tag legacy layout
+
+These directories pre-date the `<tag>` convention — they were collected
+sequence-by-sequence (or rate-by-rate) before the orchestrator-driven workflow
+existed. They are **still cited from `docs/`** (each row's "Cited from"
+column lists the docs that reference them), so they are kept on disk rather
+than retired. Re-collecting against the current orchestrator + submodule would
+produce equivalent numbers under the standard tag layout; nobody has had a
+reason to do that yet.
+
+| Path | Origin | Cited from | Notes |
+|---|---|---|---|
+| `results/timing/x86/serial/{stereo,mono}/{V1_01_easy,MH_03_medium,V1_03_difficult}.txt` | Outer commit `81e90bb` (initial timing benchmarks) | `docs/timing.md` "Raw timing data" tree, `docs/benchmark-analysis.md` slowdown comparison | Single-rep wall-clock-only CSVs (no `_cpu`/`_thread`/`_feats` siblings — the 3-clock instrumentation didn't exist yet). 3 sequences × {stereo, mono}. |
+| `results/timing/x86/serial/thread_rewrite/` | Outer commit `03fd95f` (thread-clock rewrite) | `docs/timing.md` §"What helps most" mono row, "Phase 2 findings" per-component deltas | 3-clock CSVs for all 3 sequences × {4thr stereo, 4thr mono} — produced after the thread-clock instrumentation landed but before the consolidated `master-candidate` rebuild. The `4thr_mono` cells are still the source of the mono baseline numbers in `timing.md`. |
+| `results/timing/x86/serial/sweep/thread_rewrite/` | Same as above | `docs/timing.md` §"Phase 2 findings" per-component deltas | 5 sweep variants × 3 CSV (no `_wall` suffix on the wall-clock CSV — same legacy convention as the rate-feasibility files; cpu/thread variants do carry the suffix). Superseded for *totals* by `serial/sweep/rerun_2026_04_23/`, but the per-component deltas in `timing.md` still inherit from this collection. |
+| `results/timing/x86/subscribe/thread_rewrite/V1_01_easy_rate{1.0,2.0,5.0}[_cpu,_thread].txt` | Same as above | `docs/timing.md` §3 historical rate-feasibility | Pre-PWT-fix subscribe-mode rate sweep. Numbers are roughly 2× the post-fix `rerun_2026_04_23/` rate sweep — kept on disk as the canonical "before persistent worker" comparison data. |
+| `results/timing/rpi5/serial/{stereo,mono}/{V1_01_easy,MH_03_medium,MH_03_medium_bagstart5,V1_03_difficult}.txt` | RPi5 PWT-investigation period (Q1 2026) | `docs/rpi5-benchmarking.md` Phase 4 serial baseline tables | Single-rep wall-clock CSVs from the RPi5 host, before the consolidated `openvins-humble:latest` image existed. The `MH_03_medium_bagstart5` variant exists because the default `bag_start=0` MH_03 run diverges on RPi5 stereo — see `rpi5-benchmarking.md` accuracy section. |
+| `results/timing/rpi5/serial/sweep/` | Same as above | `docs/rpi5-benchmarking.md` §4 config sensitivity sweeps | 5 sweep variants — RPi5 equivalent of `serial/sweep/thread_rewrite/`. |
+| `results/timing/rpi5/subscribe/V1_01_easy_rate{1.0,2.0,5.0}.txt` | Same as above | `docs/rpi5-benchmarking.md` §5 RPi5 subscribe mode | RPi5 rate-feasibility, same legacy filename convention as the x86 rate sweep. |
+| `results/rpi5/stereo/estimate_*.txt` | Promoted from `rerun_2026_04_26_paper/` | `docs/rpi5-benchmarking.md` §3 accuracy (RPi5 vs x86), `docs/evaluation.md` cross-platform | TUM-converted trajectory estimates promoted out of the paper-repro tag, parallel to the x86 `results/{stereo,mono}/` promotion. Includes `estimate_MH_03_medium_bagstart5.txt` and `estimate_MH_03_medium_diverged.txt` for the bag-start variants. |
+| `results/timing/x86/serial/rerun_2026_04_23_paper/tum/` | Staging step inside the paper-repro tag | (Not directly cited; intermediate to the promotion) | TUM-converted versions of every `_est.txt` in the paper-repro tag, kept as a hash-verifiable trail between the raw state-dump files and the promoted `results/{stereo,mono}/estimate_*.txt`. Could be regenerated from the parent `_est.txt` files with the awk one-liner; preserved for audit. |
+| `results/stereo/estimate_MH_03_medium_bagstart5.txt` | Direct `serial.launch.py` invocation outside any orchestrator (`bag_start:=5.0`) | `docs/evaluation.md` accuracy table | One-off run to produce a healthy MH_03 trajectory for the x86 baseline (the `bag_start=0` run diverges on stereo). Same intent as the matching RPi5 `bagstart5` files. |
 
 ## Retired tags
 
