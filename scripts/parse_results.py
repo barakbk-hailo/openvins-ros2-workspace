@@ -66,19 +66,25 @@ def _ros_setup_paths():
     return paths
 
 
-def _run_ros2(cmd, timeout=60):
+def _run_ros2(cmd, timeout=15):
     """Run a ros2 command with ROS env auto-sourced and headless Qt platform.
-    Returns the CompletedProcess. cmd is a list of strings."""
+    Returns the CompletedProcess. cmd is a list of strings.
+
+    `error_singlerun` ends with matplotlibcpp::show() which blocks indefinitely
+    even with QT_QPA_PLATFORM=offscreen. Stats are printed before show(), so
+    we wrap with shell `timeout`: the process is SIGTERMed after `timeout`
+    seconds, by which point rmse_/RPE lines are already on stdout. The Python
+    timeout is a safety margin in case shell `timeout` itself misbehaves."""
     setup = _ros_setup_paths()
     if not setup:
-        # No ROS install detected; surface that rather than silently failing.
         return subprocess.CompletedProcess(cmd, returncode=127, stdout="", stderr="")
     sourced = " && ".join(f"source {shlex.quote(p)}" for p in setup)
     quoted = " ".join(shlex.quote(c) for c in cmd)
-    bash = f"{sourced} && export QT_QPA_PLATFORM=offscreen && exec {quoted}"
+    bash = (f"{sourced} && export QT_QPA_PLATFORM=offscreen && "
+            f"exec timeout --preserve-status {timeout} {quoted}")
     return subprocess.run(
         ["bash", "-c", bash],
-        capture_output=True, text=True, timeout=timeout,
+        capture_output=True, text=True, timeout=timeout + 5,
     )
 
 # Known per-frame CSV "clock" suffixes (last token before .txt).
@@ -216,15 +222,19 @@ def have_ov_eval():
 def run_ate_rpe(gt, traj):
     """Run `ros2 run ov_eval error_singlerun posyaw` and parse both ATE and
     per-segment RPE. Returns dict {ate_ori, ate_pos, rpe: {seg_len: dict}} or
-    None on failure. Auto-sources ROS and sets QT_QPA_PLATFORM=offscreen so it
-    works on headless hosts."""
+    None on failure. Auto-sources ROS, sets QT_QPA_PLATFORM=offscreen, and
+    timeouts the underlying GUI tool so the call returns in seconds rather
+    than blocking forever at matplotlibcpp::show()."""
+    print(f"  → error_singlerun: {Path(traj).name} ...",
+          file=sys.stderr, end="", flush=True)
     try:
         result = _run_ros2(
             ["ros2", "run", "ov_eval", "error_singlerun", "posyaw", gt, traj],
-            timeout=60,
+            timeout=15,
         )
+        print(" done", file=sys.stderr, flush=True)
     except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-        print(f"  ATE/RPE failed for {traj}: {e}", file=sys.stderr)
+        print(f" FAILED ({e})", file=sys.stderr, flush=True)
         return None
 
     out = {"ate_ori": None, "ate_pos": None, "rpe": {}}
