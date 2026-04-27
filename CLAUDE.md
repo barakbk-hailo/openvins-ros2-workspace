@@ -62,8 +62,7 @@ x86 host (run from workspace root):
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/run_full_benchmark.sh` | Flexible orchestrator: serial/subscribe × sequences × threads × cameras × reps. `--quick` for 1-rep smoke, `--dry-run` to print planned cells, `--help` for options. |
-| `scripts/run_timing_subscribe.sh` | Subscribe mode at configurable bag-playback rates (1×/2×/5× realtime feasibility — Phase 3) |
+| `scripts/run_full_benchmark.sh` | Flexible orchestrator: serial/subscribe × sequences × threads × cameras × reps × rates. `--rate <csv>` adds a rate-sweep dimension (e.g. `--rate 1.0,2.0,5.0` = Phase 3 rate-feasibility). `--quick` for 1-rep smoke, `--dry-run` to print planned cells, `--help` for options. Output base auto-detected by arch (`x86` on x86_64, `rpi5` on aarch64). |
 | `scripts/run_timing_sweep.sh` | Config sensitivity sweep: 5 variants (downsample, ±features, no-SLAM, 1-thread OpenCV) on V1_01_easy serial (Phase 2) |
 
 RPi5 host (run from workspace root, requires Docker + a prebuilt image):

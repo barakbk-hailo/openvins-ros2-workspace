@@ -377,12 +377,12 @@ Going from 4 threads to 1 thread costs only +1ms (+9%). This means:
 This tests whether the system can keep up with realtime sensor data under ROS 2
 middleware overhead.
 
-**Script:** `scripts/run_timing_subscribe.sh [rate]`
+**Script:** `scripts/run_full_benchmark.sh -m subscribe -s <seq> --rate <csv>`
 Launches `ros2 launch ov_msckf subscribe.launch.py` in the background, waits 3
 seconds for the node to start, then runs `ros2 bag play <bag> --rate <rate>` which
 blocks until the bag finishes. After playback, waits 5 seconds for OpenVINS to drain
-its message queue, then kills the process and copies the timing CSV. Reports
-processed frame count vs expected (2912) to quantify drops.
+its message queue, then kills the process and copies the timing CSV. The `--rate <csv>`
+flag is a sweep dimension — pass `1.0,2.0,5.0` to run all three rates in one invocation.
 
 **Why different rates:** 1× tests normal realtime. Higher rates stress-test to find
 the breaking point — the playback rate at which VIO falls behind and starts dropping
@@ -402,7 +402,7 @@ frames.
 | 5.0× | 2790 | 122 | 4.2% | 6.38 | ~10 real drops; total ms drops because the heavy init frames are excluded |
 | Serial (reference) | 2776 | 136 | 4.7% | 10.86 | strict ±20 ms stereo sync |
 
-*Source: `results/timing/x86/subscribe/rerun_2026_04_23/V1_01_easy_rate{1.0,2.0,5.0}.txt` (wall-clock; rate-suffixed files are written by `scripts/run_timing_subscribe.sh` without a `_wall` suffix — the `_cpu`/`_thread` siblings do carry the suffix); serial reference from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_wall.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`. Re-collected 2026-04-26. Reproduce: `bash scripts/run_timing_subscribe.sh 1.0 --tag rerun_2026_04_23` (and similarly for `2.0` and `5.0`).*
+*Source: `results/timing/x86/subscribe/rerun_2026_04_23/V1_01_easy_rate{1.0,2.0,5.0}.txt` (data was collected with the now-deleted `run_timing_subscribe.sh`, which wrote the wall CSV without a `_wall` suffix; under the consolidated `run_full_benchmark.sh --rate` flow the layout is uniform: `V1_01_easy_4thr_run1_wall.txt` for rate=1.0, `V1_01_easy_4thr_rate{2.0,5.0}_run1_wall.txt` for the others). Serial reference from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_wall.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`. Re-collected 2026-04-26. Reproduce in a single invocation: `bash scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy --rate 1.0,2.0,5.0 --tag rerun_2026_04_23`.*
 
 The ~112-136 baseline "missing" frames at 1× and 2× are **NOT performance-related
 drops**. They come from:
@@ -565,7 +565,7 @@ won't match.
 |--------|-------|-------------|
 | `scripts/run_full_benchmark.sh -m serial -c both -r 1 --tag <name>` | 1 | Runs serial mode on 3 sequences × {stereo, mono}. Pass `-s <csv>` to override the sequence list (e.g. all 10 EuRoC for paper repro). `--dry-run` prints the planned cells without executing. |
 | `scripts/run_timing_sweep.sh --tag <name>` | 2 | Runs 5 config variants on V1_01_easy (serial mode). |
-| `scripts/run_timing_subscribe.sh <rate> --tag <name>` | 3 | Subscribe mode + bag playback at given rate (1.0/2.0/5.0). |
+| `scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy --rate 1.0,2.0,5.0 --tag <name>` | 3 | Subscribe + bag-rate sweep (1×/2×/5×) — single invocation runs the whole rate matrix. |
 
 ## Key source files
 

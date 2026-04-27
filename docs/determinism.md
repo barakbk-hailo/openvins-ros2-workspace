@@ -597,7 +597,7 @@ benchmark reproducibility against the pre-`64cfe59` numbers.
 
 *Source:
 - V1_01_easy @ rate=1.0 baseline (with-recovery): mean over `results/timing/x86/subscribe/rerun_2026_04_23/V1_01_easy_*_run{1..5}_est.txt` (5 runs, archived).
-- V1_01_easy @ rate=2.0 row: unarchived. The `rerun_2026_04_23_rate2_recovery_{on,off}/` tags only carry V1_03_difficult; the V1_01_easy @ rate=2 cell remains an ad-hoc A/B preserved only in this table. Re-collect with `bash scripts/run_timing_subscribe.sh 2.0 --tag rerun_rate2_v101_recovery_off --slam-chi2-recovery false` (and `_on`) if precise verification is needed.
+- V1_01_easy @ rate=2.0 row: unarchived. The `rerun_2026_04_23_rate2_recovery_{on,off}/` tags only carry V1_03_difficult; the V1_01_easy @ rate=2 cell remains an ad-hoc A/B preserved only in this table. Re-collect with `bash scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy --rate 2.0 --tag rerun_rate2_v101_recovery_off --slam-chi2-recovery false` (and `_on`) if precise verification is needed.
 - V1_03_difficult @ rate=1.0: 3 runs each in `results/timing/x86/subscribe/rerun_2026_04_23_recovery_{on,off}/V1_03_difficult_4thr_run{1,2,3}_{est,feats}.txt` (archived).
 - V1_03_difficult @ rate=2.0 (the load-bearing row): 3 runs each in `results/timing/x86/subscribe/rerun_2026_04_23_rate2_recovery_{on,off}/V1_03_difficult_4thr_run{1,2,3}_{est,feats}.txt` (archived).
 
@@ -611,10 +611,11 @@ bash scripts/run_full_benchmark.sh -m subscribe -s V1_03_difficult -t 4 -r 3 \
 bash scripts/run_full_benchmark.sh -m subscribe -s V1_03_difficult -t 4 -r 3 \
     --tag rerun_2026_04_23_recovery_off --slam-chi2-recovery false
 
-# rate=2.0 A/B (the failure-mode reproducer): scripts/run_full_benchmark.sh
-# hardcodes rate=1.0, so use scripts/run_timing_subscribe.sh per-rep, or
-# temporarily edit the `--rate 1.0` token in the subscribe loop. The
-# --slam-chi2-recovery flag works the same way.
+# rate=2.0 A/B (the failure-mode reproducer): pass --rate 2.0
+bash scripts/run_full_benchmark.sh -m subscribe -s V1_03_difficult -t 4 -r 3 \
+    --rate 2.0 --tag rerun_2026_04_23_rate2_recovery_on  --slam-chi2-recovery true
+bash scripts/run_full_benchmark.sh -m subscribe -s V1_03_difficult -t 4 -r 3 \
+    --rate 2.0 --tag rerun_2026_04_23_rate2_recovery_off --slam-chi2-recovery false
 ```
 
 ---
@@ -660,7 +661,7 @@ record_feature_counts: true
 
 ### Script zombie cleanup
 
-**File:** `scripts/run_full_benchmark.sh`, `scripts/run_timing_subscribe.sh`
+**File:** `scripts/run_full_benchmark.sh` (via `kill_stale_subscribe_nodes` in `scripts/bench_lib.sh`)
 
 Subscribe test scripts now kill any stale `run_subscribe_msckf` processes before
 and after each run. Stale nodes on the same DDS domain steal messages from active

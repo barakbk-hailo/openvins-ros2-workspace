@@ -21,7 +21,8 @@ Usage:
   bash run_timing_sweep.sh [--tag <name>] [--slam-chi2-recovery true|false]
 
 Options:
-  --tag <name>         output goes to $HOME/results/timing/x86/serial/sweep/<tag>/
+  --tag <name>         output goes to $HOME/results/timing/<arch>/serial/sweep/<tag>/
+                       (<arch> = x86 on x86_64, rpi5 on aarch64; auto-detected)
   --slam-chi2-recovery <true|false>
                        override slam_chi2_recovery in each variant's temp config
   -h, --help           show this help and exit
@@ -35,8 +36,8 @@ Variants:
 
 Compare against the baseline:
   ros2 run ov_eval timing_comparison \
-      ~/results/timing/x86/serial/stereo/V1_01_easy.txt \
-      ~/results/timing/x86/serial/sweep/<tag>/*.txt
+      ~/results/timing/<arch>/serial/stereo/V1_01_easy.txt \
+      ~/results/timing/<arch>/serial/sweep/<tag>/*.txt
 EOF
 }
 
@@ -59,7 +60,7 @@ require_dir "datasets" "$DATASETS_DIR" || exit 1
 SEQ="V1_01_easy"
 require_bag "$SEQ" || exit 1
 
-RESULTS_DIR="$HOME/results/timing/x86/serial/sweep${TAG:+/$TAG}"
+RESULTS_DIR="${RESULTS_BASE:-$(arch_results_base)}/serial/sweep${TAG:+/$TAG}"
 TMP_CONFIG="$CONFIG_DIR/estimator_config_sweep.yaml"
 
 cleanup() {

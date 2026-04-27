@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/bench_lib.sh"
 
 # ── Defaults ──
-RESULTS_BASE="$HOME/results/timing/x86"
+RESULTS_BASE="${RESULTS_BASE:-$(arch_results_base)}"
 BAG_PLAY_DELAY=5  # seconds the script waits after `ros2 bag play` to flush queued msgs
 
 MODE="both"
@@ -19,6 +19,7 @@ SEQUENCES_CSV="V1_01_easy,MH_03_medium,V2_02_medium"
 THREADS_CSV="4,1"
 CAMERAS="stereo"
 SUBSCRIBE_REPS=5
+RATES_CSV="1.0"
 BENCH_TAG="bench_$(date +%Y%m%d_%H%M%S)"
 SLAM_CHI2_RECOVERY=""  # empty = leave config value alone (shipping default is false)
 DRY_RUN=0
@@ -42,10 +43,14 @@ Options:
                                        (mono is only measured in serial mode;
                                         mono+subscribe is skipped)
   -r, --reps <N>                       default: 5 (subscribe reps; serial is always 1)
+      --rate <csv>                     default: 1.0 (subscribe-mode bag-play rates)
+                                       sweep dimension; e.g. --rate 1.0,2.0,5.0
+                                       runs the matrix three times.
       --tag <name>                     default: bench_YYYYMMDD_HHMMSS
                                        routes output under
                                        <results-base>/{serial,subscribe}/<tag>/
-      --results-base <dir>             default: $HOME/results/timing/x86
+      --results-base <dir>             default: $HOME/results/timing/<arch>
+                                       (x86_64→x86, aarch64→rpi5; auto-detected)
       --slam-chi2-recovery <true|false>  override slam_chi2_recovery in the temp config
                                        (default: leave config's value alone)
       --dry-run                        print the cells that would run, no execution
@@ -54,22 +59,27 @@ Options:
 
 Examples:
   # Full default suite
-  bash run_full_benchmark.sh --tag bench_$(date +%Y%m%d)
+  bash scripts/run_full_benchmark.sh --tag bench_$(date +%Y%m%d)
 
   # Serial mode, 3 sequences, stereo+mono, 1 rep (paper Table II/III reproduction)
-  bash run_full_benchmark.sh -m serial -c both -r 1 \
+  bash scripts/run_full_benchmark.sh -m serial -c both -r 1 \
       -s V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium,MH_01_easy,MH_02_easy,MH_03_medium,MH_04_difficult,MH_05_difficult \
       --tag rerun_paper
 
   # Subscribe mode, single sequence, 5 reps
-  bash run_full_benchmark.sh -m subscribe -s V2_02_medium -r 5 --tag bench_v2_only
+  bash scripts/run_full_benchmark.sh -m subscribe -s V2_02_medium -r 5 --tag bench_v2_only
+
+  # Subscribe rate-feasibility sweep (single invocation, 3 rates)
+  bash scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy --rate 1.0,2.0,5.0 --tag rate_sweep
 
   # Quick smoke test
-  bash run_full_benchmark.sh --quick
+  bash scripts/run_full_benchmark.sh --quick
 
 Output naming:
   Serial:    <SEQ>_<N>thr[_mono]_{wall,cpu,thread,feats,est}.txt
-  Subscribe: <SEQ>_<N>thr_run<R>_{wall,cpu,thread,feats,est}.txt
+  Subscribe: <SEQ>_<N>thr[_rate<R>]_run<R>_{wall,cpu,thread,feats,est}.txt
+             (the _rate<R> segment is inserted only when R != 1.0, so existing
+              rate=1.0 citations like <SEQ>_<N>thr_run<R>_*.txt are unchanged.)
 
 Stale OpenVINS subscribe nodes (this user only) are TERM-then-KILL'd on
 script start and after each subscribe rep.
@@ -89,6 +99,8 @@ while [[ $# -gt 0 ]]; do
     -c|--cameras)             CAMERAS="${2:-}"; shift 2 ;;
     -r=*|--reps=*)            SUBSCRIBE_REPS="${1#*=}"; shift ;;
     -r|--reps)                SUBSCRIBE_REPS="${2:-}"; shift 2 ;;
+    --rate=*)                 RATES_CSV="${1#*=}"; shift ;;
+    --rate)                   RATES_CSV="${2:-}"; shift 2 ;;
     --tag=*)                  BENCH_TAG="${1#*=}"; shift ;;
     --tag)                    BENCH_TAG="${2:-}"; shift 2 ;;
     --results-base=*)         RESULTS_BASE="${1#*=}"; shift ;;
@@ -130,10 +142,19 @@ fi
 
 IFS=',' read -ra SEQUENCES <<< "$SEQUENCES_CSV"
 IFS=',' read -ra THREADS <<< "$THREADS_CSV"
+IFS=',' read -ra RATES <<< "$RATES_CSV"
 
 # Validate every requested sequence has a bag dir.
 for seq in "${SEQUENCES[@]}"; do
   require_bag "$seq" || exit 1
+done
+
+# Validate every requested rate is a positive float.
+for rate in "${RATES[@]}"; do
+  [[ "$rate" =~ ^[0-9]+(\.[0-9]+)?$ ]] || {
+    echo "ERROR: --rate token must be a positive float (got: $rate)" >&2
+    exit 2
+  }
 done
 
 # Camera-config pairs as "name:max_cameras:use_stereo"
@@ -201,9 +222,11 @@ print(f'{sum(v)/len(v):.1f}') if v else print('?')
 
 echo "================================================================"
 echo "  OpenVINS Benchmark"
+echo "  Arch:      $(uname -m)  →  RESULTS_BASE=$RESULTS_BASE"
 echo "  Mode:      $MODE"
 echo "  Sequences: ${SEQUENCES[*]}"
 echo "  Threads:   ${THREADS[*]}"
+echo "  Rates:     ${RATES[*]}"
 echo "  Cameras:   $CAMERAS"
 echo "  Sub reps:  $SUBSCRIBE_REPS"
 echo "  Tag:       $BENCH_TAG"
@@ -268,42 +291,51 @@ if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
   echo "==================== SUBSCRIBE MODE ===================="
   for seq in "${SEQUENCES[@]}"; do
     for thr in "${THREADS[@]}"; do
-      for i in $(seq 1 "$SUBSCRIBE_REPS"); do
-        DIR="$RESULTS_BASE/subscribe/$BENCH_TAG"
-        TAG="${seq}_${thr}thr_run${i}"
-        if run_complete "$DIR" "$TAG"; then
-          echo "SKIP subscribe $seq ${thr}-thr run $i (already complete)"
-          continue
+      for rate in "${RATES[@]}"; do
+        # Rate=1.0 produces the historic filename layout <seq>_<thr>thr_run<N>_*;
+        # other rates inject _rate<R> so existing rate=1.0 citations stay valid.
+        if [ "$rate" = "1.0" ]; then
+          rate_suffix=""
+        else
+          rate_suffix="_rate${rate}"
         fi
-        if [ "$DRY_RUN" -eq 1 ]; then
-          echo "DRY-RUN subscribe $seq ${thr}-thr run $i → $DIR/${TAG}_*.txt"
-          continue
-        fi
-        CFG=$(get_config "$thr")
-        rm -f "$TIMING_WALL_TMP" "$TIMING_CPU_TMP" "$TIMING_THREAD_TMP" "$FEATS_TMP" "$EST_TMP" "$STD_TMP"
-        echo "--- subscribe $seq ${thr}-thr run $i / $SUBSCRIBE_REPS ---"
+        for i in $(seq 1 "$SUBSCRIBE_REPS"); do
+          DIR="$RESULTS_BASE/subscribe/$BENCH_TAG"
+          TAG="${seq}_${thr}thr${rate_suffix}_run${i}"
+          if run_complete "$DIR" "$TAG"; then
+            echo "SKIP subscribe $seq ${thr}-thr rate=$rate run $i (already complete)"
+            continue
+          fi
+          if [ "$DRY_RUN" -eq 1 ]; then
+            echo "DRY-RUN subscribe $seq ${thr}-thr rate=$rate run $i → $DIR/${TAG}_*.txt"
+            continue
+          fi
+          CFG=$(get_config "$thr")
+          rm -f "$TIMING_WALL_TMP" "$TIMING_CPU_TMP" "$TIMING_THREAD_TMP" "$FEATS_TMP" "$EST_TMP" "$STD_TMP"
+          echo "--- subscribe $seq ${thr}-thr rate=$rate run $i / $SUBSCRIBE_REPS ---"
 
-        ros2 launch ov_msckf subscribe.launch.py \
-            config_path:="$CFG" \
-            max_cameras:=2 use_stereo:=true \
-            save_total_state:=true \
-            filepath_est:="$EST_TMP" \
-            filepath_std:="$STD_TMP" &>/dev/null &
-        OV_PID=$!
-        sleep 3
-        ros2 bag play "$DATASETS_DIR/$seq" --rate 1.0 -d "$BAG_PLAY_DELAY" &>/dev/null
-        sleep 5
-        kill "$OV_PID" 2>/dev/null || true
-        wait "$OV_PID" 2>/dev/null || true
-        kill_stale_subscribe_nodes
+          ros2 launch ov_msckf subscribe.launch.py \
+              config_path:="$CFG" \
+              max_cameras:=2 use_stereo:=true \
+              save_total_state:=true \
+              filepath_est:="$EST_TMP" \
+              filepath_std:="$STD_TMP" &>/dev/null &
+          OV_PID=$!
+          sleep 3
+          ros2 bag play "$DATASETS_DIR/$seq" --rate "$rate" -d "$BAG_PLAY_DELAY" &>/dev/null
+          sleep 5
+          kill "$OV_PID" 2>/dev/null || true
+          wait "$OV_PID" 2>/dev/null || true
+          kill_stale_subscribe_nodes
 
-        save_results "$DIR" "$TAG"
-        if ! run_complete "$DIR" "$TAG"; then
-          echo "  -> WARNING: produced incomplete results (< $MIN_ROWS_FOR_COMPLETE_RUN frames)" >&2
-        fi
-        ROWS=$(grep -cv '^#' "$DIR/${TAG}_wall.txt" 2>/dev/null || echo 0)
-        SLAM=$(get_slam_avg "$DIR/${TAG}_feats.txt")
-        echo "  -> ${ROWS} frames, avg SLAM=$SLAM"
+          save_results "$DIR" "$TAG"
+          if ! run_complete "$DIR" "$TAG"; then
+            echo "  -> WARNING: produced incomplete results (< $MIN_ROWS_FOR_COMPLETE_RUN frames)" >&2
+          fi
+          ROWS=$(grep -cv '^#' "$DIR/${TAG}_wall.txt" 2>/dev/null || echo 0)
+          SLAM=$(get_slam_avg "$DIR/${TAG}_feats.txt")
+          echo "  -> ${ROWS} frames, avg SLAM=$SLAM"
+        done
       done
     done
   done
@@ -346,15 +378,22 @@ if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
   for seq in "${SEQUENCES[@]}"; do
     echo "  $seq:"
     for thr in "${THREADS[@]}"; do
-      VALS=""
-      for i in $(seq 1 "$SUBSCRIBE_REPS"); do
-        F="$RESULTS_BASE/subscribe/$BENCH_TAG/${seq}_${thr}thr_run${i}_wall.txt"
-        [ -f "$F" ] || continue
-        T=$(ros2 run ov_eval timing_flamegraph "$F" 2>/dev/null | grep "(total)" | grep -oP 'mean_time = \K[0-9.]+' || true)
-        T_MS=$(python3 -c "print(f'{float(\"${T:-0}\")*1000:.1f}')")
-        VALS="$VALS $T_MS"
+      for rate in "${RATES[@]}"; do
+        if [ "$rate" = "1.0" ]; then rate_suffix=""; else rate_suffix="_rate${rate}"; fi
+        VALS=""
+        for i in $(seq 1 "$SUBSCRIBE_REPS"); do
+          F="$RESULTS_BASE/subscribe/$BENCH_TAG/${seq}_${thr}thr${rate_suffix}_run${i}_wall.txt"
+          [ -f "$F" ] || continue
+          T=$(ros2 run ov_eval timing_flamegraph "$F" 2>/dev/null | grep "(total)" | grep -oP 'mean_time = \K[0-9.]+' || true)
+          T_MS=$(python3 -c "print(f'{float(\"${T:-0}\")*1000:.1f}')")
+          VALS="$VALS $T_MS"
+        done
+        if [ "$rate" = "1.0" ]; then
+          echo "    ${thr}-thr:$VALS ms"
+        else
+          echo "    ${thr}-thr rate=${rate}:$VALS ms"
+        fi
       done
-      echo "    ${thr}-thr:$VALS ms"
     done
   done
   echo ""
@@ -376,12 +415,19 @@ for seq in "${SEQUENCES[@]}"; do
   fi
   if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
     for thr in "${THREADS[@]}"; do
-      VALS=""
-      for i in $(seq 1 "$SUBSCRIBE_REPS"); do
-        SLAM=$(get_slam_avg "$RESULTS_BASE/subscribe/$BENCH_TAG/${seq}_${thr}thr_run${i}_feats.txt")
-        VALS="$VALS $SLAM"
+      for rate in "${RATES[@]}"; do
+        if [ "$rate" = "1.0" ]; then rate_suffix=""; else rate_suffix="_rate${rate}"; fi
+        VALS=""
+        for i in $(seq 1 "$SUBSCRIBE_REPS"); do
+          SLAM=$(get_slam_avg "$RESULTS_BASE/subscribe/$BENCH_TAG/${seq}_${thr}thr${rate_suffix}_run${i}_feats.txt")
+          VALS="$VALS $SLAM"
+        done
+        if [ "$rate" = "1.0" ]; then
+          echo "    subscribe ${thr}-thr:$VALS"
+        else
+          echo "    subscribe ${thr}-thr rate=${rate}:$VALS"
+        fi
       done
-      echo "    subscribe ${thr}-thr:$VALS"
     done
   fi
 done
@@ -408,14 +454,21 @@ for seq in "${SEQUENCES[@]}"; do
   fi
   if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
     for thr in "${THREADS[@]}"; do
-      VALS=""
-      for i in $(seq 1 "$SUBSCRIBE_REPS"); do
-        F="$RESULTS_BASE/subscribe/$BENCH_TAG/${seq}_${thr}thr_run${i}_est.txt"
-        [ -f "$F" ] || continue
-        ATE=$(ros2 run ov_eval error_singlerun posyaw "$GT" "$F" 2>/dev/null | grep "rmse_.*pos" | head -1 | grep -oP 'rmse_pos = \K[0-9.]+' || true)
-        VALS="$VALS ${ATE:-FAIL}"
+      for rate in "${RATES[@]}"; do
+        if [ "$rate" = "1.0" ]; then rate_suffix=""; else rate_suffix="_rate${rate}"; fi
+        VALS=""
+        for i in $(seq 1 "$SUBSCRIBE_REPS"); do
+          F="$RESULTS_BASE/subscribe/$BENCH_TAG/${seq}_${thr}thr${rate_suffix}_run${i}_est.txt"
+          [ -f "$F" ] || continue
+          ATE=$(ros2 run ov_eval error_singlerun posyaw "$GT" "$F" 2>/dev/null | grep "rmse_.*pos" | head -1 | grep -oP 'rmse_pos = \K[0-9.]+' || true)
+          VALS="$VALS ${ATE:-FAIL}"
+        done
+        if [ "$rate" = "1.0" ]; then
+          echo "    subscribe ${thr}-thr:$VALS"
+        else
+          echo "    subscribe ${thr}-thr rate=${rate}:$VALS"
+        fi
       done
-      echo "    subscribe ${thr}-thr:$VALS"
     done
   fi
 done

@@ -8,6 +8,18 @@ DATASETS_DIR="${DATASETS_DIR:-$HOME/datasets/euroc}"
 CONFIG_DIR="${CONFIG_DIR:-$WS_DIR/src/open_vins/config/euroc_mav}"
 BASE_CONFIG="${BASE_CONFIG:-$CONFIG_DIR/estimator_config.yaml}"
 
+# Default results base by host arch. Map x86_64 → x86 and aarch64 → rpi5 so the
+# tag layout in data-provenance.md (results/timing/{x86,rpi5}/...) is preserved.
+# Other archs land under `results/timing/$(uname -m)/`. Callers can override via
+# the RESULTS_BASE env var or a script-level --results-base flag.
+arch_results_base() {
+  case "$(uname -m)" in
+    x86_64)  echo "$HOME/results/timing/x86" ;;
+    aarch64) echo "$HOME/results/timing/rpi5" ;;
+    *)       echo "$HOME/results/timing/$(uname -m)" ;;
+  esac
+}
+
 # Temp file paths the OpenVINS nodes write to (matches launch defaults).
 TIMING_WALL_TMP="/tmp/traj_timing.txt"
 TIMING_CPU_TMP="/tmp/traj_timing_cpu.txt"
