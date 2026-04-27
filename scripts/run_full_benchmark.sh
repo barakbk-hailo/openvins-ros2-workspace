@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 #
 # Flexible benchmark orchestrator: serial + subscribe on the EuRoC dataset.
-# Supersedes run_timing_benchmark.sh and run_timing_combined.sh — their
-# scopes are covered by the CLI options below. See usage() for full flags.
+# Single entry point — supersedes run_timing_subscribe.sh, run_pwt_benchmark_v2.sh,
+# and run_pwt_final_ab.sh. Native by default; --docker <image> wraps each
+# launch in a container. --rate <csv> is a sweep dimension; --slam-chi2-recovery
+# overrides the YAML key in the temp config. See usage() for full flags.
 
 set -euo pipefail
 
@@ -146,6 +148,21 @@ validate_nonempty "--tag" "$BENCH_TAG" || exit 2
 require_dir "datasets" "$DATASETS_DIR" || exit 1
 require_dir "config" "$CONFIG_DIR" || exit 1
 
+# Pre-flight when --docker is set: the daemon must be reachable AND the
+# named image must exist locally. Catches "docker is down" and
+# "image missing" before we burn N reps' worth of confusing errors.
+if [ -n "$DOCKER_IMAGE" ]; then
+  command -v docker >/dev/null 2>&1 || {
+    echo "ERROR: --docker $DOCKER_IMAGE requested but docker is not in PATH" >&2
+    exit 1
+  }
+  docker image inspect "$DOCKER_IMAGE" >/dev/null 2>&1 || {
+    echo "ERROR: docker image '$DOCKER_IMAGE' not found locally" >&2
+    echo "       (try: docker pull $DOCKER_IMAGE  or  docker build -t $DOCKER_IMAGE ...)" >&2
+    exit 1
+  }
+fi
+
 # Subscribe mode only runs stereo. Fail fast on pure mono+subscribe; warn on both+subscribe.
 if [[ "$MODE" == "subscribe" && "$CAMERAS" == "mono" ]]; then
   echo "ERROR: --cameras mono --mode subscribe is not supported (mono+subscribe is untested)." >&2
@@ -165,12 +182,24 @@ for seq in "${SEQUENCES[@]}"; do
   require_bag "$seq" || exit 1
 done
 
-# Validate every requested rate is a positive float.
-for rate in "${RATES[@]}"; do
+# Validate every requested rate is a positive float, then canonicalise to a
+# `<int>.<frac>` form so that string comparisons against "1.0" later in the
+# loop don't miss `--rate 1` / `--rate 01.00` / etc. The canonical form is
+# also what gets injected into output filenames as `_rate<R>`.
+for i in "${!RATES[@]}"; do
+  rate="${RATES[$i]}"
   [[ "$rate" =~ ^[0-9]+(\.[0-9]+)?$ ]] || {
     echo "ERROR: --rate token must be a positive float (got: $rate)" >&2
     exit 2
   }
+  awk -v r="$rate" 'BEGIN{exit !(r>0)}' || {
+    echo "ERROR: --rate token must be > 0 (got: $rate)" >&2
+    exit 2
+  }
+  RATES[$i]=$(awk -v r="$rate" 'BEGIN{printf "%g", r+0}')
+  # `%g` collapses 1.0 → 1, 2.00 → 2, 5.0 → 5; we want a uniform 1-decimal
+  # form so it matches the historical `_rate2.0` / `_rate5.0` filenames.
+  case "${RATES[$i]}" in *.*) ;; *) RATES[$i]="${RATES[$i]}.0" ;; esac
 done
 
 # Camera-config pairs as "name:max_cameras:use_stereo"
@@ -366,7 +395,7 @@ if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
             [ -f $FEATS_TMP ]         && cp $FEATS_TMP         '$DIR/${TAG}_feats.txt'
             [ -f $EST_TMP ]           && cp $EST_TMP           '$DIR/${TAG}_est.txt'
             true
-          " || true
+          " || echo "  -> WARNING: subscribe rep returned nonzero (container/launch error?)" >&2
           # In native mode, also reap host-side strays. In --docker mode the
           # container is --rm so it cleans itself up; the user-scoped pkill
           # is a no-op there but harmless.

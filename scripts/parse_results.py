@@ -51,6 +51,16 @@ _LEGACY_RE = re.compile(
     r"^(?P<mode>serial|sub)_run(?P<run>\d+)_(?P<clock>" + "|".join(_CLOCKS) + r")\.txt$"
 )
 
+# Legacy rate-feasibility pattern (from the deleted run_timing_subscribe.sh).
+# Wall-clock CSV has no _wall suffix; cpu/thread variants do. Treated as
+# subscribe runs with run_id derived from the rate.
+#   <seq>_rate<R>[_<clock>].txt
+_LEGACY_RATE_RE = re.compile(
+    r"^(?P<seq>[A-Za-z0-9_]+?)_rate(?P<rate>[0-9]+(?:\.[0-9]+)?)"
+    r"(?:_(?P<clock>cpu|thread|feats|pose|est))?"
+    r"\.txt$"
+)
+
 
 def parse_timing_csv(path):
     """Return list of floats from the 'total' (last) column, in seconds."""
@@ -165,6 +175,17 @@ def classify_files(directory):
             run = int(m.group("run"))
             cell = (mode, "V1_01_easy", None, "stereo", 1.0)
             cells.setdefault(cell, {}).setdefault(run, {})[m.group("clock")] = path
+            continue
+
+        m = _LEGACY_RATE_RE.match(entry)
+        if m:
+            seq = m.group("seq")
+            rate = float(m.group("rate"))
+            # Wall-clock has no _<clock> suffix in this legacy convention; map
+            # to "wall" so it groups with the cpu/thread/etc. siblings.
+            clock = m.group("clock") or "wall"
+            cell = ("subscribe", seq, None, "stereo", rate)
+            cells.setdefault(cell, {}).setdefault(1, {})[clock] = path
     return cells
 
 

@@ -30,6 +30,18 @@ is given here so individual citations stay short.
 
 ## RPi5 tags
 
+> **File-layout note for the PWT-investigation rows.** The `rerun_2026_04_26_pwt_*`
+> data on disk uses the legacy filename convention from the now-deleted
+> `run_pwt_benchmark_v2.sh` — `{serial,sub}_run<N>_*.txt` directly under
+> `results/rpi5/<tag>/`, with `_pose.txt` (TUM) trajectories. The "Reproduce"
+> commands below use the consolidated orchestrator and write the standard
+> convention — `<seq>_<thr>thr[_run<N>]_*.txt` under
+> `~/results/timing/rpi5/{serial,subscribe}/<tag>/` with `_est.txt` (state
+> dump) trajectories. The two layouts are **analytically equivalent** —
+> `parse_results.py` reads both and produces matching cross-run statistics —
+> but a re-run will not bit-overwrite the archived files. Treat the
+> reproduce-commands as "re-collect from scratch", not "reproduce in place".
+
 | Tag (under `results/rpi5/`) | Submodule | Outer commit | Date | chi2_recovery | Docker flags | Notes |
 |---|---|---|---|---|---|---|
 | `rerun_2026_04_26_pwt_baseline/` | `master-candidate` / `2a50450` (via Docker `openvins-humble:latest` rebuilt 2026-04-26) | `8424c9e` | 2026-04-26 | `false` | (none, only `-e HOME=/tmp` for `~/.ros/log` workaround — applied automatically by `docker_wrap`) | 10 subscribe reps × V1_01_easy stereo. Originally produced by the now-deleted `run_pwt_benchmark_v2.sh`; reproduce with the consolidated orchestrator: `bash scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy -t 4 -r 10 --docker openvins-humble:latest --tag rerun_2026_04_26_pwt_baseline` |

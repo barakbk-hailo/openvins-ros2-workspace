@@ -135,14 +135,19 @@ kill_stale_subscribe_nodes() {
   pkill -u "$USER" -KILL -f 'run_subscribe_msckf' 2>/dev/null || true
 }
 
-# Kill all containers spawned from $DOCKER_IMAGE (used by the EXIT/INT/TERM
-# trap when the orchestrator runs with --docker so a Ctrl-C doesn't leak a
-# running container).
+# Stable label used to tag containers spawned by this orchestrator process so
+# the EXIT/INT/TERM trap can kill only its own children (vs every container
+# from $DOCKER_IMAGE on the host, which would harm a coworker running the
+# same image in another session).
+ov_bench_label() { echo "ov_bench_pid=$$"; }
+
+# Kill containers tagged by this orchestrator process. Used by the
+# EXIT/INT/TERM trap so a Ctrl-C doesn't leak a running container.
 kill_stale_docker_containers() {
   [ -n "${DOCKER_IMAGE:-}" ] || return 0
   command -v docker >/dev/null 2>&1 || return 0
   local stale
-  stale=$(docker ps -q --filter "ancestor=$DOCKER_IMAGE" 2>/dev/null || true)
+  stale=$(docker ps -q --filter "label=$(ov_bench_label)" 2>/dev/null || true)
   [ -n "$stale" ] && docker kill $stale >/dev/null 2>&1 || true
 }
 
@@ -178,12 +183,13 @@ docker_wrap() { # <bash_code>
   fi
   docker run --rm --network host \
     --user "$(id -u):$(id -g)" \
+    --label "$(ov_bench_label)" \
     -v "$HOME/workspace:$HOME/workspace" \
     -v "$HOME/datasets:$HOME/datasets" \
     -v "$HOME/results:$HOME/results" \
     -e HOME=/tmp \
     "${docker_flags_array[@]}" \
-    "$DOCKER_IMAGE" bash -c "set -e; source /opt/ros_ws/install/setup.bash; $1"
+    "$DOCKER_IMAGE" bash -c "set -eo pipefail; source /opt/ros_ws/install/setup.bash; $1"
 }
 
 # ── Output validation ──
