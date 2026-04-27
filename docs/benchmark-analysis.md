@@ -10,7 +10,7 @@
 **Reproduce all data cited in this doc:**
 
 ```bash
-bash run_full_benchmark.sh -r 5 --tag rerun_2026_04_23
+bash scripts/run_full_benchmark.sh -r 5 --tag rerun_2026_04_23
 ```
 
 (Default suite: 3 sequences × {4-thr, 1-thr} × stereo, 1 serial rep + 5

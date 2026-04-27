@@ -62,16 +62,16 @@ x86 host (run from workspace root):
 
 | Script | Purpose |
 |--------|---------|
-| `run_full_benchmark.sh` | Flexible orchestrator: serial/subscribe × sequences × threads × cameras × reps. `--quick` for 1-rep smoke, `--dry-run` to print planned cells, `--help` for options. |
-| `run_timing_subscribe.sh` | Subscribe mode at configurable bag-playback rates (1×/2×/5× realtime feasibility — Phase 3) |
-| `run_timing_sweep.sh` | Config sensitivity sweep: 5 variants (downsample, ±features, no-SLAM, 1-thread OpenCV) on V1_01_easy serial (Phase 2) |
+| `scripts/run_full_benchmark.sh` | Flexible orchestrator: serial/subscribe × sequences × threads × cameras × reps. `--quick` for 1-rep smoke, `--dry-run` to print planned cells, `--help` for options. |
+| `scripts/run_timing_subscribe.sh` | Subscribe mode at configurable bag-playback rates (1×/2×/5× realtime feasibility — Phase 3) |
+| `scripts/run_timing_sweep.sh` | Config sensitivity sweep: 5 variants (downsample, ±features, no-SLAM, 1-thread OpenCV) on V1_01_easy serial (Phase 2) |
 
 RPi5 host (run from workspace root, requires Docker + a prebuilt image):
 
 | Script | Purpose |
 |--------|---------|
-| `run_pwt_benchmark_v2.sh` | Single PWT variant on V1_01_easy: 2 serial + N subscribe reps inside the named Docker image. Pass extra Docker flags positionally for RT testing. |
-| `run_pwt_final_ab.sh` | Sequential A/B harness — calls `run_pwt_benchmark_v2.sh` twice (with/without RT flags) to minimise system-load drift between the two halves. |
+| `scripts/run_pwt_benchmark_v2.sh` | Single PWT variant on V1_01_easy: 2 serial + N subscribe reps inside the named Docker image. Pass extra Docker flags positionally for RT testing. |
+| `scripts/run_pwt_final_ab.sh` | Sequential A/B harness — calls `scripts/run_pwt_benchmark_v2.sh` twice (with/without RT flags) to minimise system-load drift between the two halves. |
 
 All x86 scripts source `scripts/bench_lib.sh` for the ROS-distro detection,
 config templating (with grep-verified `sed` substitutions), validators, and
@@ -79,7 +79,7 @@ user-scoped `pkill`. Add new orchestrator scripts the same way.
 
 Example: targeted subscribe benchmark on a single sequence
 ```bash
-bash run_full_benchmark.sh -m subscribe -s V2_02_medium -r 5 --tag bench_v2
+bash scripts/run_full_benchmark.sh -m subscribe -s V2_02_medium -r 5 --tag bench_v2
 ```
 
 Results go to `~/results/timing/x86/{serial,subscribe}/<tag>/`. File naming:
@@ -159,6 +159,6 @@ Primary benchmark config: `euroc_mav`. Custom config: `barak_mav` (for live RPi5
 - RPi5-specific content lives in `docs/rpi5-*.md` only. Don't add RPi5
   sections to x86-scoped docs (`timing.md`, `benchmark-analysis.md`,
   `evaluation.md`).
-- When adding a new benchmark table, include the `run_full_benchmark.sh`
+- When adding a new benchmark table, include the `scripts/run_full_benchmark.sh`
   invocation (with flags) that produced it — this keeps the docs
   reproducible as the CLI evolves.

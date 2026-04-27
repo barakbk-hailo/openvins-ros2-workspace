@@ -69,14 +69,14 @@ ros2 launch ov_msckf serial.launch.py \
 
 The launcher blocks until the bag finishes processing, then exits.
 
-To record the estimate for accuracy evaluation, start `record_poses.py` in a
+To record the estimate for accuracy evaluation, start `scripts/record_poses.py` in a
 separate terminal **before** launching OpenVINS — see
 [evaluation.md](evaluation.md) §"Option A — Serial node" for the complete
 recorder-first flow.
 
 For per-frame timing CSVs, set `record_timing_information: true` in the
 `estimator_config.yaml` (or use the benchmark orchestrator
-`run_full_benchmark.sh` from the workspace root, which handles the temp-config
+`scripts/run_full_benchmark.sh` from the workspace root, which handles the temp-config
 dance automatically).
 
 ## 3. Subscribe mode (realtime)

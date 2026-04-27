@@ -184,7 +184,7 @@ V1_01_easy is also the sequence used for our accuracy benchmarks (see
 mono modes (6 runs total). Serial mode reads the bag directly — no `ros2 bag play`
 needed.
 
-**Script:** `run_full_benchmark.sh -m serial -c both -r 1 --tag <name>`
+**Script:** `scripts/run_full_benchmark.sh -m serial -c both -r 1 --tag <name>`
 Loops over sequences × {stereo, mono}, runs `ros2 launch ov_msckf serial.launch.py`
 with `max_cameras:=2 use_stereo:=true` (or `1`/`false` for mono), and copies the
 timing CSVs (wall + cpu + thread + feats + est) to the results directory. Skips
@@ -277,7 +277,7 @@ Frames processed: V1_01=2799, MH_03=2310, V2_02=2266
 **What we ran:** 5 config variants on V1_01_easy (stereo, serial mode) to find which
 knobs matter most when optimizing runtime.
 
-**Script:** `run_timing_sweep.sh`
+**Script:** `scripts/run_timing_sweep.sh`
 For each variant, copies `estimator_config.yaml` to a temp file in the **same
 directory** (important — the YAML uses `relative_config_imu` and
 `relative_config_imucam` which are resolved relative to the config file's path),
@@ -318,7 +318,7 @@ and **p99** is the per-frame 99th percentile of the total.
 > per-component deltas in each entry below are inherited from the older
 > `bench_5rep_3clock` sweep collection and are *directionally* correct but not
 > precisely re-derived against the v2 baseline. Re-collect with
-> `bash run_timing_sweep.sh --tag <new_tag>` if you need v2-precise per-stage
+> `bash scripts/run_timing_sweep.sh --tag <new_tag>` if you need v2-precise per-stage
 > numbers.
 
 1. **100 features** (-2.85 ms, **-26%** wall): Biggest single win. MSCKF update nearly
@@ -377,7 +377,7 @@ Going from 4 threads to 1 thread costs only +1ms (+9%). This means:
 This tests whether the system can keep up with realtime sensor data under ROS 2
 middleware overhead.
 
-**Script:** `run_timing_subscribe.sh [rate]`
+**Script:** `scripts/run_timing_subscribe.sh [rate]`
 Launches `ros2 launch ov_msckf subscribe.launch.py` in the background, waits 3
 seconds for the node to start, then runs `ros2 bag play <bag> --rate <rate>` which
 blocks until the bag finishes. After playback, waits 5 seconds for OpenVINS to drain
@@ -402,7 +402,7 @@ frames.
 | 5.0× | 2790 | 122 | 4.2% | 6.38 | ~10 real drops; total ms drops because the heavy init frames are excluded |
 | Serial (reference) | 2776 | 136 | 4.7% | 10.86 | strict ±20 ms stereo sync |
 
-*Source: `results/timing/x86/subscribe/rerun_2026_04_23/V1_01_easy_rate{1.0,2.0,5.0}.txt` (wall-clock; rate-suffixed files are written by `run_timing_subscribe.sh` without a `_wall` suffix — the `_cpu`/`_thread` siblings do carry the suffix); serial reference from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_wall.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`. Re-collected 2026-04-26. Reproduce: `bash run_timing_subscribe.sh 1.0 --tag rerun_2026_04_23` (and similarly for `2.0` and `5.0`).*
+*Source: `results/timing/x86/subscribe/rerun_2026_04_23/V1_01_easy_rate{1.0,2.0,5.0}.txt` (wall-clock; rate-suffixed files are written by `scripts/run_timing_subscribe.sh` without a `_wall` suffix — the `_cpu`/`_thread` siblings do carry the suffix); serial reference from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_wall.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`. Re-collected 2026-04-26. Reproduce: `bash scripts/run_timing_subscribe.sh 1.0 --tag rerun_2026_04_23` (and similarly for `2.0` and `5.0`).*
 
 The ~112-136 baseline "missing" frames at 1× and 2× are **NOT performance-related
 drops**. They come from:
@@ -514,7 +514,7 @@ resolution — `serial/rerun_2026_04_23/V1_01_easy_4thr_wall.txt`).
 | Reduce OpenCV threads | **+15%** (12.53 ms) | Modest cost on x86. Worse on RPi5 — see `rpi5-benchmarking.md`. |
 | Increase features to 300 | **+45%** (15.71 ms) | Diminishing returns. Avoid. |
 
-*Source: sweep variants from `results/timing/x86/serial/sweep/rerun_2026_04_23/{A_downsample,B_num_pts_100,C_num_pts_300,D_no_slam,E_opencv_1thread}.txt`; baseline from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_wall.txt`. Reproduce: `bash run_timing_sweep.sh --tag rerun_2026_04_23` (baseline is from the `run_full_benchmark.sh -m serial -s V1_01_easy --tag rerun_2026_04_23` row). The mono row is from `thread_rewrite/V1_01_easy_4thr_mono_thread.txt` — re-collect with `run_full_benchmark.sh -m serial -c mono -s V1_01_easy --tag <new_tag>` if precise v2 numbers are needed.*
+*Source: sweep variants from `results/timing/x86/serial/sweep/rerun_2026_04_23/{A_downsample,B_num_pts_100,C_num_pts_300,D_no_slam,E_opencv_1thread}.txt`; baseline from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_wall.txt`. Reproduce: `bash scripts/run_timing_sweep.sh --tag rerun_2026_04_23` (baseline is from the `scripts/run_full_benchmark.sh -m serial -s V1_01_easy --tag rerun_2026_04_23` row). The mono row is from `thread_rewrite/V1_01_easy_4thr_mono_thread.txt` — re-collect with `scripts/run_full_benchmark.sh -m serial -c mono -s V1_01_easy --tag <new_tag>` if precise v2 numbers are needed.*
 
 Recommended starting configs for RPi5 are listed in
 [rpi5-benchmarking.md](rpi5-benchmarking.md) — those were validated against
@@ -563,9 +563,9 @@ won't match.
 
 | Script | Phase | What it does |
 |--------|-------|-------------|
-| `run_full_benchmark.sh -m serial -c both -r 1 --tag <name>` | 1 | Runs serial mode on 3 sequences × {stereo, mono}. Pass `-s <csv>` to override the sequence list (e.g. all 10 EuRoC for paper repro). `--dry-run` prints the planned cells without executing. |
-| `run_timing_sweep.sh --tag <name>` | 2 | Runs 5 config variants on V1_01_easy (serial mode). |
-| `run_timing_subscribe.sh <rate> --tag <name>` | 3 | Subscribe mode + bag playback at given rate (1.0/2.0/5.0). |
+| `scripts/run_full_benchmark.sh -m serial -c both -r 1 --tag <name>` | 1 | Runs serial mode on 3 sequences × {stereo, mono}. Pass `-s <csv>` to override the sequence list (e.g. all 10 EuRoC for paper repro). `--dry-run` prints the planned cells without executing. |
+| `scripts/run_timing_sweep.sh --tag <name>` | 2 | Runs 5 config variants on V1_01_easy (serial mode). |
+| `scripts/run_timing_subscribe.sh <rate> --tag <name>` | 3 | Subscribe mode + bag playback at given rate (1.0/2.0/5.0). |
 
 ## Key source files
 

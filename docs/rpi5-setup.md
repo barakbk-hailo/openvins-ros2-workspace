@@ -93,8 +93,8 @@ echo $AMENT_PREFIX_PATH
 
 ### 1d. Run the container — non-interactive (benchmark scripts)
 
-The benchmark orchestrators (`run_pwt_benchmark_v2.sh`,
-`run_full_benchmark.sh`) invoke docker non-interactively. The call pattern
+The benchmark orchestrators (`scripts/run_pwt_benchmark_v2.sh`,
+`scripts/run_full_benchmark.sh`) invoke docker non-interactively. The call pattern
 they use, mirrored here for ad-hoc runs:
 
 ```bash
@@ -282,18 +282,18 @@ ros2 launch ov_msckf serial.launch.py \
 > `source /opt/ros_ws/install/setup.bash` when you open an interactive shell,
 > so the `source` line above is redundant for `docker run -it`. It's only
 > needed when you spawn a `bash -c '...'` non-interactively (where `.bashrc`
-> isn't sourced) — that's why the benchmark script `run_pwt_benchmark_v2.sh`
+> isn't sourced) — that's why the benchmark script `scripts/run_pwt_benchmark_v2.sh`
 > always sources it explicitly inside its `docker run ... bash -c '...'`
 > invocation.
 
-To reproduce the Phase 4 RPi5 timing numbers, use `run_pwt_benchmark_v2.sh`
+To reproduce the Phase 4 RPi5 timing numbers, use `scripts/run_pwt_benchmark_v2.sh`
 from the **host** (not from inside the container — the script itself spawns
 its own docker containers per rep):
 
 ```bash
 # On the RPi5 host shell, NOT inside docker:
 cd ~/workspace/catkin_ws_ov
-bash run_pwt_benchmark_v2.sh my_baseline openvins-humble 10 -e HOME=/tmp
+bash scripts/run_pwt_benchmark_v2.sh my_baseline openvins-humble 10 -e HOME=/tmp
 ```
 
 The first three positional args are `<results_subdir> <image_tag> <num_subscribe_reps>`;

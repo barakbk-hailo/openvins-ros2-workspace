@@ -7,8 +7,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=scripts/bench_lib.sh
-. "$SCRIPT_DIR/scripts/bench_lib.sh"
+# shellcheck source=bench_lib.sh
+. "$SCRIPT_DIR/bench_lib.sh"
 
 # ── Defaults ──
 RESULTS_BASE="$HOME/results/timing/x86"

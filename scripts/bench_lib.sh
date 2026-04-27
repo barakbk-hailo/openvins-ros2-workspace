@@ -1,5 +1,5 @@
 # Shared helpers for benchmark orchestrator scripts.
-# Source this from a script with `. "$(dirname "$0")/scripts/bench_lib.sh"`.
+# Source this from a sibling script with `. "$(dirname "$0")/bench_lib.sh"`.
 # Sourced (not executed); do not run directly.
 
 # ── Path constants (overridable via env) ──

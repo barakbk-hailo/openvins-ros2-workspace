@@ -31,10 +31,15 @@ bash install.sh
 catkin_ws_ov/
 ├── src/open_vins/              fork submodule (algorithm + nodes + launch files)
 ├── install.sh                  one-shot Ubuntu 22.04 / 24.04 setup (auto-detects)
-├── record_poses.py             subscribe-mode pose recorder (used by evaluation)
-├── run_full_benchmark.sh       flexible benchmark orchestrator (serial + subscribe)
-├── run_timing_subscribe.sh     Phase 3: subscribe at configurable bag-playback rates
-├── run_timing_sweep.sh         Phase 2: config sensitivity sweeps
+├── scripts/
+│   ├── bench_lib.sh            shared library (sourced by orchestrators)
+│   ├── run_full_benchmark.sh   flexible benchmark orchestrator (serial + subscribe)
+│   ├── run_timing_subscribe.sh Phase 3: subscribe at configurable bag-playback rates
+│   ├── run_timing_sweep.sh     Phase 2: config sensitivity sweeps
+│   ├── run_pwt_benchmark_v2.sh RPi5 / Docker — single PWT variant on V1_01_easy
+│   ├── run_pwt_final_ab.sh     RPi5 / Docker — sequential RT-flag A/B harness
+│   ├── record_poses.py         subscribe-mode pose recorder (used by evaluation)
+│   └── aggregate_pwt.py        post-hoc results aggregator (PWT investigation)
 ├── results/
 │   ├── stereo/  mono/          x86 EuRoC trajectory estimates (paper reproduction)
 │   ├── rpi5/stereo/            RPi5 EuRoC trajectory estimates
@@ -51,7 +56,7 @@ tag → (platform, submodule commit, config) lookup.
 ## Recent changes
 
 - **`slam_chi2_recovery` default `false`** (in `config/euroc_mav/estimator_config.yaml`). Leave at the default for offline serial replay and paper-repro reproducibility — the always-on chi2 relaxation interfered with stereo init on dark sequences (MH_05_difficult). Set to `true` for subscribe-mode deployment at >1× realtime under load (V1_03_difficult @ rate 2.0 shows ATE 3.7 m with `true` vs >50 m collapse with `false` in 2/3 runs). See [docs/determinism.md §4](docs/determinism.md#4-optional-safety-net-slam-recovery-mechanism).
-- **`--slam-chi2-recovery <true|false>`** CLI flag added to `run_full_benchmark.sh`, `run_timing_sweep.sh`, and `run_timing_subscribe.sh` for ad-hoc overrides without editing the YAML.
+- **`--slam-chi2-recovery <true|false>`** CLI flag added to `scripts/run_full_benchmark.sh`, `scripts/run_timing_sweep.sh`, and `scripts/run_timing_subscribe.sh` for ad-hoc overrides without editing the YAML.
 - **Serial-mode timing improved 8-15 %** — the persistent-worker thread is now properly gated on `use_multi_threading_subs`, so it's no longer spawned in serial mode. Also makes serial bit-deterministic across reps.
 - **Paper-reproduction estimates regenerated** under the consolidated `master-candidate` submodule (`results/{stereo,mono}/estimate_*.txt`); ATE values bit-reproduce the prior committed numbers for every sequence × mode.
 - **Latest benchmark tags:** `rerun_2026_04_23` (x86 main suite + paper repro + chi2 A/B) and `rerun_2026_04_26_pwt_*` + `rerun_2026_04_26_paper` (RPi5 PWT variants + cross-platform paper repro). Retired tags (`bench_5rep_3clock`, `bench_persistent_worker`, `pwt_*`) are removed from `results/` but preserved in git history.

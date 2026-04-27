@@ -34,7 +34,7 @@ message regardless of CPU speed, and is the recommended way to run benchmarks.
 ```bash
 . /etc/os-release && source /opt/ros/$([ "$UBUNTU_CODENAME" = "noble" ] && echo jazzy || echo humble)/setup.bash
 mkdir -p ~/results && cd ~/results
-python3 ~/workspace/catkin_ws_ov/record_poses.py
+python3 ~/workspace/catkin_ws_ov/scripts/record_poses.py
 ```
 
 **Terminal 2 — run OpenVINS** (reads the bag directly, no `ros2 bag play` needed):
@@ -62,7 +62,7 @@ serial's ATE characteristics with modest per-run variance on V1_01_easy.
 ```bash
 . /etc/os-release && source /opt/ros/$([ "$UBUNTU_CODENAME" = "noble" ] && echo jazzy || echo humble)/setup.bash
 mkdir -p ~/results && cd ~/results
-python3 ~/workspace/catkin_ws_ov/record_poses.py
+python3 ~/workspace/catkin_ws_ov/scripts/record_poses.py
 ```
 
 **Terminal 2 — launch OpenVINS:**
@@ -156,7 +156,7 @@ The trajectory estimates used to produce these tables are committed in
 **Reproduce the underlying runs:**
 
 ```bash
-bash run_full_benchmark.sh -m serial -c both -r 1 \
+bash scripts/run_full_benchmark.sh -m serial -c both -r 1 \
     -s V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium,MH_01_easy,MH_02_easy,MH_03_medium,MH_04_difficult,MH_05_difficult \
     --tag rerun_2026_04_23_paper
 ```
@@ -485,7 +485,7 @@ for mode in stereo mono; do
 
     # Start recorder in the background
     cd ~/results
-    python3 ~/workspace/catkin_ws_ov/record_poses.py &
+    python3 ~/workspace/catkin_ws_ov/scripts/record_poses.py &
     RECORD_PID=$!
     sleep 2
 
