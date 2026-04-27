@@ -13,7 +13,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/bench_lib.sh"
 
 # ── Defaults ──
-RESULTS_BASE="${RESULTS_BASE:-$(arch_results_base)}"
+# RESULTS_BASE is computed AFTER CLI parsing so --docker can shift the env
+# segment (native_humble → docker_humble) before arch_results_base reads it.
+# Honors both an explicit RESULTS_BASE env var and the --results-base flag.
+RESULTS_BASE="${RESULTS_BASE:-}"
 BAG_PLAY_DELAY=5  # seconds the script waits after `ros2 bag play` to flush queued msgs
 
 MODE="both"
@@ -52,9 +55,13 @@ Options:
                                        runs the matrix three times.
       --tag <name>                     default: bench_YYYYMMDD_HHMMSS
                                        routes output under
-                                       <results-base>/{serial,subscribe}/<tag>/
-      --results-base <dir>             default: $HOME/results/timing/<arch>
-                                       (x86_64→x86, aarch64→rpi5; auto-detected)
+                                       <results-base>/<tag>/{serial,subscribe}/
+      --results-base <dir>             default: $HOME/results/<arch>/<env>
+                                       arch ∈ {x86 (x86_64), rpi5 (aarch64)}
+                                       env  = native_<distro>, or docker_<distro>
+                                              when --docker is used (auto from
+                                              the image tag). Override with
+                                              BENCH_ENV=... to force a name.
       --slam-chi2-recovery <true|false>  override slam_chi2_recovery in the temp config
                                        (default: leave config's value alone)
       --docker <image>                 run the OpenVINS launches inside this Docker
@@ -139,6 +146,20 @@ while [[ $# -gt 0 ]]; do
       exit 2 ;;
   esac
 done
+
+# ── Resolve RESULTS_BASE (post-CLI so --docker can shift env, and --results-base
+#    can bypass arch_results_base entirely) ──
+if [ -z "$RESULTS_BASE" ]; then
+  if [ -n "$DOCKER_IMAGE" ]; then
+    case "$DOCKER_IMAGE" in
+      *humble*) BENCH_ENV="${BENCH_ENV:-docker_humble}" ;;
+      *jazzy*)  BENCH_ENV="${BENCH_ENV:-docker_jazzy}" ;;
+      *)        BENCH_ENV="${BENCH_ENV:-docker_unknown}" ;;
+    esac
+    export BENCH_ENV
+  fi
+  RESULTS_BASE="$(arch_results_base)"
+fi
 
 # ── Validate ──
 case "$MODE" in serial|subscribe|both) ;; *) echo "ERROR: --mode must be serial|subscribe|both (got: $MODE)" >&2; exit 2 ;; esac
@@ -264,7 +285,9 @@ print(f'{sum(v)/len(v):.1f}') if v else print('?')
 
 echo "================================================================"
 echo "  OpenVINS Benchmark"
-echo "  Arch:      $(uname -m)  →  RESULTS_BASE=$RESULTS_BASE"
+echo "  Arch:      $(uname -m)  →  $(case "$(uname -m)" in x86_64) echo x86;; aarch64) echo rpi5;; *) uname -m;; esac)"
+echo "  Env:       ${BENCH_ENV:-native_$(detect_ros_distro)}"
+echo "  Results:   $RESULTS_BASE/$BENCH_TAG/{serial,subscribe}/"
 echo "  Mode:      $MODE"
 echo "  Sequences: ${SEQUENCES[*]}"
 echo "  Threads:   ${THREADS[*]}"
@@ -292,7 +315,7 @@ if [[ "$MODE" == "serial" || "$MODE" == "both" ]]; then
     for thr in "${THREADS[@]}"; do
       for cam_spec in "${CAM_CONFIGS[@]}"; do
         IFS=':' read -r CAM_NAME CAM_N CAM_STEREO <<< "$cam_spec"
-        DIR="$RESULTS_BASE/serial/$BENCH_TAG"
+        DIR="$RESULTS_BASE/$BENCH_TAG/serial"
         TAG="$(tag_for "$seq" "$thr" "$CAM_NAME")"
         if run_complete "$DIR" "$TAG"; then
           echo "SKIP serial $seq ${thr}-thr $CAM_NAME (already complete)"
@@ -359,7 +382,7 @@ if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
           rate_suffix="_rate${rate}"
         fi
         for i in $(seq 1 "$SUBSCRIBE_REPS"); do
-          DIR="$RESULTS_BASE/subscribe/$BENCH_TAG"
+          DIR="$RESULTS_BASE/$BENCH_TAG/subscribe"
           TAG="${seq}_${thr}thr${rate_suffix}_run${i}"
           if run_complete "$DIR" "$TAG"; then
             echo "SKIP subscribe $seq ${thr}-thr rate=$rate run $i (already complete)"
@@ -480,10 +503,10 @@ first_complete_rep() {
 # Print where output files for this run landed. Indented for nesting in summary.
 print_save_locations() {
   if [[ "$MODE" == "serial" || "$MODE" == "both" ]]; then
-    echo "  Serial:    $RESULTS_BASE/serial/$BENCH_TAG/"
+    echo "  Serial:    $RESULTS_BASE/$BENCH_TAG/serial/"
   fi
   if [[ ( "$MODE" == "subscribe" || "$MODE" == "both" ) && "$CAMERAS" != "mono" ]]; then
-    echo "  Subscribe: $RESULTS_BASE/subscribe/$BENCH_TAG/"
+    echo "  Subscribe: $RESULTS_BASE/$BENCH_TAG/subscribe/"
   fi
 }
 
@@ -505,7 +528,7 @@ if [[ "$MODE" == "serial" || "$MODE" == "both" ]]; then
       for cam_spec in "${CAM_CONFIGS[@]}"; do
         IFS=':' read -r CAM_NAME _ _ <<< "$cam_spec"
         TAG="$(tag_for "$seq" "$thr" "$CAM_NAME")"
-        DIR="$RESULTS_BASE/serial/$BENCH_TAG"
+        DIR="$RESULTS_BASE/$BENCH_TAG/serial"
         FS_WALL=$(frame_stats "$DIR/${TAG}_wall.txt")
         [ -z "$FS_WALL" ] && continue
         FS_CPU=$(frame_stats  "$DIR/${TAG}_cpu.txt")
@@ -527,7 +550,7 @@ if [[ ( "$MODE" == "subscribe" || "$MODE" == "both" ) && "$CAMERAS" != "mono" ]]
   echo "--- Subscribe timing — frame-level total (ms; rep marked per row) ---"
   printf "  %-14s %-3s %-5s %5s %22s %22s %22s\n" "sequence" "thr" "rate" "rep" \
     "wall (mean±std, p99)" "cpu (mean±std, p99)" "thread (mean±std, p99)"
-  DIR="$RESULTS_BASE/subscribe/$BENCH_TAG"
+  DIR="$RESULTS_BASE/$BENCH_TAG/subscribe"
   for seq in "${SEQUENCES[@]}"; do
     for thr in "${THREADS[@]}"; do
       for rate in "${RATES[@]}"; do
@@ -590,7 +613,7 @@ for seq in "${SEQUENCES[@]}"; do
       for cam_spec in "${CAM_CONFIGS[@]}"; do
         IFS=':' read -r CAM_NAME _ _ <<< "$cam_spec"
         TAG="$(tag_for "$seq" "$thr" "$CAM_NAME")"
-        SLAM=$(get_slam_avg "$RESULTS_BASE/serial/$BENCH_TAG/${TAG}_feats.txt")
+        SLAM=$(get_slam_avg "$RESULTS_BASE/$BENCH_TAG/serial/${TAG}_feats.txt")
         if [ "$SLAM" = "?" ]; then continue; fi
         printf "  %-14s %-14s %-3s %-5s %14s\n" "$seq" "serial/$CAM_NAME" "$thr" "—" "$SLAM"
       done
@@ -602,7 +625,7 @@ for seq in "${SEQUENCES[@]}"; do
         if [ "$rate" = "1.0" ]; then rate_suffix=""; else rate_suffix="_rate${rate}"; fi
         VALS=""
         for i in $(seq 1 "$SUBSCRIBE_REPS"); do
-          S=$(get_slam_avg "$RESULTS_BASE/subscribe/$BENCH_TAG/${seq}_${thr}thr${rate_suffix}_run${i}_feats.txt")
+          S=$(get_slam_avg "$RESULTS_BASE/$BENCH_TAG/subscribe/${seq}_${thr}thr${rate_suffix}_run${i}_feats.txt")
           [ "$S" = "?" ] && continue
           VALS+=" $S"
         done
@@ -626,7 +649,7 @@ for seq in "${SEQUENCES[@]}"; do
       for cam_spec in "${CAM_CONFIGS[@]}"; do
         IFS=':' read -r CAM_NAME _ _ <<< "$cam_spec"
         TAG="$(tag_for "$seq" "$thr" "$CAM_NAME")"
-        F="$RESULTS_BASE/serial/$BENCH_TAG/${TAG}_est.txt"
+        F="$RESULTS_BASE/$BENCH_TAG/serial/${TAG}_est.txt"
         [ -f "$F" ] || continue
         ATE=$(QT_QPA_PLATFORM=offscreen timeout 30 ros2 run ov_eval error_singlerun posyaw "$GT" "$F" 2>/dev/null | grep "rmse_.*pos" | head -1 | grep -oP 'rmse_pos = \K[0-9.]+' || true)
         printf "  %-14s %-14s %-3s %-5s %14s\n" "$seq" "serial/$CAM_NAME" "$thr" "—" "${ATE:-FAIL}"
@@ -639,7 +662,7 @@ for seq in "${SEQUENCES[@]}"; do
         if [ "$rate" = "1.0" ]; then rate_suffix=""; else rate_suffix="_rate${rate}"; fi
         VALS=""
         for i in $(seq 1 "$SUBSCRIBE_REPS"); do
-          F="$RESULTS_BASE/subscribe/$BENCH_TAG/${seq}_${thr}thr${rate_suffix}_run${i}_est.txt"
+          F="$RESULTS_BASE/$BENCH_TAG/subscribe/${seq}_${thr}thr${rate_suffix}_run${i}_est.txt"
           [ -f "$F" ] || continue
           ATE=$(QT_QPA_PLATFORM=offscreen timeout 30 ros2 run ov_eval error_singlerun posyaw "$GT" "$F" 2>/dev/null | grep "rmse_.*pos" | head -1 | grep -oP 'rmse_pos = \K[0-9.]+' || true)
           [ -n "$ATE" ] && VALS+=" $ATE"
@@ -661,10 +684,10 @@ print_save_locations
 echo ""
 echo "Detailed analysis (per-component breakdown + ATE + RPE per segment):"
 if [[ "$MODE" == "serial" || "$MODE" == "both" ]]; then
-  echo "  python3 $WS_DIR/scripts/parse_results.py $RESULTS_BASE/serial/$BENCH_TAG --detailed"
+  echo "  python3 $WS_DIR/scripts/parse_results.py $RESULTS_BASE/$BENCH_TAG/serial --detailed"
 fi
 if [[ ( "$MODE" == "subscribe" || "$MODE" == "both" ) && "$CAMERAS" != "mono" ]]; then
-  echo "  python3 $WS_DIR/scripts/parse_results.py $RESULTS_BASE/subscribe/$BENCH_TAG --detailed"
+  echo "  python3 $WS_DIR/scripts/parse_results.py $RESULTS_BASE/$BENCH_TAG/subscribe --detailed"
 fi
 echo "  (parse_results.py auto-sources ROS — no need to source first.)"
 echo ""

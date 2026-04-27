@@ -18,11 +18,12 @@ Phase 2: Config sensitivity sweeps on V1_01_easy (serial mode, stereo).
 Tests which config knobs matter most for RPi5 optimization.
 
 Usage:
-  bash run_timing_sweep.sh [--tag <name>] [--slam-chi2-recovery true|false]
+  bash run_timing_sweep.sh --tag <name> [--slam-chi2-recovery true|false]
 
 Options:
-  --tag <name>         output goes to $HOME/results/timing/<arch>/serial/sweep/<tag>/
-                       (<arch> = x86 on x86_64, rpi5 on aarch64; auto-detected)
+  --tag <name>         REQUIRED. Output goes to
+                       $HOME/results/<arch>/<env>/<tag>/serial/
+                       (arch ∈ {x86, rpi5}; env defaults to native_<distro>).
   --slam-chi2-recovery <true|false>
                        override slam_chi2_recovery in each variant's temp config
   -h, --help           show this help and exit
@@ -34,10 +35,10 @@ Variants:
   D_no_slam           — MSCKF-only (max_slam=0)
   E_opencv_1thread    — single-threaded OpenCV (RPi5 thermal proxy)
 
-Compare against the baseline:
+Compare against a baseline tag (e.g. rerun_2026_04_27_main):
   ros2 run ov_eval timing_comparison \
-      ~/results/timing/<arch>/serial/stereo/V1_01_easy.txt \
-      ~/results/timing/<arch>/serial/sweep/<tag>/*.txt
+      $HOME/results/<arch>/<env>/<baseline_tag>/serial/V1_01_easy_4thr_wall.txt \
+      $HOME/results/<arch>/<env>/<sweep_tag>/serial/*.txt
 EOF
 }
 
@@ -55,12 +56,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 validate_chi2_recovery "$SLAM_CHI2_RECOVERY" || exit 2
+validate_nonempty "--tag" "$TAG" || exit 2
 require_dir "datasets" "$DATASETS_DIR" || exit 1
 
 SEQ="V1_01_easy"
 require_bag "$SEQ" || exit 1
 
-RESULTS_DIR="${RESULTS_BASE:-$(arch_results_base)}/serial/sweep${TAG:+/$TAG}"
+RESULTS_DIR="${RESULTS_BASE:-$(arch_results_base)}/$TAG/serial"
 TMP_CONFIG="$CONFIG_DIR/estimator_config_sweep.yaml"
 
 cleanup() {
@@ -151,5 +153,5 @@ echo ""
 echo "======== Done ========"
 echo "Results in: $RESULTS_DIR"
 echo ""
-echo "Compare all variants:"
-echo "  ros2 run ov_eval timing_comparison ~/results/timing/x86/serial/stereo/V1_01_easy.txt $RESULTS_DIR/*.txt"
+echo "Compare all variants against a baseline tag's V1_01_easy 4thr stereo run:"
+echo "  ros2 run ov_eval timing_comparison <baseline_tag>/serial/V1_01_easy_4thr_wall.txt $RESULTS_DIR/*.txt"

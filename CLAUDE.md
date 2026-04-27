@@ -86,9 +86,14 @@ Timing files are CSV: `timestamp,tracking,propagation,msckf_update,slam_update,s
 ## Benchmarking Scripts
 
 All scripts run from the workspace root and are cross-platform — `RESULTS_BASE`
-auto-detects from `uname -m` (`x86_64` → `results/timing/x86`, `aarch64` →
-`results/timing/rpi5`). Native vs. Docker is orthogonal to arch and is selected
-via `--docker <image>` / `--docker-flags '<args>'` on `run_full_benchmark.sh`.
+auto-detects from `uname -m` and the runtime environment:
+`results/<arch>/<env>/` where `<arch>` ∈ {`x86` (x86_64), `rpi5` (aarch64)} and
+`<env>` defaults to `native_<distro>` (distro from `/etc/os-release`, e.g.
+`native_humble` on Jammy / `native_jazzy` on Noble). Passing `--docker <image>`
+flips the env to `docker_<distro>` automatically. Override with
+`BENCH_ENV=<name>` to force a custom segment, or `--results-base <dir>` to
+bypass entirely. Native vs. Docker is orthogonal to arch and is selected via
+`--docker <image>` / `--docker-flags '<args>'` on `run_full_benchmark.sh`.
 
 | Script | Purpose |
 |--------|---------|
@@ -112,12 +117,14 @@ Example: targeted subscribe benchmark on a single sequence
 bash scripts/run_full_benchmark.sh -m subscribe -s V2_02_medium -r 5 --tag bench_v2
 ```
 
-Results go to `~/results/timing/x86/{serial,subscribe}/<tag>/`. File naming:
+Results go to `~/results/<arch>/<env>/<tag>/{serial,subscribe}/` (tag-before-mode
+— a single experimental session lands under one tag dir with both serial/ and
+subscribe/ subdirs when both modes ran). File naming inside each mode subdir:
 `{SEQUENCE}_{THREADS}thr[_rate<R>]_run{N}_{wall|cpu|thread|feats|est}.txt`
 (subscribe — the `_rate<R>` segment is inserted only when rate ≠ 1.0, so
 existing rate=1.0 citations stay valid),
 `{SEQUENCE}_{THREADS}thr_{wall|cpu|thread|feats|est}.txt` (serial). Mono runs
-append `_mono` to the tag.
+append `_mono` to the filename (after the `thr` token).
 
 ## Formatting
 
@@ -187,7 +194,7 @@ Primary benchmark config: `euroc_mav`. Custom config: `barak_mav` (for live RPi5
   See [README.md](README.md) for the full index and [docs/running.md](docs/running.md) as the entry point.
 - Every results/data table carries a `*Source: ...*` citation line pointing
   at the CSV(s) under `results/` that produced it.
-  Example: `*Source: results/timing/x86/serial/stereo/V1_01_easy.txt*`
+  Example: `*Source: results/x86/native_humble/rerun_2026_04_27_main/serial/V1_01_easy_4thr_wall.txt*`
 - RPi5-specific content lives in `docs/rpi5-*.md` only. Don't add RPi5
   sections to x86-scoped docs (`timing.md`, `benchmark-analysis.md`,
   `evaluation.md`).

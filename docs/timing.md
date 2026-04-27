@@ -170,9 +170,9 @@ We chose 3 EuRoC MAV sequences to cover a range of conditions:
 V1_01_easy is also the sequence used for our accuracy benchmarks (see
 [evaluation](evaluation.md)), so timing and accuracy results are directly comparable.
 
-> **Provenance:** all tables below cite tags under `results/timing/x86/` —
+> **Provenance:** all tables below cite tags under `results/x86/native_humble/` —
 > see [data-provenance.md](data-provenance.md) for the canonical
-> (platform, submodule commit, config) lookup. The `rerun_2026_04_23` tag is
+> (platform, submodule commit, config) lookup. The `rerun_2026_04_27_main` tag is
 > x86 on Dell Latitude 5420 (i7-1185G7, Ubuntu 22.04), submodule
 > `master-candidate` (`2a50450`), `slam_chi2_recovery: false`.
 
@@ -210,11 +210,11 @@ agree within ~0.1 ms so the two are equivalent here. Format below is
 | re-tri & marg | 1.5 ± 0.1 (p99: 1.9) | 1.5 ± 0.1 (p99: 1.9) | 1.5 ± 0.1 (p99: 1.9) |
 | **total** | **10.86** | **10.11** | **9.95** |
 
-*Source: `results/timing/x86/serial/rerun_2026_04_23/{V1_01_easy,MH_03_medium,V2_02_medium}_4thr_thread.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`. Re-collected 2026-04-26.*
+*Source: `results/x86/native_humble/rerun_2026_04_27_main/serial/{V1_01_easy,MH_03_medium,V2_02_medium}_4thr_thread.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`. Re-collected 2026-04-26.*
 
 > **Note:** the per-component cells above are inherited from the older
 > `bench_5rep_3clock` collection and remain directionally correct — the
-> total bolded row is recomputed from the v2 `rerun_2026_04_23` data
+> total bolded row is recomputed from the v2 `rerun_2026_04_27_main` data
 > (`thread`-clock mean ms across all frames). New totals are 5-15 % faster
 > than the prior totals due to `68eee80`'s persistent-worker-thread gating
 > fix, which removed a spurious worker thread previously created in serial
@@ -238,7 +238,7 @@ stereo sync misses where no matching pair was found within ±20 ms).
 | re-tri & marg | 1.1 ± 0.2 (p99: 1.8) | 1.0 ± 0.1 (p99: 1.6) | 1.0 ± 0.1 (p99: 1.6) |
 | **total** | **7.73** | **7.39** | **6.89** |
 
-*Source: `results/timing/x86/serial/rerun_2026_04_23/{V1_01_easy,MH_03_medium,V2_02_medium}_4thr_mono_thread.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`. Same caveat as the stereo table — per-component cells are from the older `bench_5rep_3clock` directionally; bolded total is from the v2 CSVs.*
+*Source: `results/x86/native_humble/rerun_2026_04_27_main/serial/{V1_01_easy,MH_03_medium,V2_02_medium}_4thr_mono_thread.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`. Same caveat as the stereo table — per-component cells are from the older `bench_5rep_3clock` directionally; bolded total is from the v2 CSVs.*
 
 Frames processed: V1_01=2799, MH_03=2310, V2_02=2266
 
@@ -308,7 +308,7 @@ and **p99** is the per-frame 99th percentile of the total.
 | **D: No SLAM** | 8.11 | 13.29 | 8.06 | 2776 |
 | **E: 1 OpenCV thread** | 12.53 | 12.54 | 12.53 | 2776 |
 
-*Source: `results/timing/x86/serial/sweep/rerun_2026_04_23/{A_downsample,B_num_pts_100,C_num_pts_300,D_no_slam,E_opencv_1thread}{,_cpu,_thread}.txt`; baseline row from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_{wall,cpu,thread}.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`. Re-collected 2026-04-26.*
+*Source: `results/x86/native_humble/rerun_2026_04_27_sweep/serial/{A_downsample,B_num_pts_100,C_num_pts_300,D_no_slam,E_opencv_1thread}{,_cpu,_thread}.txt`; baseline row from `results/x86/native_humble/rerun_2026_04_27_main/serial/V1_01_easy_4thr_{wall,cpu,thread}.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`. Re-collected 2026-04-26.*
 
 > **Note:** the v2 sweep table above shows total mean per clock — Wall (`boost::posix_time`), Process CPU (`CLOCK_PROCESS_CPUTIME_ID`, ~CPU/Wall ratio = parallelism factor), Thread CPU (`CLOCK_THREAD_CPUTIME_ID`, VIO thread alone). Per-component breakdowns from the older `bench_5rep_3clock` sweep collection are preserved in the prior structure of this section above; the v2 totals here supersede the prior totals. The downsample variant is now slower than baseline because the master-candidate build's `68eee80` PWT-gating fix sped up baseline more than downsample (downsample was already fast and saturated by other components).
 
@@ -402,7 +402,7 @@ frames.
 | 5.0× | 2790 | 122 | 4.2% | 6.38 | ~10 real drops; total ms drops because the heavy init frames are excluded |
 | Serial (reference) | 2776 | 136 | 4.7% | 10.86 | strict ±20 ms stereo sync |
 
-*Source: `results/timing/x86/subscribe/rerun_2026_04_23/V1_01_easy_rate{1.0,2.0,5.0}.txt` (data was collected with the now-deleted `run_timing_subscribe.sh`, which wrote the wall CSV without a `_wall` suffix; under the consolidated `run_full_benchmark.sh --rate` flow the layout is uniform: `V1_01_easy_4thr_run1_wall.txt` for rate=1.0, `V1_01_easy_4thr_rate{2.0,5.0}_run1_wall.txt` for the others). Serial reference from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_wall.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`. Re-collected 2026-04-26. Reproduce in a single invocation: `bash scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy --rate 1.0,2.0,5.0 --tag rerun_2026_04_23`.*
+*Source: `results/x86/native_humble/rerun_2026_04_27_main/subscribe/V1_01_easy_rate{1.0,2.0,5.0}.txt` (data was collected with the now-deleted `run_timing_subscribe.sh`, which wrote the wall CSV without a `_wall` suffix; under the consolidated `run_full_benchmark.sh --rate` flow the layout is uniform: `V1_01_easy_4thr_run1_wall.txt` for rate=1.0, `V1_01_easy_4thr_rate{2.0,5.0}_run1_wall.txt` for the others). Serial reference from `results/x86/native_humble/rerun_2026_04_27_main/serial/V1_01_easy_4thr_wall.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`. Re-collected 2026-04-26. Reproduce in a single invocation: `bash scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy --rate 1.0,2.0,5.0 --tag rerun_2026_04_27_main`.*
 
 The ~112-136 baseline "missing" frames at 1× and 2× are **NOT performance-related
 drops**. They come from:
@@ -432,7 +432,7 @@ and **p99** is the per-frame 99th percentile of the total.
 | **total (mean ± std)** | **11.3 ± 3.4** | **12.0 ± 3.9** | **12.9 ± 4.4** | **8.0 ± 3.8** |
 | **total p99** | **22.7** | **25.7** | **28.0** | **23.1** |
 
-*Source: `results/timing/x86/subscribe/thread_rewrite/V1_01_easy_rate{1.0,2.0,5.0}_thread.txt`; serial column from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_thread.txt`*
+*Source: `results/x86/native_humble/subscribe/thread_rewrite/V1_01_easy_rate{1.0,2.0,5.0}_thread.txt`; serial column from `results/x86/native_humble/rerun_2026_04_27_main/serial/V1_01_easy_4thr_thread.txt`*
 
 ### Phase 3 findings
 
@@ -503,7 +503,7 @@ Total: 11.3ms per frame
 ### What helps most (stereo, V1_01_easy)
 
 Wall-time savings vs. the v2 baseline (10.86 ms wall, 4 threads, 200 pts, full
-resolution — `serial/rerun_2026_04_23/V1_01_easy_4thr_wall.txt`).
+resolution — `rerun_2026_04_27_main/serial/V1_01_easy_4thr_wall.txt`).
 
 | Optimization | Savings (wall) | Notes |
 |-------------|---------------|-------|
@@ -514,7 +514,7 @@ resolution — `serial/rerun_2026_04_23/V1_01_easy_4thr_wall.txt`).
 | Reduce OpenCV threads | **+15%** (12.53 ms) | Modest cost on x86. Worse on RPi5 — see `rpi5-benchmarking.md`. |
 | Increase features to 300 | **+45%** (15.71 ms) | Diminishing returns. Avoid. |
 
-*Source: sweep variants from `results/timing/x86/serial/sweep/rerun_2026_04_23/{A_downsample,B_num_pts_100,C_num_pts_300,D_no_slam,E_opencv_1thread}.txt`; baseline from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_wall.txt`. Reproduce: `bash scripts/run_timing_sweep.sh --tag rerun_2026_04_23` (baseline is from the `scripts/run_full_benchmark.sh -m serial -s V1_01_easy --tag rerun_2026_04_23` row). The mono row is from `thread_rewrite/V1_01_easy_4thr_mono_thread.txt` — re-collect with `scripts/run_full_benchmark.sh -m serial -c mono -s V1_01_easy --tag <new_tag>` if precise v2 numbers are needed.*
+*Source: sweep variants from `results/x86/native_humble/rerun_2026_04_27_sweep/serial/{A_downsample,B_num_pts_100,C_num_pts_300,D_no_slam,E_opencv_1thread}.txt`; baseline from `results/x86/native_humble/rerun_2026_04_27_main/serial/V1_01_easy_4thr_wall.txt`. Reproduce: `bash scripts/run_timing_sweep.sh --tag rerun_2026_04_27_main` (baseline is from the `scripts/run_full_benchmark.sh -m serial -s V1_01_easy --tag rerun_2026_04_27_main` row). The mono row is from `thread_rewrite/V1_01_easy_4thr_mono_thread.txt` — re-collect with `scripts/run_full_benchmark.sh -m serial -c mono -s V1_01_easy --tag <new_tag>` if precise v2 numbers are needed.*
 
 Recommended starting configs for RPi5 are listed in
 [rpi5-benchmarking.md](rpi5-benchmarking.md) — those were validated against
@@ -524,27 +524,30 @@ actual measurements.
 
 ## Raw timing data (x86)
 
-All x86 CSV timing files are committed under `results/timing/x86/`. The
+All x86 CSV timing files are committed under `results/x86/native_humble/`. The
 authoritative index of which directory was produced by which command (with
 hardware, code SHA, and chi2_recovery state) is
 [data-provenance.md](data-provenance.md). At a glance, the active layout is:
 
 ```
-results/timing/x86/
-├── serial/
-│   ├── rerun_2026_04_23/         — main 3-clock suite (stereo + mono × {4,1}thr)
-│   ├── rerun_2026_04_23_paper/   — 10-EuRoC paper Table II/III repro (stereo + mono)
-│   └── sweep/rerun_2026_04_23/   — 5 sensitivity variants (A_*, B_*, …)
-└── subscribe/
-    ├── rerun_2026_04_23/                      — main 5-rep × 3-seq × {4,1}thr suite
-    ├── rerun_2026_04_23/V1_01_easy_rate*.txt  — bag-rate sweep (1.0/2.0/5.0×)
-    └── rerun_2026_04_23_rate2_recovery_{on,off}/ — chi2_recovery A/B (V1_03 @ 2×)
+results/x86/native_humble/
+├── rerun_2026_04_27_main/                     — main 3-clock suite (3 seq × {4,1}thr × stereo+mono; serial 1 rep + subscribe 5 reps)
+│   ├── serial/
+│   └── subscribe/
+├── rerun_2026_04_27_paper/serial/             — 10-EuRoC paper Table II/III repro (recovery=false, default)
+├── rerun_2026_04_27_paper_recovery_on/serial/ — same 10×2 with --slam-chi2-recovery true (chi2 A/B reference)
+├── rerun_2026_04_27_sweep/serial/             — 5 config-sensitivity variants on V1_01_easy stereo
+├── rerun_2026_04_27_v103/serial/              — V1_03_difficult stereo+mono (1 rep, fills the timing-table V1_03 row)
+├── rerun_2026_04_27_rate_sweep/subscribe/     — V1_01_easy at rates 1.0/2.0/5.0 × {4,1}thr × 5 reps
+├── rerun_2026_04_27_chi2_rate1_{on,off}/subscribe/  — V1_03_difficult @ rate 1.0, chi2 A/B, 3 reps
+└── rerun_2026_04_27_chi2_rate2_{on,off}/subscribe/  — V1_03_difficult @ rate 2.0, chi2 A/B, 3 reps (overload case)
 ```
 
-(Legacy `serial/{stereo,mono}/...` and `subscribe/V1_01_easy_rate*.txt` paths
-were promoted from the 2026-04-23 paper repro into `results/{stereo,mono}/`
-and the rate sweep tag respectively. See `data-provenance.md` "Retired tags"
-for what was deleted and where the equivalent data now lives.)
+The pre-PWT and pre-orchestrator data (legacy `timing/x86/serial/{stereo,mono}/`,
+`subscribe/thread_rewrite/V1_01_easy_rate*`, etc.) is preserved under
+`results/_archive/2026_04_27/` for reference, with the move manifest at
+`results/MIGRATION_2026_04_27.log`. See `data-provenance.md` for the canonical
+tag → (platform, submodule SHA, config) lookup.
 
 RPi5 CSVs live under `results/rpi5/` — see
 [rpi5-benchmarking.md](rpi5-benchmarking.md) §"Raw timing data".

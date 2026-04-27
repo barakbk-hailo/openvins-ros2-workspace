@@ -38,9 +38,8 @@ catkin_ws_ov/
 │   ├── record_poses.py         subscribe-mode pose recorder (manual evaluation)
 │   └── parse_results.py        post-hoc results aggregator (cross-run timing/SLAM/ATE stats)
 ├── results/
-│   ├── stereo/  mono/          x86 EuRoC trajectory estimates (paper reproduction)
-│   ├── rpi5/stereo/            RPi5 EuRoC trajectory estimates
-│   └── timing/{x86,rpi5}/      per-frame timing CSVs (serial + subscribe)
+│   ├── x86/<env>/<tag>/{serial,subscribe}/   3-clock CSVs + EST trajectories (env = native_humble | docker_humble)
+│   └── rpi5/<env>/<tag>/{serial,subscribe}/  same layout for RPi5 (mostly docker_humble)
 └── docs/                       (see index below)
 ```
 
@@ -56,10 +55,10 @@ tag → (platform, submodule commit, config) lookup.
 - **`--slam-chi2-recovery <true|false>`** CLI flag on `scripts/run_full_benchmark.sh` and `scripts/run_timing_sweep.sh` for ad-hoc overrides without editing the YAML.
 - **`--rate <csv>` sweep dimension** on `scripts/run_full_benchmark.sh` — single invocation runs the matrix once per rate (e.g. `--rate 1.0,2.0,5.0` for Phase-3 rate-feasibility). Replaces the dedicated `run_timing_subscribe.sh` script (deleted).
 - **`--docker <image>` / `--docker-flags '<args>'`** on `scripts/run_full_benchmark.sh` — runs the OpenVINS launches inside a Docker container instead of natively. Same orchestrator handles RPi5+Docker (where the PWT investigation lives) and any future x86+Docker workflows. Replaces the dedicated `run_pwt_benchmark_v2.sh` and `run_pwt_final_ab.sh` scripts (deleted). RT-flag comparison is reproduced via two invocations differing only in `--docker-flags` — the exact flags are documented in `docs/rpi5-benchmarking.md`.
-- **Cross-platform `RESULTS_BASE`** — auto-detected from `uname -m` (`x86_64` → `results/timing/x86`, `aarch64` → `results/timing/rpi5`). Override via `--results-base` or the `RESULTS_BASE` env var.
+- **Cross-platform `RESULTS_BASE`** — auto-detected as `results/<arch>/<env>/` where `<arch>` ∈ {`x86`, `rpi5`} (from `uname -m`) and `<env>` defaults to `native_<distro>` (e.g. `native_humble`). `--docker <image>` flips env to `docker_<distro>`; override via `BENCH_ENV=...` or `--results-base`.
 - **Serial-mode timing improved 8-15 %** — the persistent-worker thread is now properly gated on `use_multi_threading_subs`, so it's no longer spawned in serial mode. Also makes serial bit-deterministic across reps.
-- **Paper-reproduction estimates regenerated** under the consolidated `master-candidate` submodule (`results/{stereo,mono}/estimate_*.txt`); ATE values bit-reproduce the prior committed numbers for every sequence × mode.
-- **Latest benchmark tags:** `rerun_2026_04_23` (x86 main suite + paper repro + chi2 A/B) and `rerun_2026_04_26_pwt_*` + `rerun_2026_04_26_paper` (RPi5 PWT variants + cross-platform paper repro). Retired tags (`bench_5rep_3clock`, `bench_persistent_worker`, `pwt_*`) are removed from `results/` but preserved in git history.
+- **Paper-reproduction estimates regenerated** under the consolidated `master-candidate` submodule (`results/x86/native_humble/rerun_2026_04_27_paper/serial/*_est.txt`); ATE values bit-reproduce the prior committed numbers for every sequence × mode.
+- **Latest benchmark tags:** `rerun_2026_04_27_*` (x86 main suite, paper repro, chi2 A/B, sweep, rate-feasibility — re-collected against the post-PWT submodule with the new tag-before-mode layout) and `rerun_2026_04_26_pwt_*` + `rerun_2026_04_26_paper` (RPi5 PWT variants + cross-platform paper repro). Pre-PWT tags are archived under `results/_archive/`.
 
 ## Documentation
 

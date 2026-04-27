@@ -34,7 +34,7 @@ measurements using two factors:
 | MH_03_medium | 10.4 ms | ~36 ms | ~67 ms | 50 ms @20 Hz |
 | V2_02_medium | 10.1 ms | ~35 ms | ~65 ms | 50 ms @20 Hz |
 
-*Source: x86 serial wall from `results/timing/x86/serial/rerun_2026_04_23/{V1_01_easy,MH_03_medium,V2_02_medium}_4thr_wall.txt`; RPi5 columns are projections (×3.5, ×1.85), not measurements.*
+*Source: x86 serial wall from `results/x86/native_humble/rerun_2026_04_27_main/serial/{V1_01_easy,MH_03_medium,V2_02_medium}_4thr_wall.txt`; RPi5 columns are projections (×3.5, ×1.85), not measurements.*
 
 **The projection said:** serial is within the 20 Hz budget with 10-15 ms
 headroom; subscribe exceeds budget by 30-45% with default config.
@@ -82,7 +82,7 @@ tracked in §7 WIP). Format: `mean ± std (p99: N)`. **4 OpenCV threads.**
 | re-tri & marg | 5.1 ± 0.6 (p99: 7.9) | 4.9 ± 0.5 (p99: 7.1) | 5.2 ± 0.5 (p99: 7.5) |
 | **total** | **24.2 ± 6.3** (p99: 44.5) | **22.0 ± 6.2** (p99: 43.0) | **21.6 ± 5.9** (p99: 40.6) |
 
-*Source: `results/timing/rpi5/serial/stereo/{V1_01_easy,MH_03_medium_bagstart5,V1_03_difficult}.txt`*
+*Source: `results/rpi5/docker_humble/serial/stereo/{V1_01_easy,MH_03_medium_bagstart5,V1_03_difficult}.txt`*
 
 Frames processed: V1_01=2776, MH_03=2302, V1_03=1990 (same as x86).
 
@@ -107,7 +107,7 @@ near-zero SLAM/MSCKF updates.
 | re-tri & marg | 3.2 ± 0.4 (p99: 4.4) | 3.1 ± 0.4 (p99: 4.3) | 2.9 ± 0.5 (p99: 3.9) |
 | **total** | **17.1 ± 3.5** (p99: 26.9) | **15.8 ± 3.9** (p99: 27.3) | **15.0 ± 4.5** (p99: 28.3) |
 
-*Source: `results/timing/rpi5/serial/mono/{V1_01_easy,MH_03_medium,V1_03_difficult}.txt`*
+*Source: `results/rpi5/docker_humble/serial/mono/{V1_01_easy,MH_03_medium,V1_03_difficult}.txt`*
 
 Frames processed: V1_01=2799, MH_03=2310, V1_03=2004.
 
@@ -124,7 +124,7 @@ Frames processed: V1_01=2799, MH_03=2310, V1_03=2004.
 | Mono | MH_03_medium | 7.7 | 15.8 | 2.1× |
 | Mono | V1_03_difficult | 6.9 | 15.0 | 2.2× |
 
-*Source: derived from `results/timing/{x86,rpi5}/serial/{stereo,mono}/*.txt`*
+*Source: derived from `results/{x86/native_humble,rpi5/docker_humble}/rerun_2026_04_27_paper/serial/*.txt`*
 
 **Actual slowdown: 2.1-2.3×** — significantly better than the 3.5× projection.
 The Cortex-A76 cores are more capable than estimated, especially for the
@@ -141,7 +141,7 @@ matrix-heavy EKF updates.
 | slam delayed | 1.8× | Triangulation + state augmentation |
 | re-tri & marg | **3.4×** | Cache-bound: 2 MB L2 (RPi5) vs 12 MB L3 (x86) |
 
-*Source: derived from `results/timing/{x86,rpi5}/serial/stereo/*.txt` (averaged across sequences)*
+*Source: derived from `results/{x86/native_humble,rpi5/docker_humble}/rerun_2026_04_27_paper/serial/*.txt` (averaged across sequences)*
 
 The re-triangulation & marginalization component scales worst (3.4×). This
 step iterates over all active features and the full covariance matrix, making
@@ -156,7 +156,7 @@ operations.
 | Stereo baseline | 24.2 | 38.8 | OK | p99 exceeds |
 | Mono baseline | 17.1 | 25.3 | OK | OK |
 
-*Source: `results/timing/rpi5/serial/{stereo,mono}/V1_01_easy.txt`*
+*Source: `results/rpi5/docker_humble/serial/{stereo,mono}/V1_01_easy.txt`*
 
 Serial mode is comfortably within the 20 Hz budget. Mono at 30 Hz has ~8 ms
 headroom at p99.
@@ -185,7 +185,7 @@ All runs are stereo, serial mode, default config (200 features, max_slam=50).
 | MH_03_medium (bag_start=5) | 1.164 | 1.031 | 0.089 | 0.116 |
 | V1_03_difficult | 2.861 | 2.818 | 0.058 | 0.063 |
 
-*Source: x86 from `results/stereo/estimate_{V1_01_easy,MH_03_medium,MH_03_medium_bagstart5,V1_03_difficult}.txt`; RPi5 from `results/rpi5/stereo/estimate_{V1_01_easy,MH_03_medium_diverged,MH_03_medium_bagstart5,V1_03_difficult}.txt`. Provenance: x86 = Latitude 5420 / `master-candidate`/`2a50450` / `slam_chi2_recovery: false`; RPi5 = openhd@192.168.200.81 / Docker `openvins-humble:latest` rebuilt 2026-04-26 / same submodule + config.*
+*Source: x86 from `results/x86/native_humble/rerun_2026_04_27_paper/serial/{V1_01_easy,MH_03_medium,MH_03_medium_bagstart5,V1_03_difficult}_4thr_est.txt`; RPi5 from `results/rpi5/docker_humble/rerun_2026_04_26_paper/serial/{V1_01_easy,MH_03_medium_diverged,MH_03_medium_bagstart5,V1_03_difficult}_4thr_est.txt`. Provenance: x86 = Latitude 5420 / `master-candidate`/`2a50450` / `slam_chi2_recovery: false`; RPi5 = openhd@192.168.200.81 / Docker `openvins-humble:latest` rebuilt 2026-04-26 / same submodule + config.*
 
 ### Absolute Trajectory Error — full 5 Vicon × stereo+mono paper-repro
 
@@ -199,7 +199,7 @@ Cross-platform comparison of all 5 Vicon-room sequences from the paper Table II 
 | V2_01_easy | 1.250 / 0.063 | 1.097 / 0.067 | 1.314 / 0.163 | 0.942 / 0.126 |
 | V2_02_medium | 1.212 / 0.051 | 1.166 / 0.048 | 1.477 / 0.078 | 1.797 / 0.072 |
 
-*Source: x86 from `results/{stereo,mono}/estimate_{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}{,_mono}.txt` (paper-repro committed estimates, regenerated under master-candidate); RPi5 from `results/rpi5/rerun_2026_04_26_paper/{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}_4thr{,_mono}_pose.txt`. Provenance: same as table above. RPi5 paper-repro collected 2026-04-26 via `serial.launch.py` inside Docker `openvins-humble:latest`.*
+*Source: x86 from `results/x86/native_humble/rerun_2026_04_27_paper/serial/{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}_4thr{,_mono}_est.txt` (re-collected 2026-04-27 against post-PWT submodule); RPi5 from `results/rpi5/docker_humble/rerun_2026_04_26_paper/serial/{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}_4thr{,_mono}_est.txt`. Provenance: same as table above. RPi5 paper-repro collected 2026-04-26 via the orchestrator inside Docker `openvins-humble:latest`.*
 
 **Cross-platform stereo position drift (RPi5 vs x86):** V1_01 +6 mm, V1_02 +9 mm, V1_03 +5 mm, V2_01 +4 mm, V2_02 −3 mm. RPi5 is consistently within ±10 mm of x86 on stereo position, with mixed signs — confirms the NEON-vs-SSE/AVX numerical drift caveat above is real but bounded.
 
@@ -213,7 +213,7 @@ Cross-platform comparison of all 5 Vicon-room sequences from the paper Table II 
 | seg 32 | 0.565 / 0.051 | 0.702 / 0.067 | 0.709 / 0.140 | 0.604 / 0.158 | — | 1.116 / 0.135 |
 | seg 40 | 0.600 / 0.038 | 0.495 / 0.068 | 0.761 / 0.138 | 0.678 / 0.184 | — | 1.100 / 0.132 |
 
-*Source: x86 from `results/stereo/estimate_{V1_01_easy,MH_03_medium_bagstart5,V1_03_difficult}.txt`; RPi5 from `results/rpi5/stereo/estimate_{V1_01_easy,MH_03_medium_bagstart5,V1_03_difficult}.txt`*
+*Source: x86 from `results/x86/native_humble/rerun_2026_04_27_paper/serial/{V1_01_easy,MH_03_medium_bagstart5,V1_03_difficult}_4thr_est.txt`; RPi5 from `results/rpi5/docker_humble/rerun_2026_04_26_paper/serial/{V1_01_easy,MH_03_medium_bagstart5,V1_03_difficult}_4thr_est.txt`*
 
 ### Accuracy findings
 
@@ -262,7 +262,7 @@ serial mode) on RPi5.
 | **D: No SLAM** | 8.2 | 0.2 | 5.3 | — | — | 5.3 | **19.1 ± 5.7** | **38.7** |
 | **E: 1 OpenCV thread** | 10.6 | 0.5 | 2.9 | 7.4 | 1.7 | 5.6 | **28.6 ± 6.2** | **48.4** |
 
-*Source: `results/timing/rpi5/serial/sweep/{A_downsample,B_num_pts_100,C_num_pts_300,D_no_slam,E_opencv_1thread}.txt`; baseline row from `results/timing/rpi5/serial/stereo/V1_01_easy.txt`*
+*Source: `results/rpi5/docker_humble/serial/sweep/{A_downsample,B_num_pts_100,C_num_pts_300,D_no_slam,E_opencv_1thread}.txt`; baseline row from `results/rpi5/docker_humble/serial/stereo/V1_01_easy.txt`*
 
 ### RPi5 sweep findings vs x86
 
@@ -275,7 +275,7 @@ serial mode) on RPi5.
 | D: No SLAM | 7.4 (-35%) | 19.1 (**-21%**) | -35% | **-21%** | 2.6× |
 | E: 1 OpenCV thread | 12.3 (+9%) | 28.6 (**+18%**) | +9% | **+18%** | 2.3× |
 
-*Source: derived from `results/timing/{x86,rpi5}/serial/sweep/*.txt` + `results/timing/{x86,rpi5}/serial/stereo/V1_01_easy.txt`*
+*Source: derived from `results/{x86/native_humble,rpi5/docker_humble}/rerun_2026_04_27_sweep/serial/*.txt` + `results/{x86/native_humble,rpi5/docker_humble}/rerun_2026_04_27_paper/serial/V1_01_easy.txt`*
 
 Key differences vs x86:
 
@@ -309,7 +309,7 @@ Key differences vs x86:
 | No SLAM | -5.1 ms (-21%) | 19.1 ms | 32.3 ms | OK |
 | Combined (downsample + 100 pts) | est. -10 ms | ~14 ms | ~22 ms | comfortable at 30 Hz |
 
-*Source: `results/timing/rpi5/serial/sweep/{A_downsample,B_num_pts_100,D_no_slam}.txt` (combined row is estimated, not measured)*
+*Source: `results/rpi5/docker_humble/serial/sweep/{A_downsample,B_num_pts_100,D_no_slam}.txt` (combined row is estimated, not measured)*
 
 ---
 
@@ -326,7 +326,7 @@ on V1_01_easy (stereo).
 | 2.0× | 2800 | 112 | 3.8% | No real drops |
 | 5.0× | **1369** | **1543** | **53.0%** | **Real performance drops** |
 
-*Source: `results/timing/rpi5/subscribe/V1_01_easy_rate{1.0,2.0,5.0}.txt`*
+*Source: `results/rpi5/docker_humble/subscribe/V1_01_easy_rate{1.0,2.0,5.0}.txt`*
 
 On x86, all three rates processed ~2800 frames (zero real drops even at 5×).
 On RPi5, 1× and 2× are fine but **5× causes 53% frame loss** — the VIO
@@ -348,7 +348,7 @@ pipeline cannot keep up at 100 Hz effective camera rate.
 | **total (mean ± std)** | **24.2 ± 6.3** | **24.1 ± 6.6** | **14.5 ± 4.2** | **19.3 ± 5.6** |
 | **total p99** | **44.5** | **47.2** | **32.2** | **40.8** |
 
-*Source: `results/timing/rpi5/subscribe/V1_01_easy_rate{1.0,2.0,5.0}.txt`; serial column from `results/timing/rpi5/serial/stereo/V1_01_easy.txt`*
+*Source: `results/rpi5/docker_humble/subscribe/V1_01_easy_rate{1.0,2.0,5.0}.txt`; serial column from `results/rpi5/docker_humble/serial/stereo/V1_01_easy.txt`*
 
 ### Findings
 
@@ -378,7 +378,7 @@ pipeline cannot keep up at 100 Hz effective camera rate.
 | Stereo + downsample (est.) | ~19 | ~29 | OK | **OK** |
 | Mono baseline (est.) | ~17 | ~25 | OK | OK |
 
-*Source: `results/timing/rpi5/subscribe/V1_01_easy_rate1.0.txt`; downsample/mono rows projected from `results/timing/rpi5/serial/{sweep/A_downsample.txt,mono/V1_01_easy.txt}`*
+*Source: `results/rpi5/docker_humble/subscribe/V1_01_easy_rate1.0.txt`; downsample/mono rows projected from `results/rpi5/docker_humble/serial/{sweep/A_downsample.txt,mono/V1_01_easy.txt}`*
 
 **Stereo at 20 Hz is realtime-feasible on RPi5** — subscribe mode adds
 negligible overhead unlike on pre-fix x86. For 30 Hz (live USB camera),
@@ -392,7 +392,7 @@ downsample or mono is needed.
 | Subscribe overhead vs serial | **1.85×** (pre-fix) | **1.00×** | — |
 | Frames at 5× | 2799 | 1369 | 2.0× drop |
 
-*Source: `results/timing/{x86,rpi5}/subscribe/V1_01_easy_rate{1.0,5.0}.txt` + `results/timing/{x86,rpi5}/serial/stereo/V1_01_easy.txt`*
+*Source: `results/{x86/native_humble,rpi5/docker_humble}/rerun_2026_04_27_rate_sweep/subscribe/V1_01_easy_rate{1.0,5.0}.txt` + `results/{x86/native_humble,rpi5/docker_humble}/rerun_2026_04_27_paper/serial/V1_01_easy.txt`*
 
 The subscribe overhead disappearing on RPi5 means the **serial timing numbers
 are directly representative of realtime performance** — a major simplification
@@ -430,8 +430,8 @@ bash scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy -t 4 -r 10 \
     --tag rerun_pwt_rtflags
 
 # Compare with the post-hoc analyzer:
-python3 scripts/parse_results.py ~/results/timing/rpi5/subscribe/rerun_pwt_baseline --ate
-python3 scripts/parse_results.py ~/results/timing/rpi5/subscribe/rerun_pwt_rtflags --ate
+python3 scripts/parse_results.py ~/results/rpi5/docker_humble/subscribe/rerun_pwt_baseline --ate
+python3 scripts/parse_results.py ~/results/rpi5/docker_humble/subscribe/rerun_pwt_rtflags --ate
 ```
 
 The two halves are sequential (one tag, then the other) to minimise
@@ -444,7 +444,7 @@ the two invocations are explicit at the cost of one extra command line.
 ## 6. Raw timing data
 
 ```
-results/timing/rpi5/
+results/rpi5/docker_humble/
 ├── serial/
 │   ├── stereo/
 │   │   ├── V1_01_easy.txt              (2776 frames)

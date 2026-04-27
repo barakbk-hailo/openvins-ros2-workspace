@@ -26,7 +26,7 @@ binaries, so a native install requires building ROS from source (~1-2 h). The
 simpler path is Docker with a pre-built ROS image.
 
 A `Dockerfile_ros2_humble_jammy` is committed in the fork. All the benchmark
-results under `results/timing/rpi5/` and `results/rpi5/rerun_2026_04_26_*/`
+results under `results/rpi5/docker_humble/rerun_2026_04_26_*/`
 were produced inside this container.
 
 ### 1a. Install Docker on RPi5
@@ -237,7 +237,7 @@ colcon build --symlink-install
 | Match for our published benchmarks | identical | may differ (ROS 2 Jazzy vs Humble) |
 | Persistence of tools between runs | requires setup (§1d) | native |
 
-For reproducing our `results/timing/rpi5/` numbers, use **Docker**. For
+For reproducing our `results/rpi5/docker_humble/` numbers, use **Docker**. For
 long-term deployment with live sensors, **native** avoids the Docker passthrough
 overhead.
 

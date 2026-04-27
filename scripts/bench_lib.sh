@@ -8,15 +8,34 @@ DATASETS_DIR="${DATASETS_DIR:-$HOME/datasets/euroc}"
 CONFIG_DIR="${CONFIG_DIR:-$WS_DIR/src/open_vins/config/euroc_mav}"
 BASE_CONFIG="${BASE_CONFIG:-$CONFIG_DIR/estimator_config.yaml}"
 
-# Default results base by host arch. Map x86_64 → x86 and aarch64 → rpi5 so the
-# tag layout in data-provenance.md (results/timing/{x86,rpi5}/...) is preserved.
-# Other archs land under `results/timing/$(uname -m)/`. Callers can override via
-# the RESULTS_BASE env var or a script-level --results-base flag.
+# Default results base by host arch + environment. Layout:
+#   $HOME/results/<arch>/<env>/<tag>/<mode>/<files>
+# where:
+#   arch = x86 (x86_64) | rpi5 (aarch64) | <uname-m>
+#   env  = ${BENCH_ENV} or `native_<distro>` (distro from detect_ros_distro)
+# Caller-side overrides:
+#   RESULTS_BASE env var or --results-base flag → bypass entirely.
+#   BENCH_ENV env var or auto-set by --docker → swap the env segment
+#     (e.g. docker_humble) without touching arch/distro detection.
 arch_results_base() {
+  local arch env
   case "$(uname -m)" in
-    x86_64)  echo "$HOME/results/timing/x86" ;;
-    aarch64) echo "$HOME/results/timing/rpi5" ;;
-    *)       echo "$HOME/results/timing/$(uname -m)" ;;
+    x86_64)  arch=x86 ;;
+    aarch64) arch=rpi5 ;;
+    *)       arch="$(uname -m)" ;;
+  esac
+  env="${BENCH_ENV:-native_$(detect_ros_distro)}"
+  echo "$HOME/results/$arch/$env"
+}
+
+# Single source of truth for the ROS distro this host runs natively. Used both
+# for sourcing /opt/ros/<distro>/setup.bash and for the env segment of the
+# results path. Mirrors install.sh's UBUNTU_CODENAME-driven choice (noble→jazzy,
+# everything else→humble).
+detect_ros_distro() {
+  case "$(. /etc/os-release && echo "${UBUNTU_CODENAME:-}")" in
+    noble) echo jazzy ;;
+    *)     echo humble ;;
   esac
 }
 
@@ -28,15 +47,12 @@ FEATS_TMP="/tmp/traj_features.txt"
 EST_TMP="/tmp/ov_estimate.txt"
 STD_TMP="/tmp/ov_estimate_std.txt"
 
-# ── ROS distro detection ──
-# Match install.sh's UBUNTU_CODENAME-driven choice (noble→jazzy, jammy→humble).
-# Sources both ROS and the workspace overlay. Caller must invoke before any `ros2 ...`.
+# ── ROS sourcing ──
+# Sources /opt/ros/<distro>/setup.bash (distro from detect_ros_distro) plus the
+# workspace overlay. Caller must invoke before any `ros2 ...`.
 source_ros() {
   local ros_distro
-  case "$(. /etc/os-release && echo "${UBUNTU_CODENAME:-}")" in
-    noble) ros_distro=jazzy ;;
-    *)     ros_distro=humble ;;
-  esac
+  ros_distro="$(detect_ros_distro)"
   [ -f "/opt/ros/${ros_distro}/setup.bash" ] || {
     echo "ERROR: /opt/ros/${ros_distro}/setup.bash not found — is ROS 2 installed?" >&2
     return 1

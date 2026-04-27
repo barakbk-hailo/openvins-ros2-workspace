@@ -151,19 +151,19 @@ single deterministic runs from the serial node (`cv::setRNGSeed(0)` makes
 results bit-identical across runs — see [reproducibility note](#real-time-dependency-and-reproducibility)).
 
 The trajectory estimates used to produce these tables are committed in
-`results/stereo/` and `results/mono/` so they can be independently verified.
+`results/x86/native_humble/rerun_2026_04_27_paper/serial/` (state-dump `_est.txt` for both stereo and mono) so they can be independently verified.
 
 **Reproduce the underlying runs:**
 
 ```bash
 bash scripts/run_full_benchmark.sh -m serial -c both -r 1 \
     -s V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium,MH_01_easy,MH_02_easy,MH_03_medium,MH_04_difficult,MH_05_difficult \
-    --tag rerun_2026_04_23_paper
+    --tag rerun_2026_04_27_paper
 ```
 
 The state-dump `_est.txt` files this writes under
-`~/results/timing/x86/serial/rerun_2026_04_23_paper/` were TUM-converted and
-promoted to `results/{stereo,mono}/estimate_*.txt` (those are the files cited
+`~/results/x86/native_humble/rerun_2026_04_27_paper/serial/` were TUM-converted and
+promoted to `results/x86/native_humble/rerun_2026_04_27_paper/serial/_4thr*.txt` (those are the files cited
 on each table below). The TUM conversion is a one-line awk and is documented
 in [data-provenance.md §"File-format conventions"](data-provenance.md#file-format-conventions).
 
@@ -178,7 +178,7 @@ in [data-provenance.md §"File-format conventions"](data-provenance.md#file-form
 | V2_02_medium | 1.212 / 0.051 | **1.151 / 0.048** |
 | **Average** | **1.303 / 0.053** | **1.454 / 0.055** |
 
-*Source: `results/stereo/estimate_{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}.txt` vs ground truth in `src/open_vins/ov_data/euroc_mav/*.txt`; paper column from Geneva et al. ICRA 2020 Table II (`stereo_ov_vio`).*
+*Source: `results/x86/native_humble/rerun_2026_04_27_paper/serial/{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}_4thr_est.txt` vs ground truth in `src/open_vins/ov_data/euroc_mav/*.txt`; paper column from Geneva et al. ICRA 2020 Table II (`stereo_ov_vio`).*
 
 **ATE RMSE — mono (Table II: `mono_ov_vio`)**
 
@@ -191,7 +191,7 @@ in [data-provenance.md §"File-format conventions"](data-provenance.md#file-form
 | V2_02_medium | 1.477 / **0.078** | **1.248** / 0.106 |
 | **Average** | 1.553 / **0.087** | **1.442** / 0.149 |
 
-*Source: `results/mono/estimate_{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}_mono.txt` vs ground truth in `src/open_vins/ov_data/euroc_mav/*.txt`; paper column from Geneva et al. ICRA 2020 Table II (`mono_ov_vio`).*
+*Source: `results/x86/native_humble/rerun_2026_04_27_paper/serial/{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}_4thr_mono_est.txt` vs ground truth in `src/open_vins/ov_data/euroc_mav/*.txt`; paper column from Geneva et al. ICRA 2020 Table II (`mono_ov_vio`).*
 
 **Stereo vs mono — our results:**
 
@@ -204,7 +204,7 @@ in [data-provenance.md §"File-format conventions"](data-provenance.md#file-form
 | V2_02_medium | **1.212 / 0.051** | 1.477 / 0.078 |
 | **Average** | **1.303 / 0.053** | 1.553 / 0.087 |
 
-*Source: derived from `results/stereo/estimate_{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}.txt` and `results/mono/estimate_*_mono.txt`.*
+*Source: derived from `results/x86/native_humble/rerun_2026_04_27_paper/serial/{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}_4thr_est.txt` and `results/x86/native_humble/rerun_2026_04_27_paper/serial/*_4thr_mono_est.txt`.*
 
 Stereo wins on position in every sequence (0.053 m vs 0.087 m average), as
 expected from the fixed stereo baseline providing direct scale observability.
@@ -236,7 +236,7 @@ custom segment lengths (included in our fork).
 | 40 m | **1.116 / 0.087** | 1.342 / 0.101 |
 | 48 m | **1.223 / 0.092** | 1.489 / 0.106 |
 
-*Source: `results/stereo/estimate_{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}.txt` (averaged across the 5 Vicon sequences, excluding V2_01 for 40m/48m); paper column from Geneva et al. ICRA 2020 Table III (`stereo_ov_vio`).*
+*Source: `results/x86/native_humble/rerun_2026_04_27_paper/serial/{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}_4thr_est.txt` (averaged across the 5 Vicon sequences, excluding V2_01 for 40m/48m); paper column from Geneva et al. ICRA 2020 Table III (`stereo_ov_vio`).*
 
 *Mono:*
 
@@ -249,7 +249,7 @@ custom segment lengths (included in our fork).
 | 40 m | **1.116 / 0.135** | 1.342 / 0.151 |
 | 48 m | **1.224 / 0.120** | 1.425 / 0.184 |
 
-*Source: `results/mono/estimate_{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}_mono.txt` (averaged across the 5 Vicon sequences, excluding V2_01 for 40m/48m); paper column from Geneva et al. ICRA 2020 Table III (`mono_ov_vio`).*
+*Source: `results/x86/native_humble/rerun_2026_04_27_paper/serial/{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}_4thr_mono_est.txt` (averaged across the 5 Vicon sequences, excluding V2_01 for 40m/48m); paper column from Geneva et al. ICRA 2020 Table III (`mono_ov_vio`).*
 
 <details>
 <summary>RPE per sequence (click to expand)</summary>
@@ -265,7 +265,7 @@ custom segment lengths (included in our fork).
 | 40 m | 0.600 / 0.038 | 0.811 / 0.136 |
 | 48 m | 0.670 / 0.050 | 0.658 / 0.130 |
 
-*Source: `results/stereo/estimate_V1_01_easy.txt`, `results/mono/estimate_V1_01_easy_mono.txt`.*
+*Source: `results/x86/native_humble/rerun_2026_04_27_paper/serial/V1_01_easy_4thr_est.txt`, `results/x86/native_humble/rerun_2026_04_27_paper/serial/V1_01_easy_4thr_mono_est.txt`.*
 
 *V1_02_medium:*
 
@@ -278,7 +278,7 @@ custom segment lengths (included in our fork).
 | 40 m | 1.262 / 0.122 | 0.678 / 0.132 |
 | 48 m | 1.204 / 0.124 | 0.704 / 0.103 |
 
-*Source: `results/stereo/estimate_V1_02_medium.txt`, `results/mono/estimate_V1_02_medium_mono.txt`.*
+*Source: `results/x86/native_humble/rerun_2026_04_27_paper/serial/V1_02_medium_4thr_est.txt`, `results/x86/native_humble/rerun_2026_04_27_paper/serial/V1_02_medium_4thr_mono_est.txt`.*
 
 *V1_03_difficult:*
 
@@ -291,7 +291,7 @@ custom segment lengths (included in our fork).
 | 40 m | 1.202 / 0.123 | 1.235 / 0.156 |
 | 48 m | 1.486 / 0.105 | 1.399 / 0.136 |
 
-*Source: `results/stereo/estimate_V1_03_difficult.txt`, `results/mono/estimate_V1_03_difficult_mono.txt`.*
+*Source: `results/x86/native_humble/rerun_2026_04_27_paper/serial/V1_03_difficult_4thr_est.txt`, `results/x86/native_humble/rerun_2026_04_27_paper/serial/V1_03_difficult_4thr_mono_est.txt`.*
 
 *V2_01_easy:*
 
@@ -304,7 +304,7 @@ custom segment lengths (included in our fork).
 | 40 m | — | — |
 | 48 m | — | — |
 
-*Source: `results/stereo/estimate_V2_01_easy.txt`, `results/mono/estimate_V2_01_easy_mono.txt` (trajectory too short for 40 m / 48 m segments).*
+*Source: `results/x86/native_humble/rerun_2026_04_27_paper/serial/V2_01_easy_4thr_est.txt`, `results/x86/native_humble/rerun_2026_04_27_paper/serial/V2_01_easy_4thr_mono_est.txt` (trajectory too short for 40 m / 48 m segments).*
 
 *V2_02_medium:*
 
@@ -317,7 +317,7 @@ custom segment lengths (included in our fork).
 | 40 m | 1.399 / 0.064 | 1.740 / 0.115 |
 | 48 m | 1.531 / 0.091 | 2.133 / 0.111 |
 
-*Source: `results/stereo/estimate_V2_02_medium.txt`, `results/mono/estimate_V2_02_medium_mono.txt`.*
+*Source: `results/x86/native_humble/rerun_2026_04_27_paper/serial/V2_02_medium_4thr_est.txt`, `results/x86/native_humble/rerun_2026_04_27_paper/serial/V2_02_medium_4thr_mono_est.txt`.*
 
 </details>
 
@@ -338,7 +338,7 @@ excluded.
 | MH_04_difficult | diverged | diverged |
 | MH_05_difficult | 0.858 / 0.213 | 0.873 / 0.496 |
 
-*Source: `results/stereo/estimate_MH_{01,02,03,04,05}_*.txt` and `results/mono/estimate_MH_{01,02,03,04,05}_*_mono.txt` vs `src/open_vins/ov_data/euroc_mav/MH_*.txt`.*
+*Source: `results/x86/native_humble/rerun_2026_04_27_paper/serial/MH_{01,02,03,04,05}_*_4thr_est.txt` and `results/x86/native_humble/rerun_2026_04_27_paper/serial/MH_{01,02,03,04,05}_*_4thr_mono_est.txt` vs `src/open_vins/ov_data/euroc_mav/MH_*.txt`.*
 
 **RPE — Machine Hall average (excluding MH_04)**
 
@@ -353,7 +353,7 @@ excluded.
 | 40 m | 1.469 / 0.258 |
 | 48 m | 1.651 / 0.287 |
 
-*Source: `results/stereo/estimate_MH_{01_easy,02_easy,03_medium,05_difficult}.txt` (MH_04 excluded — diverged).*
+*Source: `results/x86/native_humble/rerun_2026_04_27_paper/serial/MH_{01_easy,02_easy,03_medium,05_difficult}_4thr_est.txt` (MH_04 excluded — diverged).*
 
 *Mono:*
 
@@ -366,7 +366,7 @@ excluded.
 | 40 m | 1.370 / 0.373 |
 | 48 m | 1.435 / 0.426 |
 
-*Source: `results/mono/estimate_MH_{01_easy,02_easy,03_medium,05_difficult}_mono.txt` (MH_04 excluded — diverged).*
+*Source: `results/x86/native_humble/rerun_2026_04_27_paper/serial/MH_{01_easy,02_easy,03_medium,05_difficult}_4thr_mono_est.txt` (MH_04 excluded — diverged).*
 
 <details>
 <summary>RPE per MH sequence (click to expand)</summary>
@@ -382,7 +382,7 @@ excluded.
 | 40 m | 2.568 / 0.217 | 1.717 / 0.123 |
 | 48 m | 2.928 / 0.239 | 1.990 / 0.148 |
 
-*Source: `results/stereo/estimate_MH_01_easy.txt`, `results/mono/estimate_MH_01_easy_mono.txt`.*
+*Source: `results/x86/native_humble/rerun_2026_04_27_paper/serial/MH_01_easy_4thr_est.txt`, `results/x86/native_humble/rerun_2026_04_27_paper/serial/MH_01_easy_4thr_mono_est.txt`.*
 
 *MH_02_easy:*
 
@@ -395,7 +395,7 @@ excluded.
 | 40 m | 1.345 / 0.303 | 2.186 / 0.284 |
 | 48 m | 1.450 / 0.360 | 2.225 / 0.281 |
 
-*Source: `results/stereo/estimate_MH_02_easy.txt`, `results/mono/estimate_MH_02_easy_mono.txt`.*
+*Source: `results/x86/native_humble/rerun_2026_04_27_paper/serial/MH_02_easy_4thr_est.txt`, `results/x86/native_humble/rerun_2026_04_27_paper/serial/MH_02_easy_4thr_mono_est.txt`.*
 
 *MH_03_medium:*
 
@@ -408,7 +408,7 @@ excluded.
 | 40 m | 0.926 / 0.153 | 0.670 / 0.206 |
 | 48 m | 1.044 / 0.199 | 0.781 / 0.270 |
 
-*Source: `results/stereo/estimate_MH_03_medium.txt`, `results/mono/estimate_MH_03_medium_mono.txt`.*
+*Source: `results/x86/native_humble/rerun_2026_04_27_paper/serial/MH_03_medium_4thr_est.txt`, `results/x86/native_humble/rerun_2026_04_27_paper/serial/MH_03_medium_4thr_mono_est.txt`.*
 
 *MH_05_difficult:*
 
@@ -421,7 +421,7 @@ excluded.
 | 40 m | 1.037 / 0.360 | 0.906 / 0.881 |
 | 48 m | 1.182 / 0.351 | 0.744 / 1.005 |
 
-*Source: `results/stereo/estimate_MH_05_difficult.txt`, `results/mono/estimate_MH_05_difficult_mono.txt`.*
+*Source: `results/x86/native_humble/rerun_2026_04_27_paper/serial/MH_05_difficult_4thr_est.txt`, `results/x86/native_humble/rerun_2026_04_27_paper/serial/MH_05_difficult_4thr_mono_est.txt`.*
 
 </details>
 

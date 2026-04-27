@@ -196,6 +196,12 @@ Lock ordering is always A then B (worker locks `worker_mtx` first, then
 | **Non-deterministic trigger** | Which IMU callback spawns the update depends on when the previous thread finished | Worker always uses the latest IMU timestamp |
 | **Thread churn** | ~20 `std::thread` create/destroy per second, each with cold cache | One persistent thread with warm cache across all frames |
 
+#### Implementation note: busy-loop CV predicate
+
+The worker's CV predicate is `latest_imu_timestamp > 0.0` — permanently true after the first IMU, so `wait()` returns immediately on every notify and both IMU and camera callbacks can wake the worker. That makes the worker process the camera queue as soon as a frame arrives (subject to the IMU-cutoff time alignment), at the cost of one CPU core continuously while subscribed.
+
+A `new_imu_pending` edge-triggered alternative was tried (submodule commit `25d7697`) to eliminate the busy-spin. Empirically it regressed V1_01_easy 4thr subscribe wall from **11.6 ms → 20.1 ms** (+73%; tracking specifically went 2.8 → 7.3 ms, +161%) and pushed subscribe overhead vs serial from **1.07× back to 1.79×** — undoing most of the benefit attributed to the persistent worker. Mechanism: gating the worker on the 200 Hz IMU adds up to 5 ms of latency per camera frame plus increased `camera_queue_mtx` contention. Reverted in submodule commit `a7781f4`. Don't reintroduce edge-triggering without re-measuring against this baseline.
+
 ### Benchmark results
 
 #### Hardware
@@ -210,7 +216,7 @@ against the worker-enabled submodule commit:
 
 ```bash
 # Persistent-worker baseline (submodule at 0fe81a6 or newer):
-bash scripts/run_full_benchmark.sh -r 5 --tag rerun_2026_04_23
+bash scripts/run_full_benchmark.sh -r 5 --tag rerun_2026_04_27_main
 ```
 
 The "old dispatch" comparison columns come from the **retired** `bench_5rep_3clock`
@@ -220,10 +226,10 @@ collected pre-`0fe81a6`. That tag was deleted from `results/` in outer commit `4
 `44b4cfa^`. To re-extract a single file:
 
 ```bash
-git show 44b4cfa^:results/timing/x86/subscribe/bench_5rep_3clock/V1_01_easy_4thr_run1_wall.txt
+git show 44b4cfa^:results/x86/native_humble/subscribe/bench_5rep_3clock/V1_01_easy_4thr_run1_wall.txt
 ```
 
-Persistent-worker data writes to `~/results/timing/x86/{serial,subscribe}/<tag>/`. The
+Persistent-worker data writes to `~/results/x86/native_humble/{serial,subscribe}/<tag>/`. The
 `*Source:*` lines on each table below point at the specific CSVs produced (or, for the
 old-dispatch column, at the path inside the `44b4cfa^` git tree).
 
@@ -242,7 +248,7 @@ both. Cells list the 5 individual runs' means (ms).
 | V2_02_medium 4-thr | 20.8, 20.7, 20.6, 20.7, 20.7 | **10.4, 10.5, 10.6, 10.7, 10.7** | 11.2 |
 | V2_02_medium 1-thr | 21.3, 21.4, 21.1, 21.0, 21.1 | **11.2, 11.2, 11.2, 11.3, 11.3** | 11.5 |
 
-*Source: Old dispatch from retired `bench_5rep_3clock/*_{1,4}thr_run{1..5}_wall.txt` (preserved at outer `44b4cfa^:results/timing/x86/subscribe/bench_5rep_3clock/`); persistent worker from `results/timing/x86/subscribe/rerun_2026_04_23/*_{1,4}thr_run{1..5}_wall.txt`; serial reference from `results/timing/x86/serial/rerun_2026_04_23/*_{1,4}thr_wall.txt`*
+*Source: Old dispatch from retired `bench_5rep_3clock/*_{1,4}thr_run{1..5}_wall.txt` (preserved at outer `44b4cfa^:results/x86/native_humble/subscribe/bench_5rep_3clock/`); persistent worker from `results/x86/native_humble/rerun_2026_04_27_main/subscribe/*_{1,4}thr_run{1..5}_wall.txt`; serial reference from `results/x86/native_humble/rerun_2026_04_27_main/serial/*_{1,4}thr_wall.txt`*
 
 Subscribe/serial ratio: **2.0× → 1.0×** (eliminated entirely).
 
@@ -264,7 +270,7 @@ Subscribe/serial ratio: **2.0× → 1.0×** (eliminated entirely).
 
 p99 per-frame totals: Worker sub 19.2 ms, Serial wall 17.1 ms — both within the 50 ms @ 20 Hz budget.
 
-*Source: Paper column from Semenova et al. 2024 Table 4; Old dispatch from retired `bench_5rep_3clock/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt` (preserved at outer `44b4cfa^:results/timing/x86/subscribe/bench_5rep_3clock/`); Worker from `results/timing/x86/subscribe/rerun_2026_04_23/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`; Serial from `results/timing/x86/serial/rerun_2026_04_23/V2_02_medium_4thr_{wall,cpu,thread}.txt`*
+*Source: Paper column from Semenova et al. 2024 Table 4; Old dispatch from retired `bench_5rep_3clock/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt` (preserved at outer `44b4cfa^:results/x86/native_humble/subscribe/bench_5rep_3clock/`); Worker from `results/x86/native_humble/rerun_2026_04_27_main/subscribe/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`; Serial from `results/x86/native_humble/rerun_2026_04_27_main/serial/V2_02_medium_4thr_{wall,cpu,thread}.txt`*
 
 ¹ Semenova et al. 2024, Table 4 — subscribe mode, wall clock
 ² Paper combines SLAM Update + SLAM Delayed; our values shown combined for comparison
@@ -282,7 +288,7 @@ p99 per-frame totals: Worker sub 19.2 ms, Serial wall 17.1 ms — both within th
 | Re-tri & Marg | 2.52 ± 0.21 | 1.7 ± 0.4 | **1.4 ± 0.2** | 1.5 ± 0.2 |
 | **Total** | **21.25 ± 5.57** | **21.3 ± 4.2** | **11.2 ± 2.9** | **11.5 ± 3.1** |
 
-*Source: Paper column from Semenova et al. 2024 Table 4; Old dispatch from retired `bench_5rep_3clock/V2_02_medium_1thr_run*_wall.txt` (preserved at outer `44b4cfa^:results/timing/x86/subscribe/bench_5rep_3clock/`); Worker from `results/timing/x86/subscribe/rerun_2026_04_23/V2_02_medium_1thr_run*_wall.txt`; Serial from `results/timing/x86/serial/rerun_2026_04_23/V2_02_medium_1thr_wall.txt`*
+*Source: Paper column from Semenova et al. 2024 Table 4; Old dispatch from retired `bench_5rep_3clock/V2_02_medium_1thr_run*_wall.txt` (preserved at outer `44b4cfa^:results/x86/native_humble/subscribe/bench_5rep_3clock/`); Worker from `results/x86/native_humble/rerun_2026_04_27_main/subscribe/V2_02_medium_1thr_run*_wall.txt`; Serial from `results/x86/native_humble/rerun_2026_04_27_main/serial/V2_02_medium_1thr_wall.txt`*
 
 #### Cross-run variability (subscribe, 5 repetitions)
 
@@ -298,7 +304,7 @@ p99 per-frame totals: Worker sub 19.2 ms, Serial wall 17.1 ms — both within th
 | V2_02_medium | 4-thr | 10.6 | 0.13 | **1.2%** | 10.4 – 10.7 |
 | V2_02_medium | 1-thr | 11.2 | 0.05 | **0.5%** | 11.2 – 11.3 |
 
-*Source: `results/timing/x86/subscribe/rerun_2026_04_23/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_wall.txt`*
+*Source: `results/x86/native_humble/rerun_2026_04_27_main/subscribe/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_wall.txt`*
 
 All configurations have CV < 1.3%. The old dispatch had CV up to 5% on MH_03.
 
@@ -310,7 +316,7 @@ All configurations have CV < 1.3%. The old dispatch had CV up to 5% on MH_03.
 | MH_03_medium | 41.0 | 41.1, 41.2, 41.1, 41.3, 41.4 | **26.0** – 40.2 |
 | V2_02_medium | 39.1 | 38.2, 38.3, 38.6, 38.7, 38.9 | 34.5 – 35.8 |
 
-*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/*_4thr_feats.txt`; Worker subscribe from `results/timing/x86/subscribe/rerun_2026_04_23/*_4thr_run{1..5}_feats.txt`; Old dispatch from retired `bench_5rep_3clock/*_4thr_run{1..5}_feats.txt` (preserved at outer `44b4cfa^:results/timing/x86/subscribe/bench_5rep_3clock/`)*
+*Source: Serial from `results/x86/native_humble/rerun_2026_04_27_main/serial/*_4thr_feats.txt`; Worker subscribe from `results/x86/native_humble/rerun_2026_04_27_main/subscribe/*_4thr_run{1..5}_feats.txt`; Old dispatch from retired `bench_5rep_3clock/*_4thr_run{1..5}_feats.txt` (preserved at outer `44b4cfa^:results/x86/native_humble/subscribe/bench_5rep_3clock/`)*
 
 Subscribe SLAM health now matches serial within <1 feature. The old dispatch had
 a worst case of 26.0 on MH_03 (partial SLAM dip).
@@ -333,7 +339,7 @@ a worst case of 26.0 on MH_03 (partial SLAM dip).
 | MH_03_medium | 0.121 | 0.136 | 0.123 | 0.116 | 0.117 | 0.115 | 0.101 | 0.109 | 0.160 | 0.130 | 0.114 |
 | V2_02_medium | 0.049 | 0.048 | 0.066 | 0.065 | 0.070 | 0.052 | 0.058 | 0.063 | 0.065 | 0.056 | 0.062 |
 
-*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_est.txt`; subscribe from `results/timing/x86/subscribe/rerun_2026_04_23/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_est.txt`; state-dump columns converted to TUM as described above; compared against `src/open_vins/ov_data/euroc_mav/{V1_01_easy,MH_03_medium,V2_02_medium}.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`.*
+*Source: Serial from `results/x86/native_humble/rerun_2026_04_27_main/serial/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_est.txt`; subscribe from `results/x86/native_humble/rerun_2026_04_27_main/subscribe/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_est.txt`; state-dump columns converted to TUM as described above; compared against `src/open_vins/ov_data/euroc_mav/{V1_01_easy,MH_03_medium,V2_02_medium}.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`.*
 
 **Orientation RMSE (degrees) across all runs:**
 
@@ -353,7 +359,7 @@ a worst case of 26.0 on MH_03 (partial SLAM dip).
 | MH_03_medium | 0.121m | 0.101 – 0.160m | **39mm** | **17mm** |
 | V2_02_medium | 0.049m | 0.048 – 0.070m | **21mm** | **7mm** |
 
-*Source: derived from the Position RMSE table above — same TUM-converted `*_est.txt` files under `results/timing/x86/{serial,subscribe}/rerun_2026_04_23/`.*
+*Source: derived from the Position RMSE table above — same TUM-converted `*_est.txt` files under `results/x86/native_humble/rerun_2026_04_27_main/{serial,subscribe}/`.*
 
 Subscribe ATE position is 2-30 mm higher than serial on average, with run-to-run
 spread of 7–17 mm std. This is the dominant observable difference between the
@@ -377,7 +383,7 @@ All Source files below are TUM-converted from the state-dump CSVs as described i
 | 32m | 0.059 | 0.063 | +0.004 |
 | 40m | 0.053 | 0.063 | +0.010 |
 
-*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_est.txt`; Subscribe run 1 from `results/timing/x86/subscribe/rerun_2026_04_23/V1_01_easy_4thr_run1_est.txt` (TUM-converted). Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`.*
+*Source: Serial from `results/x86/native_humble/rerun_2026_04_27_main/serial/V1_01_easy_4thr_est.txt`; Subscribe run 1 from `results/x86/native_humble/rerun_2026_04_27_main/subscribe/V1_01_easy_4thr_run1_est.txt` (TUM-converted). Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`.*
 
 **MH_03_medium:**
 
@@ -389,7 +395,7 @@ All Source files below are TUM-converted from the state-dump CSVs as described i
 | 32m | 0.191 | 0.155 | -0.036 |
 | 40m | 0.195 | 0.182 | -0.013 |
 
-*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/MH_03_medium_4thr_est.txt`; Subscribe run 1 from `results/timing/x86/subscribe/rerun_2026_04_23/MH_03_medium_4thr_run1_est.txt` (TUM-converted).*
+*Source: Serial from `results/x86/native_humble/rerun_2026_04_27_main/serial/MH_03_medium_4thr_est.txt`; Subscribe run 1 from `results/x86/native_humble/rerun_2026_04_27_main/subscribe/MH_03_medium_4thr_run1_est.txt` (TUM-converted).*
 
 **V2_02_medium:**
 
@@ -401,7 +407,7 @@ All Source files below are TUM-converted from the state-dump CSVs as described i
 | 32m | 0.067 | 0.069 | +0.002 |
 | 40m | 0.063 | 0.077 | +0.014 |
 
-*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/V2_02_medium_4thr_est.txt`; Subscribe run 1 from `results/timing/x86/subscribe/rerun_2026_04_23/V2_02_medium_4thr_run1_est.txt` (TUM-converted).*
+*Source: Serial from `results/x86/native_humble/rerun_2026_04_27_main/serial/V2_02_medium_4thr_est.txt`; Subscribe run 1 from `results/x86/native_humble/rerun_2026_04_27_main/subscribe/V2_02_medium_4thr_run1_est.txt` (TUM-converted).*
 
 RPE deltas are ≤0.04 m across all segments and sequences — subscribe local
 consistency matches serial within a few cm per segment.
@@ -414,7 +420,7 @@ consistency matches serial within a few cm per segment.
 | Subscribe (worker) | 10.4 | **16.6** | 10.4 | **1.60×** |
 | Subscribe (old dispatch) | 20.8 | **37.0** | 20.6 | **1.78×** |
 
-*Source: Serial from `results/timing/x86/serial/rerun_2026_04_23/V2_02_medium_4thr_{wall,cpu,thread}.txt`; Subscribe worker from `results/timing/x86/subscribe/rerun_2026_04_23/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`; Subscribe old-dispatch from retired `bench_5rep_3clock/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt` (preserved at outer `44b4cfa^:results/timing/x86/subscribe/bench_5rep_3clock/`)*
+*Source: Serial from `results/x86/native_humble/rerun_2026_04_27_main/serial/V2_02_medium_4thr_{wall,cpu,thread}.txt`; Subscribe worker from `results/x86/native_humble/rerun_2026_04_27_main/subscribe/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt`; Subscribe old-dispatch from retired `bench_5rep_3clock/V2_02_medium_4thr_run1_{wall,cpu,thread}.txt` (preserved at outer `44b4cfa^:results/x86/native_humble/subscribe/bench_5rep_3clock/`)*
 
 CPU/Wall is now identical between serial and subscribe (1.59–1.60×) — purely the
 OpenCV KLT thread pool. The old dispatch had 1.78× because executor threads burned
@@ -428,7 +434,7 @@ extra CPU during per-frame thread churn.
 | MH_03_medium | 11.5ms | 10.8ms | ~40ms | 50ms |
 | V2_02_medium | 11.2ms | 10.6ms | ~39ms | 50ms |
 
-*Source: x86 serial from `results/timing/x86/serial/rerun_2026_04_23/*_4thr_wall.txt`; x86 subscribe (worker) from `results/timing/x86/subscribe/rerun_2026_04_23/*_4thr_run{1..5}_wall.txt`; RPi5 column is a ×3.5 projection, not measured.*
+*Source: x86 serial from `results/x86/native_humble/rerun_2026_04_27_main/serial/*_4thr_wall.txt`; x86 subscribe (worker) from `results/x86/native_humble/rerun_2026_04_27_main/subscribe/*_4thr_run{1..5}_wall.txt`; RPi5 column is a ×3.5 projection, not measured.*
 
 Since subscribe now matches serial, the RPi5 projection for subscribe mode is the
 same as serial: **~40ms, within the 50ms budget**. Previously, the 2× subscribe
@@ -505,12 +511,12 @@ Verified locally (V1_01_easy, stereo serial, this machine):
 
 | Scenario | recovery=true | recovery=false |
 |---|---|---|
-| **MH_05_difficult stereo serial** (paper sequence, dark init) | **diverges** — SLAM=0.2, RMSE 15,673 m, trajectory length 55 km | **converges** — 1845 frames / 0.213 m RMSE, matches committed `results/stereo/estimate_MH_05_difficult.txt` |
+| **MH_05_difficult stereo serial** (paper sequence, dark init) | **diverges** — SLAM=0.2, RMSE 15,673 m, trajectory length 55 km | **converges** — 1845 frames / 0.213 m RMSE, matches committed `results/x86/native_humble/rerun_2026_04_27_paper/serial/MH_05_difficult_4thr_est.txt` |
 | **V1_03_difficult subscribe @ rate 1.0** (light load, 3 reps) | SLAM avg 30.5 / 31.0 / 30.2 — equivalent | SLAM avg 31.3 / 30.6 / 30.8 — equivalent |
-| **V1_03_difficult subscribe @ rate 2.0** (overload, 3 reps) | worst-case 3.7 m ATE (per `b66bd07` commit msg + this rerun's `rerun_2026_04_23_rate2_recovery_on/`) | 2/3 runs collapse to >50 m ATE (per `b66bd07` commit msg + `rerun_2026_04_23_rate2_recovery_off/`) |
+| **V1_03_difficult subscribe @ rate 2.0** (overload, 3 reps) | worst-case 3.7 m ATE (per `b66bd07` commit msg + this rerun's `rerun_2026_04_27_chi2_rate2_on/subscribe/`) | 2/3 runs collapse to >50 m ATE (per `b66bd07` commit msg + `rerun_2026_04_27_chi2_rate2_off/subscribe/`) |
 | **Paper reproduction (10 EuRoC × stereo+mono)** | 1/20 broken (MH_05 stereo); ATE drift 5-20% from committed | **20/20 reproduce committed ATE** to 3-decimal precision |
 
-*Source: V1_03 @ rate 1.0: `results/timing/x86/subscribe/rerun_2026_04_23_recovery_{on,off}/`. V1_03 @ rate 2.0: `results/timing/x86/subscribe/rerun_2026_04_23_rate2_recovery_{on,off}/`. Paper reproduction: `results/timing/x86/serial/rerun_2026_04_23_paper/` (recovery=false) vs prior `rerun_2026_04_21_paper/` (recovery=true, hardcoded pre-`b66bd07`).*
+*Source: V1_03 @ rate 1.0: `results/x86/native_humble/rerun_2026_04_27_chi2_rate1_{on,off}/subscribe/`. V1_03 @ rate 2.0: `results/x86/native_humble/rerun_2026_04_27_chi2_rate2_{on,off}/subscribe/`. Paper reproduction: `results/x86/native_humble/rerun_2026_04_27_paper/serial/` (recovery=false) vs prior `rerun_2026_04_27_paper_recovery_on/serial/` (recovery=true, hardcoded pre-`b66bd07`).*
 
 The mechanism is still useful — its narrow benefit case (V1_03 @ rate 2× subscribe with overload) remains a real concern for resource-constrained deployments. But making it the default broke a paper-benchmark sequence (MH_05 stereo) on the most-cited use case (offline serial replay). Flipping to opt-in keeps the protection available without breaking reproducibility.
 
@@ -533,7 +539,7 @@ compared against a clean baseline without the recovery mechanism:
 debugging; raw CSVs were not preserved under `results/`. Numbers are kept
 here for historical context only. The with-recovery half of the comparison
 was superseded by the 30-run suite at
-`results/timing/x86/subscribe/rerun_2026_04_23/V2_02_medium_*_run{1..5}_{est,feats}.txt`,
+`results/x86/native_humble/rerun_2026_04_27_main/subscribe/V2_02_medium_*_run{1..5}_{est,feats}.txt`,
 which is the archived, reproducible source. Treat this table as motivation,
 not evidence.*
 
@@ -550,7 +556,7 @@ per configuration (see [benchmark-analysis.md](benchmark-analysis.md) for detail
 | RPE (8m) within 0.07m of serial | **All runs** |
 | Worst-case SLAM dip | MH_03 avg SLAM = 26.0 (still produced ATE within 0.004m and RPE within 0.13m of serial) |
 
-*Source: `results/timing/x86/subscribe/rerun_2026_04_23/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_{est,feats}.txt` vs `results/timing/x86/serial/rerun_2026_04_23/*_{1,4}thr_{est,feats}.txt`; see [benchmark-analysis.md](benchmark-analysis.md) for per-run numbers.*
+*Source: `results/x86/native_humble/rerun_2026_04_27_main/subscribe/{V1_01_easy,MH_03_medium,V2_02_medium}_{1,4}thr_run{1..5}_{est,feats}.txt` vs `results/x86/native_humble/rerun_2026_04_27_main/serial/*_{1,4}thr_{est,feats}.txt`; see [benchmark-analysis.md](benchmark-analysis.md) for per-run numbers.*
 
 The recovery mechanism maintains accuracy identical to serial mode as measured by
 both global trajectory error (ATE) and local consistency (RPE at 8-40m segments).
@@ -562,7 +568,7 @@ behaviour was masking, not preventing, scheduler-induced SLAM collapse. A/B on
 this machine, April 2026: for each (sequence, rate, flag) cell, subscribe mode
 was run 3 times with `slam_chi2_recovery` flipped via the `--slam-chi2-recovery`
 override (no source edit), **except the V1_01_easy @ rate=1.0 baseline row,
-which reuses the 5-run mean from the archived `rerun_2026_04_23` suite**.
+which reuses the 5-run mean from the archived `rerun_2026_04_27_main` suite**.
 Per-run `slam_feats_in_state` was recorded from `traj_features.txt`; final ATE
 was posyaw-aligned against the ov_data ground truth.
 
@@ -596,10 +602,10 @@ time, or real-time playback of a hard sequence). Only flip it off for strict
 benchmark reproducibility against the pre-`64cfe59` numbers.
 
 *Source:
-- V1_01_easy @ rate=1.0 baseline (with-recovery): mean over `results/timing/x86/subscribe/rerun_2026_04_23/V1_01_easy_*_run{1..5}_est.txt` (5 runs, archived).
-- V1_01_easy @ rate=2.0 row: unarchived. The `rerun_2026_04_23_rate2_recovery_{on,off}/` tags only carry V1_03_difficult; the V1_01_easy @ rate=2 cell remains an ad-hoc A/B preserved only in this table. Re-collect with `bash scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy --rate 2.0 --tag rerun_rate2_v101_recovery_off --slam-chi2-recovery false` (and `_on`) if precise verification is needed.
-- V1_03_difficult @ rate=1.0: 3 runs each in `results/timing/x86/subscribe/rerun_2026_04_23_recovery_{on,off}/V1_03_difficult_4thr_run{1,2,3}_{est,feats}.txt` (archived).
-- V1_03_difficult @ rate=2.0 (the load-bearing row): 3 runs each in `results/timing/x86/subscribe/rerun_2026_04_23_rate2_recovery_{on,off}/V1_03_difficult_4thr_run{1,2,3}_{est,feats}.txt` (archived).
+- V1_01_easy @ rate=1.0 baseline (with-recovery): mean over `results/x86/native_humble/rerun_2026_04_27_main/subscribe/V1_01_easy_*_run{1..5}_est.txt` (5 runs, archived).
+- V1_01_easy @ rate=2.0 row: unarchived. The `rerun_2026_04_27_chi2_rate2_{on,off}/subscribe/` tags only carry V1_03_difficult; the V1_01_easy @ rate=2 cell remains an ad-hoc A/B preserved only in this table. Re-collect with `bash scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy --rate 2.0 --tag rerun_rate2_v101_recovery_off --slam-chi2-recovery false` (and `_on`) if precise verification is needed.
+- V1_03_difficult @ rate=1.0: 3 runs each in `results/x86/native_humble/rerun_2026_04_27_chi2_rate1_{on,off}/subscribe/V1_03_difficult_4thr_run{1,2,3}_{est,feats}.txt` (archived).
+- V1_03_difficult @ rate=2.0 (the load-bearing row): 3 runs each in `results/x86/native_humble/rerun_2026_04_27_chi2_rate2_{on,off}/subscribe/V1_03_difficult_4thr_run{1,2,3}_{est,feats}.txt` (archived).
 
 Reproduce the V1_03 rows with the `--slam-chi2-recovery` flag (no source edits
 needed since `scripts/run_full_benchmark.sh` overrides the temp YAML in-place):*
@@ -607,15 +613,15 @@ needed since `scripts/run_full_benchmark.sh` overrides the temp YAML in-place):*
 ```bash
 # rate=1.0 A/B
 bash scripts/run_full_benchmark.sh -m subscribe -s V1_03_difficult -t 4 -r 3 \
-    --tag rerun_2026_04_23_recovery_on  --slam-chi2-recovery true
+    --tag rerun_2026_04_27_chi2_rate1_on  --slam-chi2-recovery true
 bash scripts/run_full_benchmark.sh -m subscribe -s V1_03_difficult -t 4 -r 3 \
-    --tag rerun_2026_04_23_recovery_off --slam-chi2-recovery false
+    --tag rerun_2026_04_27_chi2_rate1_off --slam-chi2-recovery false
 
 # rate=2.0 A/B (the failure-mode reproducer): pass --rate 2.0
 bash scripts/run_full_benchmark.sh -m subscribe -s V1_03_difficult -t 4 -r 3 \
-    --rate 2.0 --tag rerun_2026_04_23_rate2_recovery_on  --slam-chi2-recovery true
+    --rate 2.0 --tag rerun_2026_04_27_chi2_rate2_on  --slam-chi2-recovery true
 bash scripts/run_full_benchmark.sh -m subscribe -s V1_03_difficult -t 4 -r 3 \
-    --rate 2.0 --tag rerun_2026_04_23_rate2_recovery_off --slam-chi2-recovery false
+    --rate 2.0 --tag rerun_2026_04_27_chi2_rate2_off --slam-chi2-recovery false
 ```
 
 ---
@@ -704,7 +710,7 @@ counts, and the saved trajectory. Results are aggregated via
 `~/workspace/catkin_ws_ov/scripts/parse_results.py`.
 
 Four matched runs were executed, with results saved under
-`results/rpi5/{rerun_2026_04_26_pwt_baseline,rerun_2026_04_26_pwt_rtflags,rerun_2026_04_26_pwt_maxinterval,rerun_2026_04_26_pwt_combined}/`:
+`results/rpi5/docker_humble/{rerun_2026_04_26_pwt_baseline,rerun_2026_04_26_pwt_rtflags,rerun_2026_04_26_pwt_maxinterval,rerun_2026_04_26_pwt_combined}/`:
 
 1. **pwt_baseline** — persistent-worker-thread fork, stock Docker flags
 2. **pwt_rtflags** — PWT + `--cap-add=SYS_NICE --ulimit rtprio=99 --ulimit memlock=-1 --cpuset-cpus=0-3`
@@ -725,7 +731,7 @@ variability — complements the per-frame std seen in §3's tables).
 | Final A: back-to-back rerun of "max-interval" | 23.19 | 0.08 | 0.34% | 23.08 – 23.33 |
 | Final B: back-to-back rerun of "combined" | 23.22 | 0.09 | 0.39% | 23.11 – 23.36 |
 
-*Source: `results/rpi5/{rerun_2026_04_26_pwt_baseline,rerun_2026_04_26_pwt_rtflags,rerun_2026_04_26_pwt_maxinterval,rerun_2026_04_26_pwt_combined,rerun_2026_04_26_pwt_final_maxinterval,rerun_2026_04_26_pwt_final_combined}/sub_run{1..10}_wall.txt`. Provenance: RPi5 (openhd@192.168.200.81, BCM2712 4× Cortex-A76, Debian 13 Trixie), Docker `openvins-humble:latest` rebuilt 2026-04-26 from submodule `master-candidate`/`2a50450`, `slam_chi2_recovery: false`.*
+*Source: `results/rpi5/docker_humble/{rerun_2026_04_26_pwt_baseline,rerun_2026_04_26_pwt_rtflags,rerun_2026_04_26_pwt_maxinterval,rerun_2026_04_26_pwt_combined,rerun_2026_04_26_pwt_final_maxinterval,rerun_2026_04_26_pwt_final_combined}/sub_run{1..10}_wall.txt`. Provenance: RPi5 (openhd@192.168.200.81, BCM2712 4× Cortex-A76, Debian 13 Trixie), Docker `openvins-humble:latest` rebuilt 2026-04-26 from submodule `master-candidate`/`2a50450`, `slam_chi2_recovery: false`.*
 
 > **Variant equivalence under master-candidate:** the consolidated `master-candidate`
 > branch bakes both the persistent-worker thread (`0fe81a6`) AND the max-interval
@@ -751,7 +757,7 @@ synchronizer make no measurable additional difference at this load.
 | + Both combined | 46.32 / 46.32 | 45.48 – 46.22 | 45.99 |
 
 *Source: column 1 (slam_feats_in_state) averaged across all frames per run,
-from `results/rpi5/{rerun_2026_04_26_pwt_baseline,rerun_2026_04_26_pwt_rtflags,rerun_2026_04_26_pwt_maxinterval,rerun_2026_04_26_pwt_combined}/{serial_run*,sub_run*}_feats.txt`.*
+from `results/rpi5/docker_humble/{rerun_2026_04_26_pwt_baseline,rerun_2026_04_26_pwt_rtflags,rerun_2026_04_26_pwt_maxinterval,rerun_2026_04_26_pwt_combined}/{serial_run*,sub_run*}_feats.txt`.*
 
 Cross-platform comparison vs x86 (baseline condition only, matches the format in §3):
 
@@ -778,7 +784,7 @@ deterministic run (std and range are 0 by construction).
 | Final A: max-interval only | 0.793 ± 0.220° | 0.663° | 77.8 ± 24.5 mm | 70.0 mm |
 | Final B: max-interval + RT flags | 0.764 ± 0.133° | 0.481° | 69.1 ± 18.8 mm | 71.0 mm |
 
-*Source: `results/rpi5/{rerun_2026_04_26_pwt_baseline,rerun_2026_04_26_pwt_rtflags,rerun_2026_04_26_pwt_maxinterval,rerun_2026_04_26_pwt_combined,rerun_2026_04_26_pwt_final_maxinterval,rerun_2026_04_26_pwt_final_combined}/sub_run{1..10}_pose.txt`
+*Source: `results/rpi5/docker_humble/{rerun_2026_04_26_pwt_baseline,rerun_2026_04_26_pwt_rtflags,rerun_2026_04_26_pwt_maxinterval,rerun_2026_04_26_pwt_combined,rerun_2026_04_26_pwt_final_maxinterval,rerun_2026_04_26_pwt_final_combined}/sub_run{1..10}_pose.txt`
 evaluated against `ov_data/euroc_mav/V1_01_easy.txt`.*
 
 The Final A/B pair was run back-to-back (minimizing between-session state drift)
