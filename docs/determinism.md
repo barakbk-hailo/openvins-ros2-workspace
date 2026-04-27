@@ -696,10 +696,12 @@ benchmarks on V1_01_easy stereo:
 
 ### Methodology
 
-`~/workspace/scripts/run_pwt_benchmark_v2.sh` runs 2 serial + 10 subscribe reps on V1_01_easy
-stereo in fresh containers per rep (no state leakage between runs). Each rep captures
-wall, process-CPU and thread-CPU timing, feature counts, and the saved trajectory.
-Results are aggregated via `~/workspace/catkin_ws_ov/scripts/aggregate_pwt.py`.
+`bash scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy -t 4 -r 10 --docker
+openvins-humble:latest --tag <name>` runs 10 subscribe reps on V1_01_easy stereo,
+spawning a fresh container per rep via the `docker_wrap` helper (no state leakage
+between runs). Each rep captures wall, process-CPU and thread-CPU timing, feature
+counts, and the saved trajectory. Results are aggregated via
+`~/workspace/catkin_ws_ov/scripts/aggregate_pwt.py`.
 
 Four matched runs were executed, with results saved under
 `results/rpi5/{rerun_2026_04_26_pwt_baseline,rerun_2026_04_26_pwt_rtflags,rerun_2026_04_26_pwt_maxinterval,rerun_2026_04_26_pwt_combined}/`:

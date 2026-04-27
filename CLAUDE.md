@@ -58,23 +58,27 @@ Timing files are CSV: `timestamp,tracking,propagation,msckf_update,slam_update,s
 
 ## Benchmarking Scripts
 
-x86 host (run from workspace root):
+All scripts run from the workspace root and are cross-platform — `RESULTS_BASE`
+auto-detects from `uname -m` (`x86_64` → `results/timing/x86`, `aarch64` →
+`results/timing/rpi5`). Native vs. Docker is orthogonal to arch and is selected
+via `--docker <image>` / `--docker-flags '<args>'` on `run_full_benchmark.sh`.
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/run_full_benchmark.sh` | Flexible orchestrator: serial/subscribe × sequences × threads × cameras × reps × rates. `--rate <csv>` adds a rate-sweep dimension (e.g. `--rate 1.0,2.0,5.0` = Phase 3 rate-feasibility). `--quick` for 1-rep smoke, `--dry-run` to print planned cells, `--help` for options. Output base auto-detected by arch (`x86` on x86_64, `rpi5` on aarch64). |
-| `scripts/run_timing_sweep.sh` | Config sensitivity sweep: 5 variants (downsample, ±features, no-SLAM, 1-thread OpenCV) on V1_01_easy serial (Phase 2) |
+| `scripts/run_full_benchmark.sh` | Flexible orchestrator: serial/subscribe × sequences × threads × cameras × reps × rates. `--rate <csv>` is a sweep dimension (e.g. `--rate 1.0,2.0,5.0` = Phase 3 rate-feasibility). `--docker <image>` wraps each launch in a `docker run` (used for the RPi5 PWT and Docker-RT comparisons). `--quick`, `--dry-run`, `--help`. |
+| `scripts/run_timing_sweep.sh` | Config sensitivity sweep: 5 variants (downsample, ±features, no-SLAM, 1-thread OpenCV) on V1_01_easy serial (Phase 2). |
+| `scripts/parse_results.py` | Post-hoc results aggregator (cross-run mean/std/CV, CPU/Wall ratio, SLAM features, ATE). Reads any `<results>/<tag>/` directory. |
+| `scripts/record_poses.py` | Manual evaluation utility — VIO + Vicon GT pose recorder for live testing. |
 
-RPi5 host (run from workspace root, requires Docker + a prebuilt image):
+All shell scripts source `scripts/bench_lib.sh` for the ROS-distro detection,
+config templating (with grep-verified `sed` substitutions), validators,
+user-scoped `pkill`, the arch-derived results base, and the `docker_wrap`
+native-vs-Docker dispatcher. Add new orchestrator scripts the same way.
 
-| Script | Purpose |
-|--------|---------|
-| `scripts/run_pwt_benchmark_v2.sh` | Single PWT variant on V1_01_easy: 2 serial + N subscribe reps inside the named Docker image. Pass extra Docker flags positionally for RT testing. |
-| `scripts/run_pwt_final_ab.sh` | Sequential A/B harness — calls `scripts/run_pwt_benchmark_v2.sh` twice (with/without RT flags) to minimise system-load drift between the two halves. |
-
-All x86 scripts source `scripts/bench_lib.sh` for the ROS-distro detection,
-config templating (with grep-verified `sed` substitutions), validators, and
-user-scoped `pkill`. Add new orchestrator scripts the same way.
+**Real-time scheduling flags tested in the PWT investigation** — pass via
+`--docker-flags` to reproduce the comparison in `docs/determinism.md` §6:
+`--cap-add=SYS_NICE --ulimit rtprio=99 --ulimit memlock=-1 --cpuset-cpus=0-3`.
+See [docs/rpi5-benchmarking.md](docs/rpi5-benchmarking.md) for what each flag does.
 
 Example: targeted subscribe benchmark on a single sequence
 ```bash

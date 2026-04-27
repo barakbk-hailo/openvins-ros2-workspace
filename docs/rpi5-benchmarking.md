@@ -400,6 +400,47 @@ for planning.
 
 ---
 
+## Real-time scheduling flags tested
+
+The PWT investigation (see [docs/determinism.md §6](determinism.md#6-rpi5-deployment-investigation))
+compared timing variability with vs without Docker real-time scheduling flags.
+The flags tested were:
+
+| Flag | What it does |
+|---|---|
+| `--cap-add=SYS_NICE` | Lets processes call `sched_setscheduler()` to raise their own scheduling priority. Required for the `rtprio` ulimit to take effect. |
+| `--ulimit rtprio=99` | Raises the RT-priority ceiling for processes inside the container from the default 0 to 99 (the highest non-kernel value). |
+| `--ulimit memlock=-1` | Removes the per-process memory-lock cap — lets the runtime `mlockall()` to keep VIO state pages in RAM and avoid page-fault stalls. |
+| `--cpuset-cpus=0-3` | Pins the container to CPU cores 0–3 (all four RPi5 A76 cores). Mostly for explicitness; the default scheduler already uses all cores. |
+
+The exact comparison from the investigation finding **no measurable improvement
+from RT flags** (cross-run wall-time CV stayed within session-noise) is
+reproducible with two `run_full_benchmark.sh` invocations differing only in
+`--docker-flags`:
+
+```bash
+# Without RT flags (baseline)
+bash scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy -t 4 -r 10 \
+    --docker openvins-humble:latest --tag rerun_pwt_baseline
+
+# With RT flags
+bash scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy -t 4 -r 10 \
+    --docker openvins-humble:latest \
+    --docker-flags '--cap-add=SYS_NICE --ulimit rtprio=99 --ulimit memlock=-1 --cpuset-cpus=0-3' \
+    --tag rerun_pwt_rtflags
+
+# Compare with the post-hoc analyzer:
+python3 scripts/aggregate_pwt.py ~/results/timing/rpi5/subscribe/rerun_pwt_baseline --ate
+python3 scripts/aggregate_pwt.py ~/results/timing/rpi5/subscribe/rerun_pwt_rtflags --ate
+```
+
+The two halves are sequential (one tag, then the other) to minimise
+between-session drift; this is what the now-deleted `run_pwt_final_ab.sh`
+wrapper used to do as a single command. With the consolidated orchestrator
+the two invocations are explicit at the cost of one extra command line.
+
+---
+
 ## 6. Raw timing data
 
 ```

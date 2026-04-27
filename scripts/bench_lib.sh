@@ -135,6 +135,57 @@ kill_stale_subscribe_nodes() {
   pkill -u "$USER" -KILL -f 'run_subscribe_msckf' 2>/dev/null || true
 }
 
+# Kill all containers spawned from $DOCKER_IMAGE (used by the EXIT/INT/TERM
+# trap when the orchestrator runs with --docker so a Ctrl-C doesn't leak a
+# running container).
+kill_stale_docker_containers() {
+  [ -n "${DOCKER_IMAGE:-}" ] || return 0
+  command -v docker >/dev/null 2>&1 || return 0
+  local stale
+  stale=$(docker ps -q --filter "ancestor=$DOCKER_IMAGE" 2>/dev/null || true)
+  [ -n "$stale" ] && docker kill $stale >/dev/null 2>&1 || true
+}
+
+# ── Native / Docker dispatcher ──
+# Run a block of shell code either natively (eval) or inside a docker container.
+# Set DOCKER_IMAGE (typically via the orchestrator's --docker flag) to switch
+# modes. DOCKER_FLAGS (a single space-separated string) is word-split and
+# passed to `docker run` so callers can layer on `--cap-add`, `--ulimit`, etc.
+#
+# Mounts: $HOME/workspace, $HOME/datasets, and $HOME/results are all bind-
+# mounted at their host paths so any path the orchestrator passes (CFG, bag
+# dir, results dir) resolves to the same filesystem location in both modes.
+# HOME=/tmp is exported in the container so `~/.ros/log` writes don't fail
+# when the container user has no writable home.
+#
+# In docker mode the inner code sources `/opt/ros_ws/install/setup.bash` (the
+# image's prebuilt OpenVINS), NOT the host workspace overlay — the image is
+# the source of truth for the binary being measured.
+docker_wrap() { # <bash_code>
+  if [ -z "${DOCKER_IMAGE:-}" ]; then
+    eval "$1"
+    return $?
+  fi
+  command -v docker >/dev/null 2>&1 || {
+    echo "ERROR: --docker $DOCKER_IMAGE requested but docker is not in PATH" >&2
+    return 1
+  }
+  local -a docker_flags_array=()
+  if [ -n "${DOCKER_FLAGS:-}" ]; then
+    # Intentional word-splitting on user-supplied flags.
+    # shellcheck disable=SC2206
+    docker_flags_array=( $DOCKER_FLAGS )
+  fi
+  docker run --rm --network host \
+    --user "$(id -u):$(id -g)" \
+    -v "$HOME/workspace:$HOME/workspace" \
+    -v "$HOME/datasets:$HOME/datasets" \
+    -v "$HOME/results:$HOME/results" \
+    -e HOME=/tmp \
+    "${docker_flags_array[@]}" \
+    "$DOCKER_IMAGE" bash -c "set -e; source /opt/ros_ws/install/setup.bash; $1"
+}
+
 # ── Output validation ──
 # A run "completed" iff its wall-clock CSV has more than this many data rows.
 # 100 catches "init only" partial runs; every EuRoC bag produces >2000 frames.

@@ -93,9 +93,9 @@ echo $AMENT_PREFIX_PATH
 
 ### 1d. Run the container — non-interactive (benchmark scripts)
 
-The benchmark orchestrators (`scripts/run_pwt_benchmark_v2.sh`,
-`scripts/run_full_benchmark.sh`) invoke docker non-interactively. The call pattern
-they use, mirrored here for ad-hoc runs:
+The orchestrator `scripts/run_full_benchmark.sh --docker <image>` invokes docker
+non-interactively (via the `docker_wrap` helper in `scripts/bench_lib.sh`).
+The call pattern it uses, mirrored here for ad-hoc runs:
 
 ```bash
 docker run --rm --network host --privileged \
@@ -282,24 +282,27 @@ ros2 launch ov_msckf serial.launch.py \
 > `source /opt/ros_ws/install/setup.bash` when you open an interactive shell,
 > so the `source` line above is redundant for `docker run -it`. It's only
 > needed when you spawn a `bash -c '...'` non-interactively (where `.bashrc`
-> isn't sourced) — that's why the benchmark script `scripts/run_pwt_benchmark_v2.sh`
-> always sources it explicitly inside its `docker run ... bash -c '...'`
-> invocation.
+> isn't sourced) — that's why the orchestrator's `docker_wrap` helper in
+> `scripts/bench_lib.sh` always sources it explicitly inside its
+> `docker run ... bash -c '...'` invocation.
 
-To reproduce the Phase 4 RPi5 timing numbers, use `scripts/run_pwt_benchmark_v2.sh`
-from the **host** (not from inside the container — the script itself spawns
-its own docker containers per rep):
+To reproduce the Phase 4 RPi5 timing numbers, use `scripts/run_full_benchmark.sh`
+from the **host** with `--docker openvins-humble:latest` (the orchestrator
+spawns its own docker containers per cell via the `docker_wrap` helper):
 
 ```bash
 # On the RPi5 host shell, NOT inside docker:
 cd ~/workspace/catkin_ws_ov
-bash scripts/run_pwt_benchmark_v2.sh my_baseline openvins-humble 10 -e HOME=/tmp
+bash scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy -t 4 -r 10 \
+    --docker openvins-humble:latest --tag my_baseline
 ```
 
-The first three positional args are `<results_subdir> <image_tag> <num_subscribe_reps>`;
-extra args after that are forwarded as docker flags. **Always include `-e HOME=/tmp`** —
-without it, the container's `--user $(id -u):$(id -g)` strips `HOME` and ros2 fails
-to create `~/.ros/log` on first launch.
+`docker_wrap` automatically applies `-e HOME=/tmp` (so the container's
+`--user $(id -u):$(id -g)` doesn't strip `HOME` and break `~/.ros/log` writes),
+mounts `$HOME/{workspace,datasets,results}` at the host path, and exports
+`--network host`. Extra docker flags go through `--docker-flags '...'` — see
+[rpi5-benchmarking.md "Real-time scheduling flags tested"](rpi5-benchmarking.md#real-time-scheduling-flags-tested)
+for the RT-comparison incantation.
 
 ### 3c. Subscribe mode (realtime test)
 

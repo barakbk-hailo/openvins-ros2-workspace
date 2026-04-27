@@ -32,12 +32,10 @@ catkin_ws_ov/
 ├── src/open_vins/              fork submodule (algorithm + nodes + launch files)
 ├── install.sh                  one-shot Ubuntu 22.04 / 24.04 setup (auto-detects)
 ├── scripts/
-│   ├── bench_lib.sh            shared library (sourced by orchestrators)
-│   ├── run_full_benchmark.sh   flexible orchestrator: serial + subscribe + bag-rate sweep
-│   ├── run_timing_sweep.sh     Phase 2: config sensitivity sweeps
-│   ├── run_pwt_benchmark_v2.sh RPi5 / Docker — single PWT variant on V1_01_easy
-│   ├── run_pwt_final_ab.sh     RPi5 / Docker — sequential RT-flag A/B harness
-│   ├── record_poses.py         subscribe-mode pose recorder (used by evaluation)
+│   ├── bench_lib.sh            shared library (arch detection, config templating, docker_wrap)
+│   ├── run_full_benchmark.sh   orchestrator: serial+subscribe × seqs × threads × cams × reps × rates × native/docker
+│   ├── run_timing_sweep.sh     Phase 2: config sensitivity sweeps on V1_01_easy serial
+│   ├── record_poses.py         subscribe-mode pose recorder (manual evaluation)
 │   └── aggregate_pwt.py        post-hoc results aggregator (PWT investigation)
 ├── results/
 │   ├── stereo/  mono/          x86 EuRoC trajectory estimates (paper reproduction)
@@ -57,6 +55,8 @@ tag → (platform, submodule commit, config) lookup.
 - **`slam_chi2_recovery` default `false`** (in `config/euroc_mav/estimator_config.yaml`). Leave at the default for offline serial replay and paper-repro reproducibility — the always-on chi2 relaxation interfered with stereo init on dark sequences (MH_05_difficult). Set to `true` for subscribe-mode deployment at >1× realtime under load (V1_03_difficult @ rate 2.0 shows ATE 3.7 m with `true` vs >50 m collapse with `false` in 2/3 runs). See [docs/determinism.md §4](docs/determinism.md#4-optional-safety-net-slam-recovery-mechanism).
 - **`--slam-chi2-recovery <true|false>`** CLI flag on `scripts/run_full_benchmark.sh` and `scripts/run_timing_sweep.sh` for ad-hoc overrides without editing the YAML.
 - **`--rate <csv>` sweep dimension** on `scripts/run_full_benchmark.sh` — single invocation runs the matrix once per rate (e.g. `--rate 1.0,2.0,5.0` for Phase-3 rate-feasibility). Replaces the dedicated `run_timing_subscribe.sh` script (deleted).
+- **`--docker <image>` / `--docker-flags '<args>'`** on `scripts/run_full_benchmark.sh` — runs the OpenVINS launches inside a Docker container instead of natively. Same orchestrator handles RPi5+Docker (where the PWT investigation lives) and any future x86+Docker workflows. Replaces the dedicated `run_pwt_benchmark_v2.sh` and `run_pwt_final_ab.sh` scripts (deleted). RT-flag comparison is reproduced via two invocations differing only in `--docker-flags` — the exact flags are documented in `docs/rpi5-benchmarking.md`.
+- **Cross-platform `RESULTS_BASE`** — auto-detected from `uname -m` (`x86_64` → `results/timing/x86`, `aarch64` → `results/timing/rpi5`). Override via `--results-base` or the `RESULTS_BASE` env var.
 - **Serial-mode timing improved 8-15 %** — the persistent-worker thread is now properly gated on `use_multi_threading_subs`, so it's no longer spawned in serial mode. Also makes serial bit-deterministic across reps.
 - **Paper-reproduction estimates regenerated** under the consolidated `master-candidate` submodule (`results/{stereo,mono}/estimate_*.txt`); ATE values bit-reproduce the prior committed numbers for every sequence × mode.
 - **Latest benchmark tags:** `rerun_2026_04_23` (x86 main suite + paper repro + chi2 A/B) and `rerun_2026_04_26_pwt_*` + `rerun_2026_04_26_paper` (RPi5 PWT variants + cross-platform paper repro). Retired tags (`bench_5rep_3clock`, `bench_persistent_worker`, `pwt_*`) are removed from `results/` but preserved in git history.

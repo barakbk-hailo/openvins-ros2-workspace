@@ -22,6 +22,8 @@ SUBSCRIBE_REPS=5
 RATES_CSV="1.0"
 BENCH_TAG="bench_$(date +%Y%m%d_%H%M%S)"
 SLAM_CHI2_RECOVERY=""  # empty = leave config value alone (shipping default is false)
+DOCKER_IMAGE=""        # empty = run natively; set via --docker
+DOCKER_FLAGS=""        # extra args passed to `docker run` (one quoted token, word-split)
 DRY_RUN=0
 
 usage() {
@@ -53,6 +55,16 @@ Options:
                                        (x86_64→x86, aarch64→rpi5; auto-detected)
       --slam-chi2-recovery <true|false>  override slam_chi2_recovery in the temp config
                                        (default: leave config's value alone)
+      --docker <image>                 run the OpenVINS launches inside this Docker
+                                       image (e.g. openvins-humble:latest). Native
+                                       by default. Mounts $HOME/workspace,
+                                       $HOME/datasets, $HOME/results.
+      --docker-flags '<args>'          extra args passed through to `docker run`
+                                       (one quoted token, word-split). Example:
+                                       --docker-flags '--cap-add=SYS_NICE
+                                                       --ulimit rtprio=99
+                                                       --ulimit memlock=-1
+                                                       --cpuset-cpus=0-3'
       --dry-run                        print the cells that would run, no execution
       --quick                          shortcut: -m serial -s V1_01_easy -t 4 -c stereo -r 1
   -h, --help                           show this help and exit
@@ -107,6 +119,10 @@ while [[ $# -gt 0 ]]; do
     --results-base)           RESULTS_BASE="${2:-}"; shift 2 ;;
     --slam-chi2-recovery=*)   SLAM_CHI2_RECOVERY="${1#*=}"; shift ;;
     --slam-chi2-recovery)     SLAM_CHI2_RECOVERY="${2:-}"; shift 2 ;;
+    --docker=*)               DOCKER_IMAGE="${1#*=}"; shift ;;
+    --docker)                 DOCKER_IMAGE="${2:-}"; shift 2 ;;
+    --docker-flags=*)         DOCKER_FLAGS="${1#*=}"; shift ;;
+    --docker-flags)           DOCKER_FLAGS="${2:-}"; shift 2 ;;
     --dry-run)                DRY_RUN=1; shift ;;
     --quick)
       MODE="serial"; SEQUENCES_CSV="V1_01_easy"; THREADS_CSV="4"
@@ -172,10 +188,16 @@ TMP_CONFIG_1="$CONFIG_DIR/estimator_config_bench_1thr.yaml"
 cleanup() {
   rm -f "$TMP_CONFIG_4" "$TMP_CONFIG_1" 2>/dev/null || true
   kill_stale_subscribe_nodes
+  kill_stale_docker_containers
 }
 trap cleanup EXIT INT TERM
 
-source_ros
+# Skip host-side ROS sourcing when --docker is set: the launches happen inside
+# the container, which has its own /opt/ros_ws overlay. We still need
+# `docker` and basic shell utilities, which are already in PATH.
+if [ -z "$DOCKER_IMAGE" ]; then
+  source_ros
+fi
 kill_stale_subscribe_nodes
 
 # Compose per-mode tag suffix. Stereo keeps the historical naming
@@ -200,16 +222,6 @@ get_config() {
   echo "$TMP"
 }
 
-save_results() {
-  local DIR="$1" TAG="$2"
-  mkdir -p "$DIR"
-  [ -f "$TIMING_WALL_TMP" ]   && cp "$TIMING_WALL_TMP"   "$DIR/${TAG}_wall.txt"
-  [ -f "$TIMING_CPU_TMP" ]    && cp "$TIMING_CPU_TMP"    "$DIR/${TAG}_cpu.txt"
-  [ -f "$TIMING_THREAD_TMP" ] && cp "$TIMING_THREAD_TMP" "$DIR/${TAG}_thread.txt"
-  [ -f "$FEATS_TMP" ]         && cp "$FEATS_TMP"         "$DIR/${TAG}_feats.txt"
-  [ -f "$EST_TMP" ]           && cp "$EST_TMP"           "$DIR/${TAG}_est.txt"
-}
-
 get_slam_avg() {
   local F="$1"
   [ -f "$F" ] || { echo "?"; return; }
@@ -230,6 +242,12 @@ echo "  Rates:     ${RATES[*]}"
 echo "  Cameras:   $CAMERAS"
 echo "  Sub reps:  $SUBSCRIBE_REPS"
 echo "  Tag:       $BENCH_TAG"
+if [ -n "$DOCKER_IMAGE" ]; then
+  echo "  Docker:    $DOCKER_IMAGE"
+  [ -n "$DOCKER_FLAGS" ] && echo "  DkrFlags:  $DOCKER_FLAGS"
+else
+  echo "  Docker:    (native — no --docker)"
+fi
 echo "  Date:      $(date)"
 [ "$DRY_RUN" -eq 1 ] && echo "  DRY-RUN: planning only, no execution"
 echo "================================================================"
@@ -255,19 +273,30 @@ if [[ "$MODE" == "serial" || "$MODE" == "both" ]]; then
           continue
         fi
         CFG=$(get_config "$thr")
-        rm -f "$TIMING_WALL_TMP" "$TIMING_CPU_TMP" "$TIMING_THREAD_TMP" "$FEATS_TMP" "$EST_TMP" "$STD_TMP"
+        mkdir -p "$DIR"
         echo "--- serial $seq ${thr}-thr $CAM_NAME ---"
-        ros2 launch ov_msckf serial.launch.py \
-            config_path:="$CFG" \
-            path_bag:="$DATASETS_DIR/$seq" \
-            max_cameras:="$CAM_N" use_stereo:="$CAM_STEREO" \
-            save_total_state:=true \
-            filepath_est:="$EST_TMP" \
-            filepath_std:="$STD_TMP" 2>&1 | tail -1 || {
+        # Run the launch + save in a single shell context so the cp commands
+        # see the same /tmp filesystem as the launch (matters in --docker mode,
+        # where /tmp is the container's /tmp, not the host's).
+        if ! docker_wrap "
+          rm -f $TIMING_WALL_TMP $TIMING_CPU_TMP $TIMING_THREAD_TMP $FEATS_TMP $EST_TMP $STD_TMP
+          ros2 launch ov_msckf serial.launch.py \\
+              config_path:='$CFG' \\
+              path_bag:='$DATASETS_DIR/$seq' \\
+              max_cameras:=$CAM_N use_stereo:=$CAM_STEREO \\
+              save_total_state:=true \\
+              filepath_est:='$EST_TMP' \\
+              filepath_std:='$STD_TMP' 2>&1 | tail -1
+          [ -f $TIMING_WALL_TMP ]   && cp $TIMING_WALL_TMP   '$DIR/${TAG}_wall.txt'
+          [ -f $TIMING_CPU_TMP ]    && cp $TIMING_CPU_TMP    '$DIR/${TAG}_cpu.txt'
+          [ -f $TIMING_THREAD_TMP ] && cp $TIMING_THREAD_TMP '$DIR/${TAG}_thread.txt'
+          [ -f $FEATS_TMP ]         && cp $FEATS_TMP         '$DIR/${TAG}_feats.txt'
+          [ -f $EST_TMP ]           && cp $EST_TMP           '$DIR/${TAG}_est.txt'
+          true
+        "; then
           echo "  -> launch FAILED" >&2
           continue
-        }
-        save_results "$DIR" "$TAG"
+        fi
         if ! run_complete "$DIR" "$TAG"; then
           echo "  -> WARNING: produced incomplete results (< $MIN_ROWS_FOR_COMPLETE_RUN frames)" >&2
         fi
@@ -311,24 +340,37 @@ if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
             continue
           fi
           CFG=$(get_config "$thr")
-          rm -f "$TIMING_WALL_TMP" "$TIMING_CPU_TMP" "$TIMING_THREAD_TMP" "$FEATS_TMP" "$EST_TMP" "$STD_TMP"
+          mkdir -p "$DIR"
           echo "--- subscribe $seq ${thr}-thr rate=$rate run $i / $SUBSCRIBE_REPS ---"
 
-          ros2 launch ov_msckf subscribe.launch.py \
-              config_path:="$CFG" \
-              max_cameras:=2 use_stereo:=true \
-              save_total_state:=true \
-              filepath_est:="$EST_TMP" \
-              filepath_std:="$STD_TMP" &>/dev/null &
-          OV_PID=$!
-          sleep 3
-          ros2 bag play "$DATASETS_DIR/$seq" --rate "$rate" -d "$BAG_PLAY_DELAY" &>/dev/null
-          sleep 5
-          kill "$OV_PID" 2>/dev/null || true
-          wait "$OV_PID" 2>/dev/null || true
+          # Whole rep — launch + bag play + kill + save — runs in one shell
+          # context so /tmp is consistent (host's in native mode, container's
+          # in --docker mode; cps in the same shell see the same FS).
+          docker_wrap "
+            rm -f $TIMING_WALL_TMP $TIMING_CPU_TMP $TIMING_THREAD_TMP $FEATS_TMP $EST_TMP $STD_TMP
+            ros2 launch ov_msckf subscribe.launch.py \\
+                config_path:='$CFG' \\
+                max_cameras:=2 use_stereo:=true \\
+                save_total_state:=true \\
+                filepath_est:='$EST_TMP' \\
+                filepath_std:='$STD_TMP' >/dev/null 2>&1 &
+            OV_PID=\$!
+            sleep 3
+            ros2 bag play '$DATASETS_DIR/$seq' --rate $rate -d $BAG_PLAY_DELAY >/dev/null 2>&1
+            sleep 5
+            kill \$OV_PID 2>/dev/null || true
+            wait \$OV_PID 2>/dev/null || true
+            [ -f $TIMING_WALL_TMP ]   && cp $TIMING_WALL_TMP   '$DIR/${TAG}_wall.txt'
+            [ -f $TIMING_CPU_TMP ]    && cp $TIMING_CPU_TMP    '$DIR/${TAG}_cpu.txt'
+            [ -f $TIMING_THREAD_TMP ] && cp $TIMING_THREAD_TMP '$DIR/${TAG}_thread.txt'
+            [ -f $FEATS_TMP ]         && cp $FEATS_TMP         '$DIR/${TAG}_feats.txt'
+            [ -f $EST_TMP ]           && cp $EST_TMP           '$DIR/${TAG}_est.txt'
+            true
+          " || true
+          # In native mode, also reap host-side strays. In --docker mode the
+          # container is --rm so it cleans itself up; the user-scoped pkill
+          # is a no-op there but harmless.
           kill_stale_subscribe_nodes
-
-          save_results "$DIR" "$TAG"
           if ! run_complete "$DIR" "$TAG"; then
             echo "  -> WARNING: produced incomplete results (< $MIN_ROWS_FOR_COMPLETE_RUN frames)" >&2
           fi
