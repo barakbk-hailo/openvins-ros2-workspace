@@ -79,6 +79,45 @@ def parse_timing_csv(path):
     return values
 
 
+# Component column order matches the OpenVINS timing CSV header:
+#   timestamp, tracking, propagation, msckf update, slam update,
+#   slam delayed, re-tri & marg, total
+_COMPONENTS = ("tracking", "propagation", "msckf update", "slam update",
+               "slam delayed", "re-tri & marg", "total")
+
+
+def parse_timing_csv_components(path):
+    """Return dict {component_name: [per-frame values in seconds]}."""
+    out = {c: [] for c in _COMPONENTS}
+    with open(path) as f:
+        for line in f:
+            if line.startswith("#"):
+                continue
+            parts = line.strip().split(",")
+            if len(parts) < 8:
+                continue
+            for i, c in enumerate(_COMPONENTS):
+                try:
+                    out[c].append(float(parts[i + 1]))
+                except (ValueError, IndexError):
+                    pass
+    return out
+
+
+def percentile(values, p):
+    """Linear-interpolated percentile (matches numpy's default). p in [0,100]."""
+    if not values:
+        return None
+    xs = sorted(values)
+    if len(xs) == 1:
+        return xs[0]
+    k = (len(xs) - 1) * p / 100.0
+    lo = int(k)
+    hi = min(lo + 1, len(xs) - 1)
+    frac = k - lo
+    return xs[lo] + frac * (xs[hi] - xs[lo])
+
+
 def parse_feats_csv(path):
     """Return mean of column 1 (slam_feats_in_state) across all frames."""
     values = []
@@ -277,6 +316,50 @@ def report_cell(cell, runs, do_ate, gt, brief):
               f"ori rmse mean={s_ate_ori['mean']:.3f}°")
 
 
+def report_cell_per_component(cell, runs):
+    """Paper-style per-component breakdown. Frames are pooled across all reps
+    in this cell, then mean / std / p99 are computed per component, per clock.
+    Matches the convention in docs/benchmark-analysis.md (cells are
+    `mean ± std (p99: X)` over per-frame values, in ms)."""
+    label = cell_label(cell, brief=False)
+    rep_count = len(runs)
+
+    pooled = {"wall": {}, "cpu": {}, "thread": {}}
+    total_frames = 0
+    for run_id in sorted(runs):
+        for clock in ("wall", "cpu", "thread"):
+            f = runs[run_id].get(clock)
+            if not f:
+                continue
+            comps = parse_timing_csv_components(f)
+            for comp, vals in comps.items():
+                pooled[clock].setdefault(comp, []).extend(vals)
+                if clock == "wall" and comp == "total":
+                    total_frames += len(vals)
+
+    if not pooled["wall"]:
+        return
+
+    plural = "s" if rep_count != 1 else ""
+    print(f"\n  {label}  ({rep_count} run{plural}, {total_frames} frames pooled)")
+    print(f"    {'Component':<14s} {'wall (mean±std, p99)':<24s} "
+          f"{'cpu (mean±std, p99)':<24s} {'thread (mean±std, p99)':<24s}")
+    for comp in _COMPONENTS:
+        cells = []
+        for clock in ("wall", "cpu", "thread"):
+            v = pooled[clock].get(comp, [])
+            if not v:
+                cells.append(f"{'—':<24s}")
+                continue
+            v_ms = [x * 1000 for x in v]
+            mean = statistics.mean(v_ms)
+            std = statistics.stdev(v_ms) if len(v_ms) > 1 else 0.0
+            p99 = percentile(v_ms, 99)
+            cells.append(f"{f'{mean:.1f}±{std:.1f} (p99: {p99:.1f})':<24s}")
+        prefix = "**" if comp == "total" else "  "
+        print(f"  {prefix} {comp:<14s} {' '.join(cells)}")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.strip().split("\n")[0])
     ap.add_argument("results_dirs", nargs="+",
@@ -289,6 +372,10 @@ def main():
                          "Auto-skipped if ov_eval is not installed.")
     ap.add_argument("--brief", action="store_true",
                     help="Terse one-line-per-cell output (orchestrator end-of-run summary).")
+    ap.add_argument("--per-component", action="store_true",
+                    help="Paper-style per-component breakdown (tracking, propagation, "
+                         "msckf update, …, total) with mean ± std and p99 over pooled frames "
+                         "across all reps in each cell. Matches docs/benchmark-analysis.md.")
     args = ap.parse_args()
 
     do_ate = args.ate
@@ -311,7 +398,9 @@ def main():
         total_runs = sum(len(r) for r in cells.values())
         print(f"\n=== {d} ({total_runs} run{'s' if total_runs != 1 else ''} "
               f"across {len(cells)} cell{'s' if len(cells) != 1 else ''}) ===")
-        for cell in sorted(cells):
+        # Some legacy cells have thr=None (rate-feasibility files); map to -1
+        # so tuple comparison doesn't trip over None vs int.
+        for cell in sorted(cells, key=lambda c: tuple(-1 if x is None else x for x in c)):
             runs = cells[cell]
             gt = args.gt
             if gt is None:
@@ -320,7 +409,10 @@ def main():
                     candidate = ws_gt_dir / f"{seq}.txt"
                     if candidate.exists():
                         gt = str(candidate)
-            report_cell(cell, runs, do_ate, gt, brief=args.brief)
+            if args.per_component:
+                report_cell_per_component(cell, runs)
+            else:
+                report_cell(cell, runs, do_ate, gt, brief=args.brief)
         print()
 
 

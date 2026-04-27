@@ -421,20 +421,38 @@ fi
 # ANALYSIS
 # ══════════════════════════════════════════════════════════════════════
 
-# Mean of the trailing "total" column (in ms) from an OpenVINS timing CSV.
-# Reads the file directly: timing CSVs have header `# timestamp,...,total`
-# and 8 numeric columns per data row. This avoids `ros2 run ov_eval
-# timing_flamegraph`, which is a Qt/matplotlib GUI tool that aborts in
-# headless environments. Echoes empty on missing/empty file.
-total_ms() {
+# Frame-level stats from the trailing "total" column of an OpenVINS timing
+# CSV: prints "mean std p99" (ms, space-separated). Empty on missing/empty
+# file. Reads the CSV directly — avoids `ros2 run ov_eval timing_flamegraph`,
+# which is a Qt/matplotlib GUI tool that aborts on headless hosts. Requires
+# GNU awk (asort).
+frame_stats() {
   local f="$1"
   [ -f "$f" ] || return 0
-  awk -F, '!/^#/ && NF >= 2 { sum += $NF; n++ }
-           END { if (n > 0) printf "%.1f", (sum/n)*1000 }' "$f"
+  awk -F, '
+    !/^#/ && NF >= 2 { v[++n] = $NF }
+    END {
+      if (n == 0) exit
+      s = 0; for (i=1;i<=n;i++) s += v[i]
+      m = s/n
+      ss = 0; for (i=1;i<=n;i++) ss += (v[i]-m)*(v[i]-m)
+      sd = (n>1) ? sqrt(ss/(n-1)) : 0
+      asort(v)
+      idx = int(0.99 * n + 0.5); if (idx < 1) idx = 1; if (idx > n) idx = n
+      printf "%.1f %.1f %.1f", m*1000, sd*1000, v[idx]*1000
+    }' "$f"
 }
 
-# Format a whitespace-separated series of numbers as "mean±std".
-# Single value collapses std to 0.0; empty input yields "--".
+# Format a frame_stats triple ("mean std p99") as "mean±std (p99: X)".
+# Empty input yields a literal em dash for the cell.
+fmt_frame_cell() {
+  if [ -z "$1" ]; then echo "—"; return; fi
+  read -r m s p <<<"$1"
+  printf '%s±%s (p99: %s)' "$m" "$s" "$p"
+}
+
+# Mean ± std of a whitespace-separated series. Single value → "mean±0.0";
+# empty → "--".
 mean_std() {
   awk '{
     n = NF
@@ -445,6 +463,18 @@ mean_std() {
     sd = (n>1) ? sqrt(ss/(n-1)) : 0
     printf "%.1f±%.1f", m, sd
   }' <<<"$*"
+}
+
+# Find the first rep index that has a populated wall.txt for a subscribe cell.
+# Echoes the index (1..reps) or empty if none.
+first_complete_rep() {
+  local dir="$1" prefix="$2"
+  local i
+  for i in $(seq 1 "$SUBSCRIBE_REPS"); do
+    if [ -f "$dir/${prefix}_run${i}_wall.txt" ]; then
+      echo "$i"; return
+    fi
+  done
 }
 
 # Print where output files for this run landed. Indented for nesting in summary.
@@ -467,52 +497,84 @@ echo ""
 
 # ── Serial timing table (3-clock totals) ──
 if [[ "$MODE" == "serial" || "$MODE" == "both" ]]; then
-  echo "--- Serial timing (mean total per clock, ms) ---"
-  printf "  %-14s %-3s %-6s %7s %7s %7s\n" "sequence" "thr" "cam" "wall" "cpu" "thread"
+  echo "--- Serial timing — frame-level total (ms) ---"
+  printf "  %-14s %-3s %-6s %22s %22s %22s\n" "sequence" "thr" "cam" \
+    "wall (mean±std, p99)" "cpu (mean±std, p99)" "thread (mean±std, p99)"
   for seq in "${SEQUENCES[@]}"; do
     for thr in "${THREADS[@]}"; do
       for cam_spec in "${CAM_CONFIGS[@]}"; do
         IFS=':' read -r CAM_NAME _ _ <<< "$cam_spec"
         TAG="$(tag_for "$seq" "$thr" "$CAM_NAME")"
         DIR="$RESULTS_BASE/serial/$BENCH_TAG"
-        WALL=$(total_ms "$DIR/${TAG}_wall.txt")
-        [ -z "$WALL" ] && continue
-        CPU=$(total_ms "$DIR/${TAG}_cpu.txt")
-        THRMS=$(total_ms "$DIR/${TAG}_thread.txt")
-        printf "  %-14s %-3s %-6s %7s %7s %7s\n" \
-          "$seq" "$thr" "$CAM_NAME" "$WALL" "${CPU:-—}" "${THRMS:-—}"
+        FS_WALL=$(frame_stats "$DIR/${TAG}_wall.txt")
+        [ -z "$FS_WALL" ] && continue
+        FS_CPU=$(frame_stats  "$DIR/${TAG}_cpu.txt")
+        FS_THR=$(frame_stats  "$DIR/${TAG}_thread.txt")
+        printf "  %-14s %-3s %-6s %22s %22s %22s\n" \
+          "$seq" "$thr" "$CAM_NAME" \
+          "$(fmt_frame_cell "$FS_WALL")" \
+          "$(fmt_frame_cell "$FS_CPU")" \
+          "$(fmt_frame_cell "$FS_THR")"
       done
     done
   done
   echo ""
 fi
 
-# ── Subscribe timing table (mean ± std across reps, 3 clocks) ──
+# ── Subscribe timing tables: frame-level (one rep) + across-reps aggregate ──
 if [[ ( "$MODE" == "subscribe" || "$MODE" == "both" ) && "$CAMERAS" != "mono" ]]; then
-  echo "--- Subscribe timing (mean ± std across $SUBSCRIBE_REPS reps, ms) ---"
-  printf "  %-14s %-3s %-5s %12s %12s %12s\n" "sequence" "thr" "rate" "wall" "cpu" "thread"
+  # Table 1: frame-level (rep N picked per cell — first complete one).
+  echo "--- Subscribe timing — frame-level total (ms; rep marked per row) ---"
+  printf "  %-14s %-3s %-5s %5s %22s %22s %22s\n" "sequence" "thr" "rate" "rep" \
+    "wall (mean±std, p99)" "cpu (mean±std, p99)" "thread (mean±std, p99)"
+  DIR="$RESULTS_BASE/subscribe/$BENCH_TAG"
   for seq in "${SEQUENCES[@]}"; do
     for thr in "${THREADS[@]}"; do
       for rate in "${RATES[@]}"; do
         if [ "$rate" = "1.0" ]; then rate_suffix=""; else rate_suffix="_rate${rate}"; fi
-        WALL_VALS="" CPU_VALS="" THR_VALS=""
-        DIR="$RESULTS_BASE/subscribe/$BENCH_TAG"
+        prefix="${seq}_${thr}thr${rate_suffix}"
+        REP=$(first_complete_rep "$DIR" "$prefix")
+        [ -z "$REP" ] && continue
+        BASE="$DIR/${prefix}_run${REP}"
+        FS_WALL=$(frame_stats "${BASE}_wall.txt")
+        [ -z "$FS_WALL" ] && continue
+        FS_CPU=$(frame_stats  "${BASE}_cpu.txt")
+        FS_THR=$(frame_stats  "${BASE}_thread.txt")
+        printf "  %-14s %-3s %-5s %5s %22s %22s %22s\n" \
+          "$seq" "$thr" "$rate" "$REP" \
+          "$(fmt_frame_cell "$FS_WALL")" \
+          "$(fmt_frame_cell "$FS_CPU")" \
+          "$(fmt_frame_cell "$FS_THR")"
+      done
+    done
+  done
+  echo ""
+
+  # Table 2: across-reps aggregate. Each cell shows
+  #   mean±std (of per-rep frame-mean) / mean±std (of per-rep frame-p99)
+  echo "--- Subscribe timing — across $SUBSCRIBE_REPS reps (mean±std of per-rep frame-mean / frame-p99, ms) ---"
+  printf "  %-14s %-3s %-5s %22s %22s %22s\n" "sequence" "thr" "rate" "wall" "cpu" "thread"
+  for seq in "${SEQUENCES[@]}"; do
+    for thr in "${THREADS[@]}"; do
+      for rate in "${RATES[@]}"; do
+        if [ "$rate" = "1.0" ]; then rate_suffix=""; else rate_suffix="_rate${rate}"; fi
+        WM="" WP="" CM="" CP="" TM="" TP=""
         for i in $(seq 1 "$SUBSCRIBE_REPS"); do
           BASE="$DIR/${seq}_${thr}thr${rate_suffix}_run${i}"
           [ -f "${BASE}_wall.txt" ] || continue
-          W=$(total_ms "${BASE}_wall.txt")
-          C=$(total_ms "${BASE}_cpu.txt")
-          T=$(total_ms "${BASE}_thread.txt")
-          [ -n "$W" ] && WALL_VALS+=" $W"
-          [ -n "$C" ] && CPU_VALS+=" $C"
-          [ -n "$T" ] && THR_VALS+=" $T"
+          read -r m _ p <<< "$(frame_stats "${BASE}_wall.txt")"
+          [ -n "$m" ] && WM+=" $m"; [ -n "$p" ] && WP+=" $p"
+          read -r m _ p <<< "$(frame_stats "${BASE}_cpu.txt")"
+          [ -n "$m" ] && CM+=" $m"; [ -n "$p" ] && CP+=" $p"
+          read -r m _ p <<< "$(frame_stats "${BASE}_thread.txt")"
+          [ -n "$m" ] && TM+=" $m"; [ -n "$p" ] && TP+=" $p"
         done
-        [ -z "${WALL_VALS// }" ] && continue
-        printf "  %-14s %-3s %-5s %12s %12s %12s\n" \
+        [ -z "${WM// }" ] && continue
+        printf "  %-14s %-3s %-5s %22s %22s %22s\n" \
           "$seq" "$thr" "$rate" \
-          "$(mean_std "$WALL_VALS")" \
-          "$(mean_std "$CPU_VALS")" \
-          "$(mean_std "$THR_VALS")"
+          "$(mean_std "$WM") / $(mean_std "$WP")" \
+          "$(mean_std "$CM") / $(mean_std "$CP")" \
+          "$(mean_std "$TM") / $(mean_std "$TP")"
       done
     done
   done
@@ -596,6 +658,14 @@ echo "--- Zombie check (this user only): ${ZOMBIES} stale processes ---"
 echo ""
 echo "Saved results:"
 print_save_locations
+echo ""
+echo "Per-component breakdown (paper-style, mean±std and p99 per component):"
+if [[ "$MODE" == "serial" || "$MODE" == "both" ]]; then
+  echo "  python3 $WS_DIR/scripts/parse_results.py $RESULTS_BASE/serial/$BENCH_TAG --per-component"
+fi
+if [[ ( "$MODE" == "subscribe" || "$MODE" == "both" ) && "$CAMERAS" != "mono" ]]; then
+  echo "  python3 $WS_DIR/scripts/parse_results.py $RESULTS_BASE/subscribe/$BENCH_TAG --per-component"
+fi
 echo ""
 echo "================================================================"
 echo "  Done — $(date)"
