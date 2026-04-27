@@ -430,8 +430,8 @@ bash scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy -t 4 -r 10 \
     --tag rerun_pwt_rtflags
 
 # Compare with the post-hoc analyzer:
-python3 scripts/aggregate_pwt.py ~/results/timing/rpi5/subscribe/rerun_pwt_baseline --ate
-python3 scripts/aggregate_pwt.py ~/results/timing/rpi5/subscribe/rerun_pwt_rtflags --ate
+python3 scripts/parse_results.py ~/results/timing/rpi5/subscribe/rerun_pwt_baseline --ate
+python3 scripts/parse_results.py ~/results/timing/rpi5/subscribe/rerun_pwt_rtflags --ate
 ```
 
 The two halves are sequential (one tag, then the other) to minimise

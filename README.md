@@ -36,7 +36,7 @@ catkin_ws_ov/
 │   ├── run_full_benchmark.sh   orchestrator: serial+subscribe × seqs × threads × cams × reps × rates × native/docker
 │   ├── run_timing_sweep.sh     Phase 2: config sensitivity sweeps on V1_01_easy serial
 │   ├── record_poses.py         subscribe-mode pose recorder (manual evaluation)
-│   └── aggregate_pwt.py        post-hoc results aggregator (PWT investigation)
+│   └── parse_results.py        post-hoc results aggregator (cross-run timing/SLAM/ATE stats)
 ├── results/
 │   ├── stereo/  mono/          x86 EuRoC trajectory estimates (paper reproduction)
 │   ├── rpi5/stereo/            RPi5 EuRoC trajectory estimates

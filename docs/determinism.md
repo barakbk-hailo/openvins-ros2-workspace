@@ -701,7 +701,7 @@ openvins-humble:latest --tag <name>` runs 10 subscribe reps on V1_01_easy stereo
 spawning a fresh container per rep via the `docker_wrap` helper (no state leakage
 between runs). Each rep captures wall, process-CPU and thread-CPU timing, feature
 counts, and the saved trajectory. Results are aggregated via
-`~/workspace/catkin_ws_ov/scripts/aggregate_pwt.py`.
+`~/workspace/catkin_ws_ov/scripts/parse_results.py`.
 
 Four matched runs were executed, with results saved under
 `results/rpi5/{rerun_2026_04_26_pwt_baseline,rerun_2026_04_26_pwt_rtflags,rerun_2026_04_26_pwt_maxinterval,rerun_2026_04_26_pwt_combined}/`:
