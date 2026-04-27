@@ -659,13 +659,14 @@ echo ""
 echo "Saved results:"
 print_save_locations
 echo ""
-echo "Per-component breakdown (paper-style, mean±std and p99 per component):"
+echo "Detailed analysis (per-component breakdown + ATE + RPE per segment):"
 if [[ "$MODE" == "serial" || "$MODE" == "both" ]]; then
-  echo "  python3 $WS_DIR/scripts/parse_results.py $RESULTS_BASE/serial/$BENCH_TAG --per-component"
+  echo "  python3 $WS_DIR/scripts/parse_results.py $RESULTS_BASE/serial/$BENCH_TAG --detailed"
 fi
 if [[ ( "$MODE" == "subscribe" || "$MODE" == "both" ) && "$CAMERAS" != "mono" ]]; then
-  echo "  python3 $WS_DIR/scripts/parse_results.py $RESULTS_BASE/subscribe/$BENCH_TAG --per-component"
+  echo "  python3 $WS_DIR/scripts/parse_results.py $RESULTS_BASE/subscribe/$BENCH_TAG --detailed"
 fi
+echo "  (parse_results.py auto-sources ROS — no need to source first.)"
 echo ""
 echo "================================================================"
 echo "  Done — $(date)"

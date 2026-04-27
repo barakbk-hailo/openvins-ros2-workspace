@@ -23,6 +23,7 @@ Usage:
 import argparse
 import os
 import re
+import shlex
 import statistics
 import subprocess
 import sys
@@ -30,6 +31,55 @@ from pathlib import Path
 
 # Strip ANSI CSI escapes from `error_singlerun` output.
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+# RPE per-segment line:
+#   seg 8 - median_ori = 128.109 | median_pos = 3.217 (2361 samples)
+_RPE_RE = re.compile(
+    r"^seg\s+(\d+)\s*-\s*median_ori\s*=\s*([\d.]+)\s*\|\s*median_pos\s*=\s*([\d.]+)"
+    r"\s*\((\d+)\s*samples\)"
+)
+
+
+def _ros_distro():
+    """Pick ROS distro from /etc/os-release: jazzy on Noble, humble otherwise.
+    Mirrors bench_lib.sh:source_ros and install.sh."""
+    try:
+        with open("/etc/os-release") as f:
+            for line in f:
+                if line.startswith("UBUNTU_CODENAME=") and "noble" in line:
+                    return "jazzy"
+    except OSError:
+        pass
+    return "humble"
+
+
+def _ros_setup_paths():
+    """Setup files to source so `ros2 run ov_eval ...` works in a fresh shell."""
+    paths = []
+    distro = os.environ.get("ROS_DISTRO_OVERRIDE") or _ros_distro()
+    base = f"/opt/ros/{distro}/setup.bash"
+    if os.path.isfile(base):
+        paths.append(base)
+    ws_install = Path.home() / "workspace" / "catkin_ws_ov" / "install" / "setup.bash"
+    if ws_install.is_file():
+        paths.append(str(ws_install))
+    return paths
+
+
+def _run_ros2(cmd, timeout=60):
+    """Run a ros2 command with ROS env auto-sourced and headless Qt platform.
+    Returns the CompletedProcess. cmd is a list of strings."""
+    setup = _ros_setup_paths()
+    if not setup:
+        # No ROS install detected; surface that rather than silently failing.
+        return subprocess.CompletedProcess(cmd, returncode=127, stdout="", stderr="")
+    sourced = " && ".join(f"source {shlex.quote(p)}" for p in setup)
+    quoted = " ".join(shlex.quote(c) for c in cmd)
+    bash = f"{sourced} && export QT_QPA_PLATFORM=offscreen && exec {quoted}"
+    return subprocess.run(
+        ["bash", "-c", bash],
+        capture_output=True, text=True, timeout=timeout,
+    )
 
 # Known per-frame CSV "clock" suffixes (last token before .txt).
 _CLOCKS = ("wall", "cpu", "thread", "feats", "pose", "est")
@@ -154,34 +204,66 @@ def summary(values, unit_scale=1.0):
 
 
 def have_ov_eval():
-    """True if `ros2 run ov_eval error_singlerun` is available on this host."""
+    """True if `ros2 run ov_eval error_singlerun` is available on this host.
+    Auto-sources ROS — caller doesn't need to source first."""
     try:
-        r = subprocess.run(
-            ["ros2", "pkg", "list"], capture_output=True, text=True, timeout=10
-        )
+        r = _run_ros2(["ros2", "pkg", "list"], timeout=15)
         return "ov_eval" in r.stdout
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False
 
 
-def run_ate(gt, traj):
-    """Call ros2 run ov_eval error_singlerun posyaw and parse rmse_ori, rmse_pos."""
+def run_ate_rpe(gt, traj):
+    """Run `ros2 run ov_eval error_singlerun posyaw` and parse both ATE and
+    per-segment RPE. Returns dict {ate_ori, ate_pos, rpe: {seg_len: dict}} or
+    None on failure. Auto-sources ROS and sets QT_QPA_PLATFORM=offscreen so it
+    works on headless hosts."""
     try:
-        result = subprocess.run(
+        result = _run_ros2(
             ["ros2", "run", "ov_eval", "error_singlerun", "posyaw", gt, traj],
-            capture_output=True, text=True, timeout=60,
+            timeout=60,
         )
-        for line in result.stdout.splitlines():
-            clean = _ANSI_RE.sub("", line).strip()
-            if clean.startswith("rmse_ori"):
-                # Format: rmse_ori = 0.536 | rmse_pos = 0.042
+    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+        print(f"  ATE/RPE failed for {traj}: {e}", file=sys.stderr)
+        return None
+
+    out = {"ate_ori": None, "ate_pos": None, "rpe": {}}
+    for line in result.stdout.splitlines():
+        clean = _ANSI_RE.sub("", line).strip()
+        if clean.startswith("rmse_ori"):
+            try:
                 parts = clean.split("|")
-                ori = float(parts[0].split("=")[1].strip())
-                pos = float(parts[1].split("=")[1].strip())
-                return ori, pos
-    except Exception as e:
-        print(f"  ATE failed for {traj}: {e}", file=sys.stderr)
-    return None, None
+                out["ate_ori"] = float(parts[0].split("=")[1].strip())
+                out["ate_pos"] = float(parts[1].split("=")[1].strip())
+            except (ValueError, IndexError):
+                pass
+            continue
+        m = _RPE_RE.match(clean)
+        if m:
+            seg = int(m.group(1))
+            out["rpe"][seg] = {
+                "med_ori": float(m.group(2)),
+                "med_pos": float(m.group(3)),
+                "samples": int(m.group(4)),
+            }
+    if out["ate_ori"] is None and not out["rpe"]:
+        # Surface why nothing was parsed — most likely Qt/matplotlib aborted
+        # before the stats lines, or the trajectory didn't match the GT.
+        last = (result.stderr.strip().splitlines() or [""])[-1]
+        if last:
+            print(f"  ATE/RPE: no stats parsed for {Path(traj).name} "
+                  f"(rc={result.returncode}, last stderr: {last[:120]})",
+                  file=sys.stderr)
+        return None
+    return out
+
+
+# Back-compat shim for callers that only need ATE (ori, pos).
+def run_ate(gt, traj):
+    res = run_ate_rpe(gt, traj)
+    if res is None:
+        return None, None
+    return res["ate_ori"], res["ate_pos"]
 
 
 def classify_files(directory):
@@ -255,7 +337,30 @@ def per_run_means(runs, clock):
     return out
 
 
-def report_cell(cell, runs, do_ate, gt, brief):
+def collect_ate_rpe(runs, gt):
+    """Run error_singlerun on each rep's est/pose file and collect per-rep
+    ATE + per-segment RPE. Returns (ate_oris, ate_poss, rpe_by_seg) where
+    rpe_by_seg = {seg_len: {"med_ori": [...], "med_pos": [...]}}."""
+    ate_oris, ate_poss = [], []
+    rpe_by_seg = {}
+    for run_id in sorted(runs):
+        traj = runs[run_id].get("est") or runs[run_id].get("pose")
+        if not traj:
+            continue
+        res = run_ate_rpe(gt, str(traj))
+        if not res:
+            continue
+        if res["ate_ori"] is not None:
+            ate_oris.append(res["ate_ori"])
+            ate_poss.append(res["ate_pos"])
+        for seg, vals in res["rpe"].items():
+            d = rpe_by_seg.setdefault(seg, {"med_ori": [], "med_pos": []})
+            d["med_ori"].append(vals["med_ori"])
+            d["med_pos"].append(vals["med_pos"])
+    return ate_oris, ate_poss, rpe_by_seg
+
+
+def report_cell(cell, runs, do_ate, gt, brief, do_rpe=False):
     label = cell_label(cell, brief=brief)
     wall = per_run_means(runs, "wall")
     cpu = per_run_means(runs, "cpu")
@@ -270,20 +375,12 @@ def report_cell(cell, runs, do_ate, gt, brief):
     s_wall = summary(wall, unit_scale=1000.0)
     s_feats = summary(feats_means)
     s_ate_pos = s_ate_ori = None
-    if do_ate and gt:
-        oris, poss = [], []
-        # Try _est.txt first (state dump), fall back to _pose.txt (TUM).
-        for run_id in sorted(runs):
-            traj = runs[run_id].get("est") or runs[run_id].get("pose")
-            if not traj:
-                continue
-            ori, pos = run_ate(gt, str(traj))
-            if ori is not None:
-                oris.append(ori)
-                poss.append(pos)
-        if oris:
-            s_ate_ori = summary(oris)
-            s_ate_pos = summary(poss)
+    rpe_by_seg = {}
+    if (do_ate or do_rpe) and gt:
+        ate_oris, ate_poss, rpe_by_seg = collect_ate_rpe(runs, gt)
+        if ate_oris:
+            s_ate_ori = summary(ate_oris)
+            s_ate_pos = summary(ate_poss)
 
     if brief:
         bits = [label]
@@ -314,6 +411,17 @@ def report_cell(cell, runs, do_ate, gt, brief):
         print(f"    ATE:   pos rmse mean={s_ate_pos['mean']:.4f} m "
               f"(std={s_ate_pos['std']:.5f}, range {s_ate_pos['range']*1000:.1f} mm); "
               f"ori rmse mean={s_ate_ori['mean']:.3f}°")
+    if do_rpe and rpe_by_seg:
+        print(f"    RPE:   per-segment median, across {len(runs)} run"
+              f"{'s' if len(runs) != 1 else ''}")
+        for seg in sorted(rpe_by_seg):
+            d = rpe_by_seg[seg]
+            ms_pos = summary(d["med_pos"])
+            ms_ori = summary(d["med_ori"])
+            if not ms_pos:
+                continue
+            print(f"           seg {seg:>3d}s: pos {ms_pos['mean']:.3f}±{ms_pos['std']:.3f} m, "
+                  f"ori {ms_ori['mean']:.2f}±{ms_ori['std']:.2f}°  (n={ms_pos['n']})")
 
 
 def report_cell_per_component(cell, runs):
@@ -376,7 +484,22 @@ def main():
                     help="Paper-style per-component breakdown (tracking, propagation, "
                          "msckf update, …, total) with mean ± std and p99 over pooled frames "
                          "across all reps in each cell. Matches docs/benchmark-analysis.md.")
+    ap.add_argument("--rpe", action="store_true",
+                    help="Print Relative Pose Error per segment (median pos/ori per default "
+                         "{8,16,24,32,40} s segments, mean ± std across reps). Auto-enables --ate.")
+    ap.add_argument("--detailed", action="store_true",
+                    help="Shortcut: --per-component + --ate + --rpe. Everything we can "
+                         "extract from the result files for each cell.")
     args = ap.parse_args()
+
+    # --detailed is a meta flag.
+    if args.detailed:
+        args.per_component = True
+        args.ate = True
+        args.rpe = True
+    # --rpe implies --ate (same subprocess call produces both).
+    if args.rpe:
+        args.ate = True
 
     do_ate = args.ate
     if do_ate and not have_ov_eval():
@@ -411,8 +534,29 @@ def main():
                         gt = str(candidate)
             if args.per_component:
                 report_cell_per_component(cell, runs)
+                # When --detailed (or --ate / --rpe alongside --per-component),
+                # also print the ATE/RPE summary so the user sees everything.
+                if (do_ate or args.rpe) and gt:
+                    ate_oris, ate_poss, rpe_by_seg = collect_ate_rpe(runs, gt)
+                    if ate_poss:
+                        s_pos = summary(ate_poss)
+                        s_ori = summary(ate_oris)
+                        print(f"    ATE:   pos rmse mean={s_pos['mean']:.4f} m "
+                              f"(std={s_pos['std']:.5f}, range {s_pos['range']*1000:.1f} mm); "
+                              f"ori rmse mean={s_ori['mean']:.3f}°")
+                    if args.rpe and rpe_by_seg:
+                        print(f"    RPE:   per-segment median, across {len(runs)} run"
+                              f"{'s' if len(runs) != 1 else ''}")
+                        for seg in sorted(rpe_by_seg):
+                            d = rpe_by_seg[seg]
+                            ms_pos = summary(d["med_pos"])
+                            ms_ori = summary(d["med_ori"])
+                            if not ms_pos:
+                                continue
+                            print(f"           seg {seg:>3d}s: pos {ms_pos['mean']:.3f}±{ms_pos['std']:.3f} m, "
+                                  f"ori {ms_ori['mean']:.2f}±{ms_ori['std']:.2f}°  (n={ms_pos['n']})")
             else:
-                report_cell(cell, runs, do_ate, gt, brief=args.brief)
+                report_cell(cell, runs, do_ate, gt, brief=args.brief, do_rpe=args.rpe)
         print()
 
 
