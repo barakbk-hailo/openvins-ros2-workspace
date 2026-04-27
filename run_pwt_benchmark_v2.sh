@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # PWT benchmark v2: 3-clock timing + feature counts + accuracy
 #
+# RPi5 / Docker only — runs OpenVINS inside a prebuilt container; not portable
+# to x86 or non-Docker hosts. For x86 use run_full_benchmark.sh / run_timing_*.sh.
+#
 # Usage:
 #   bash run_pwt_benchmark_v2.sh <results_subdir> <image_tag> [num_subscribe_reps] [extra_docker_flags...]
 #
@@ -14,7 +17,7 @@
 # Example (max-interval sync):
 #   bash run_pwt_benchmark_v2.sh pwt_maxinterval openvins-humble-maxinterval 10
 
-set -eo pipefail
+set -euo pipefail
 
 SUBDIR="${1:?Usage: $0 <results_subdir> <image_tag> [reps] [extra_docker_flags...]}"
 IMAGE="${2:?Missing image tag}"

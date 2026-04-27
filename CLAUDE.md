@@ -58,11 +58,24 @@ Timing files are CSV: `timestamp,tracking,propagation,msckf_update,slam_update,s
 
 ## Benchmarking Scripts
 
+x86 host (run from workspace root):
+
 | Script | Purpose |
 |--------|---------|
-| `run_full_benchmark.sh` | Flexible orchestrator: serial/subscribe × sequences × threads × cameras × reps. `--quick` for 1-rep smoke, `--help` for options. |
+| `run_full_benchmark.sh` | Flexible orchestrator: serial/subscribe × sequences × threads × cameras × reps. `--quick` for 1-rep smoke, `--dry-run` to print planned cells, `--help` for options. |
 | `run_timing_subscribe.sh` | Subscribe mode at configurable bag-playback rates (1×/2×/5× realtime feasibility — Phase 3) |
-| `run_timing_sweep.sh` | Config sensitivity sweep: thread count, feature density, SLAM delay (Phase 2) |
+| `run_timing_sweep.sh` | Config sensitivity sweep: 5 variants (downsample, ±features, no-SLAM, 1-thread OpenCV) on V1_01_easy serial (Phase 2) |
+
+RPi5 host (run from workspace root, requires Docker + a prebuilt image):
+
+| Script | Purpose |
+|--------|---------|
+| `run_pwt_benchmark_v2.sh` | Single PWT variant on V1_01_easy: 2 serial + N subscribe reps inside the named Docker image. Pass extra Docker flags positionally for RT testing. |
+| `run_pwt_final_ab.sh` | Sequential A/B harness — calls `run_pwt_benchmark_v2.sh` twice (with/without RT flags) to minimise system-load drift between the two halves. |
+
+All x86 scripts source `scripts/bench_lib.sh` for the ROS-distro detection,
+config templating (with grep-verified `sed` substitutions), validators, and
+user-scoped `pkill`. Add new orchestrator scripts the same way.
 
 Example: targeted subscribe benchmark on a single sequence
 ```bash

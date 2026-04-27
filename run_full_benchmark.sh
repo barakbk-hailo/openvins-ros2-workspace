@@ -4,15 +4,15 @@
 # Supersedes run_timing_benchmark.sh and run_timing_combined.sh — their
 # scopes are covered by the CLI options below. See usage() for full flags.
 
-set -u -o pipefail
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/bench_lib.sh
+. "$SCRIPT_DIR/scripts/bench_lib.sh"
 
 # ── Defaults ──
-WS_DIR="$HOME/workspace/catkin_ws_ov"
-DATASETS_DIR="$HOME/datasets/euroc"
 RESULTS_BASE="$HOME/results/timing/x86"
-CONFIG_DIR="$WS_DIR/src/open_vins/config/euroc_mav"
-GT_DIR="$WS_DIR/src/open_vins/ov_data/euroc_mav"
-BAG_PLAY_DELAY=5
+BAG_PLAY_DELAY=5  # seconds the script waits after `ros2 bag play` to flush queued msgs
 
 MODE="both"
 SEQUENCES_CSV="V1_01_easy,MH_03_medium,V2_02_medium"
@@ -21,13 +21,15 @@ CAMERAS="stereo"
 SUBSCRIBE_REPS=5
 BENCH_TAG="bench_$(date +%Y%m%d_%H%M%S)"
 SLAM_CHI2_RECOVERY=""  # empty = leave config value alone (shipping default is false)
+DRY_RUN=0
 
 usage() {
   cat <<'EOF'
 Flexible benchmark orchestrator: serial + subscribe on the EuRoC dataset.
 
 Default behavior (no options): all 3 sequences × {4-thr, 1-thr} × stereo,
-serial (1 rep each) + subscribe (5 reps each). ~2.5 hours total.
+serial (1 rep each) + subscribe (5 reps each). Wall-time on x86 (i7-1185G7):
+~12 min serial + ~90 min subscribe ≈ 1h 45m. RPi5 is ~3.5× slower.
 
 Usage:
   bash run_full_benchmark.sh [OPTIONS]
@@ -41,44 +43,65 @@ Options:
                                         mono+subscribe is skipped)
   -r, --reps <N>                       default: 5 (subscribe reps; serial is always 1)
       --tag <name>                     default: bench_YYYYMMDD_HHMMSS
+                                       routes output under
+                                       <results-base>/{serial,subscribe}/<tag>/
       --results-base <dir>             default: $HOME/results/timing/x86
       --slam-chi2-recovery <true|false>  override slam_chi2_recovery in the temp config
                                        (default: leave config's value alone)
+      --dry-run                        print the cells that would run, no execution
       --quick                          shortcut: -m serial -s V1_01_easy -t 4 -c stereo -r 1
   -h, --help                           show this help and exit
 
 Examples:
   # Full default suite
-  bash run_full_benchmark.sh
+  bash run_full_benchmark.sh --tag bench_$(date +%Y%m%d)
 
-  # Serial mode, 3 sequences, stereo+mono, 1 rep (old run_timing_benchmark.sh)
-  bash run_full_benchmark.sh -m serial -c both -r 1
+  # Serial mode, 3 sequences, stereo+mono, 1 rep (paper Table II/III reproduction)
+  bash run_full_benchmark.sh -m serial -c both -r 1 \
+      -s V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium,MH_01_easy,MH_02_easy,MH_03_medium,MH_04_difficult,MH_05_difficult \
+      --tag rerun_paper
 
-  # Subscribe mode, single sequence, 5 reps (old run_timing_combined.sh)
-  bash run_full_benchmark.sh -m subscribe -s V2_02_medium -r 5
+  # Subscribe mode, single sequence, 5 reps
+  bash run_full_benchmark.sh -m subscribe -s V2_02_medium -r 5 --tag bench_v2_only
 
   # Quick smoke test
   bash run_full_benchmark.sh --quick
+
+Output naming:
+  Serial:    <SEQ>_<N>thr[_mono]_{wall,cpu,thread,feats,est}.txt
+  Subscribe: <SEQ>_<N>thr_run<R>_{wall,cpu,thread,feats,est}.txt
+
+Stale OpenVINS subscribe nodes (this user only) are TERM-then-KILL'd on
+script start and after each subscribe rep.
 EOF
 }
 
-# ── CLI parsing ──
+# ── CLI parsing (supports both `--opt val` and `--opt=val`) ──
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -m|--mode)         MODE="$2"; shift 2 ;;
-    -s|--sequences)    SEQUENCES_CSV="$2"; shift 2 ;;
-    -t|--threads)      THREADS_CSV="$2"; shift 2 ;;
-    -c|--cameras)      CAMERAS="$2"; shift 2 ;;
-    -r|--reps)         SUBSCRIBE_REPS="$2"; shift 2 ;;
-    --tag)             BENCH_TAG="$2"; shift 2 ;;
-    --results-base)    RESULTS_BASE="$2"; shift 2 ;;
-    --slam-chi2-recovery) SLAM_CHI2_RECOVERY="$2"; shift 2 ;;
+    -m=*|--mode=*)            MODE="${1#*=}"; shift ;;
+    -m|--mode)                MODE="${2:-}"; shift 2 ;;
+    -s=*|--sequences=*)       SEQUENCES_CSV="${1#*=}"; shift ;;
+    -s|--sequences)           SEQUENCES_CSV="${2:-}"; shift 2 ;;
+    -t=*|--threads=*)         THREADS_CSV="${1#*=}"; shift ;;
+    -t|--threads)             THREADS_CSV="${2:-}"; shift 2 ;;
+    -c=*|--cameras=*)         CAMERAS="${1#*=}"; shift ;;
+    -c|--cameras)             CAMERAS="${2:-}"; shift 2 ;;
+    -r=*|--reps=*)            SUBSCRIBE_REPS="${1#*=}"; shift ;;
+    -r|--reps)                SUBSCRIBE_REPS="${2:-}"; shift 2 ;;
+    --tag=*)                  BENCH_TAG="${1#*=}"; shift ;;
+    --tag)                    BENCH_TAG="${2:-}"; shift 2 ;;
+    --results-base=*)         RESULTS_BASE="${1#*=}"; shift ;;
+    --results-base)           RESULTS_BASE="${2:-}"; shift 2 ;;
+    --slam-chi2-recovery=*)   SLAM_CHI2_RECOVERY="${1#*=}"; shift ;;
+    --slam-chi2-recovery)     SLAM_CHI2_RECOVERY="${2:-}"; shift 2 ;;
+    --dry-run)                DRY_RUN=1; shift ;;
     --quick)
       MODE="serial"; SEQUENCES_CSV="V1_01_easy"; THREADS_CSV="4"
       CAMERAS="stereo"; SUBSCRIBE_REPS=1
       BENCH_TAG="smoke_$(date +%Y%m%d_%H%M%S)"
       shift ;;
-    -h|--help)         usage; exit 0 ;;
+    -h|--help)                usage; exit 0 ;;
     *)
       echo "ERROR: unknown option: $1" >&2
       usage >&2
@@ -89,7 +112,12 @@ done
 # ── Validate ──
 case "$MODE" in serial|subscribe|both) ;; *) echo "ERROR: --mode must be serial|subscribe|both (got: $MODE)" >&2; exit 2 ;; esac
 case "$CAMERAS" in stereo|mono|both) ;; *) echo "ERROR: --cameras must be stereo|mono|both (got: $CAMERAS)" >&2; exit 2 ;; esac
-case "${SLAM_CHI2_RECOVERY:-}" in ""|true|false) ;; *) echo "ERROR: --slam-chi2-recovery must be true or false (got: $SLAM_CHI2_RECOVERY)" >&2; exit 2 ;; esac
+validate_chi2_recovery "$SLAM_CHI2_RECOVERY" || exit 2
+validate_positive_int "--reps" "$SUBSCRIBE_REPS" || exit 2
+validate_nonempty "--tag" "$BENCH_TAG" || exit 2
+require_dir "datasets" "$DATASETS_DIR" || exit 1
+require_dir "config" "$CONFIG_DIR" || exit 1
+
 # Subscribe mode only runs stereo. Fail fast on pure mono+subscribe; warn on both+subscribe.
 if [[ "$MODE" == "subscribe" && "$CAMERAS" == "mono" ]]; then
   echo "ERROR: --cameras mono --mode subscribe is not supported (mono+subscribe is untested)." >&2
@@ -103,6 +131,11 @@ fi
 IFS=',' read -ra SEQUENCES <<< "$SEQUENCES_CSV"
 IFS=',' read -ra THREADS <<< "$THREADS_CSV"
 
+# Validate every requested sequence has a bag dir.
+for seq in "${SEQUENCES[@]}"; do
+  require_bag "$seq" || exit 1
+done
+
 # Camera-config pairs as "name:max_cameras:use_stereo"
 CAM_CONFIGS=()
 case "$CAMERAS" in
@@ -111,66 +144,18 @@ case "$CAMERAS" in
   both)   CAM_CONFIGS=("stereo:2:true" "mono:1:false") ;;
 esac
 
-WALL_TMP="/tmp/traj_timing.txt"
-CPU_TMP="/tmp/traj_timing_cpu.txt"
-THREAD_TMP="/tmp/traj_timing_thread.txt"
-FEATS_TMP="/tmp/traj_features.txt"
-EST_TMP="/tmp/ov_estimate.txt"
-STD_TMP="/tmp/ov_estimate_std.txt"
+# ── Setup ──
+TMP_CONFIG_4="$CONFIG_DIR/estimator_config_bench_4thr.yaml"
+TMP_CONFIG_1="$CONFIG_DIR/estimator_config_bench_1thr.yaml"
 
-# ROS setup scripts reference unset vars on first load; guard them from set -u.
-set +u
-for _distro in jazzy humble; do
-  if [ -f "/opt/ros/$_distro/setup.bash" ]; then source "/opt/ros/$_distro/setup.bash"; break; fi
-done
-source "$WS_DIR/install/setup.bash"
-set -u
-
-cleanup_stale() {
-  pkill -9 -f "run_subscribe_msckf" 2>/dev/null || true
-  sleep 1
+cleanup() {
+  rm -f "$TMP_CONFIG_4" "$TMP_CONFIG_1" 2>/dev/null || true
+  kill_stale_subscribe_nodes
 }
-cleanup_stale
+trap cleanup EXIT INT TERM
 
-make_config() {
-  local THREADS="$1"
-  local TMP="$CONFIG_DIR/estimator_config_bench.yaml"
-  cp "$CONFIG_DIR/estimator_config.yaml" "$TMP"
-  sed -i 's/^record_timing_information: false/record_timing_information: true/' "$TMP"
-  sed -i 's/^record_timing_cpu_time: false/record_timing_cpu_time: true/' "$TMP"
-  sed -i 's/^record_timing_thread_time: false/record_timing_thread_time: true/' "$TMP"
-  sed -i 's/^record_feature_counts: false/record_feature_counts: true/' "$TMP"
-  if [ "$THREADS" = "1" ]; then
-    sed -i 's/^num_opencv_threads: 4/num_opencv_threads: 1/' "$TMP"
-  fi
-  if [ -n "${SLAM_CHI2_RECOVERY:-}" ]; then
-    sed -i "s/^slam_chi2_recovery: .*/slam_chi2_recovery: ${SLAM_CHI2_RECOVERY} # overridden via --slam-chi2-recovery/" "$TMP"
-  fi
-  echo "$TMP"
-}
-trap 'rm -f "$CONFIG_DIR/estimator_config_bench.yaml"' EXIT
-
-save_results() {
-  local DIR="$1" TAG="$2"
-  mkdir -p "$DIR"
-  [ -f "$WALL_TMP" ]   && cp "$WALL_TMP"   "$DIR/${TAG}_wall.txt"
-  [ -f "$CPU_TMP" ]    && cp "$CPU_TMP"    "$DIR/${TAG}_cpu.txt"
-  [ -f "$THREAD_TMP" ] && cp "$THREAD_TMP" "$DIR/${TAG}_thread.txt"
-  [ -f "$FEATS_TMP" ]  && cp "$FEATS_TMP"  "$DIR/${TAG}_feats.txt"
-  [ -f "$EST_TMP" ]    && cp "$EST_TMP"    "$DIR/${TAG}_est.txt"
-}
-
-get_slam_avg() {
-  local F="$1"
-  [ -f "$F" ] && python3 -c "
-import csv; v=[int(r[1]) for r in csv.reader(open('$F')) if not r[0].startswith('#')]
-print(f'{sum(v)/len(v):.1f}') if v else print('?')
-" 2>/dev/null || echo "?"
-}
-
-skip_check() {
-  [ -f "$1/${2}_wall.txt" ] && [ -f "$1/${2}_feats.txt" ]
-}
+source_ros
+kill_stale_subscribe_nodes
 
 # Compose per-mode tag suffix. Stereo keeps the historical naming
 # (no camera suffix) so earlier results directories continue to match.
@@ -183,6 +168,37 @@ tag_for() {
   fi
 }
 
+# Pick (or build) a temp config for the requested thread count.
+get_config() {
+  local THREADS="$1"
+  local TMP
+  if [ "$THREADS" = "1" ]; then TMP="$TMP_CONFIG_1"; else TMP="$TMP_CONFIG_4"; fi
+  if [ ! -f "$TMP" ]; then
+    make_bench_config "$TMP" "$SLAM_CHI2_RECOVERY" "$THREADS" || exit 1
+  fi
+  echo "$TMP"
+}
+
+save_results() {
+  local DIR="$1" TAG="$2"
+  mkdir -p "$DIR"
+  [ -f "$TIMING_WALL_TMP" ]   && cp "$TIMING_WALL_TMP"   "$DIR/${TAG}_wall.txt"
+  [ -f "$TIMING_CPU_TMP" ]    && cp "$TIMING_CPU_TMP"    "$DIR/${TAG}_cpu.txt"
+  [ -f "$TIMING_THREAD_TMP" ] && cp "$TIMING_THREAD_TMP" "$DIR/${TAG}_thread.txt"
+  [ -f "$FEATS_TMP" ]         && cp "$FEATS_TMP"         "$DIR/${TAG}_feats.txt"
+  [ -f "$EST_TMP" ]           && cp "$EST_TMP"           "$DIR/${TAG}_est.txt"
+}
+
+get_slam_avg() {
+  local F="$1"
+  [ -f "$F" ] || { echo "?"; return; }
+  python3 -c "
+import csv
+v=[int(r[1]) for r in csv.reader(open('$F')) if not r[0].startswith('#')]
+print(f'{sum(v)/len(v):.1f}') if v else print('?')
+" 2>/dev/null || echo "?"
+}
+
 echo "================================================================"
 echo "  OpenVINS Benchmark"
 echo "  Mode:      $MODE"
@@ -192,6 +208,7 @@ echo "  Cameras:   $CAMERAS"
 echo "  Sub reps:  $SUBSCRIBE_REPS"
 echo "  Tag:       $BENCH_TAG"
 echo "  Date:      $(date)"
+[ "$DRY_RUN" -eq 1 ] && echo "  DRY-RUN: planning only, no execution"
 echo "================================================================"
 echo ""
 
@@ -206,12 +223,16 @@ if [[ "$MODE" == "serial" || "$MODE" == "both" ]]; then
         IFS=':' read -r CAM_NAME CAM_N CAM_STEREO <<< "$cam_spec"
         DIR="$RESULTS_BASE/serial/$BENCH_TAG"
         TAG="$(tag_for "$seq" "$thr" "$CAM_NAME")"
-        if skip_check "$DIR" "$TAG"; then
-          echo "SKIP serial $seq ${thr}-thr $CAM_NAME"
+        if run_complete "$DIR" "$TAG"; then
+          echo "SKIP serial $seq ${thr}-thr $CAM_NAME (already complete)"
           continue
         fi
-        CFG=$(make_config "$thr")
-        rm -f "$WALL_TMP" "$CPU_TMP" "$THREAD_TMP" "$FEATS_TMP" "$EST_TMP" "$STD_TMP"
+        if [ "$DRY_RUN" -eq 1 ]; then
+          echo "DRY-RUN serial $seq ${thr}-thr $CAM_NAME → $DIR/${TAG}_*.txt"
+          continue
+        fi
+        CFG=$(get_config "$thr")
+        rm -f "$TIMING_WALL_TMP" "$TIMING_CPU_TMP" "$TIMING_THREAD_TMP" "$FEATS_TMP" "$EST_TMP" "$STD_TMP"
         echo "--- serial $seq ${thr}-thr $CAM_NAME ---"
         ros2 launch ov_msckf serial.launch.py \
             config_path:="$CFG" \
@@ -219,11 +240,17 @@ if [[ "$MODE" == "serial" || "$MODE" == "both" ]]; then
             max_cameras:="$CAM_N" use_stereo:="$CAM_STEREO" \
             save_total_state:=true \
             filepath_est:="$EST_TMP" \
-            filepath_std:="$STD_TMP" 2>&1 | tail -1
+            filepath_std:="$STD_TMP" 2>&1 | tail -1 || {
+          echo "  -> launch FAILED" >&2
+          continue
+        }
         save_results "$DIR" "$TAG"
-        ROWS=$(grep -cv '^#' "$DIR/${TAG}_wall.txt" 2>/dev/null || true)
+        if ! run_complete "$DIR" "$TAG"; then
+          echo "  -> WARNING: produced incomplete results (< $MIN_ROWS_FOR_COMPLETE_RUN frames)" >&2
+        fi
+        ROWS=$(grep -cv '^#' "$DIR/${TAG}_wall.txt" 2>/dev/null || echo 0)
         SLAM=$(get_slam_avg "$DIR/${TAG}_feats.txt")
-        echo "  -> ${ROWS:-0} frames, avg SLAM=$SLAM"
+        echo "  -> ${ROWS} frames, avg SLAM=$SLAM"
       done
     done
   done
@@ -241,15 +268,19 @@ if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
   echo "==================== SUBSCRIBE MODE ===================="
   for seq in "${SEQUENCES[@]}"; do
     for thr in "${THREADS[@]}"; do
-      CFG=$(make_config "$thr")
       for i in $(seq 1 "$SUBSCRIBE_REPS"); do
         DIR="$RESULTS_BASE/subscribe/$BENCH_TAG"
         TAG="${seq}_${thr}thr_run${i}"
-        if skip_check "$DIR" "$TAG"; then
-          echo "SKIP subscribe $seq ${thr}-thr run $i"
+        if run_complete "$DIR" "$TAG"; then
+          echo "SKIP subscribe $seq ${thr}-thr run $i (already complete)"
           continue
         fi
-        rm -f "$WALL_TMP" "$CPU_TMP" "$THREAD_TMP" "$FEATS_TMP" "$EST_TMP" "$STD_TMP"
+        if [ "$DRY_RUN" -eq 1 ]; then
+          echo "DRY-RUN subscribe $seq ${thr}-thr run $i → $DIR/${TAG}_*.txt"
+          continue
+        fi
+        CFG=$(get_config "$thr")
+        rm -f "$TIMING_WALL_TMP" "$TIMING_CPU_TMP" "$TIMING_THREAD_TMP" "$FEATS_TMP" "$EST_TMP" "$STD_TMP"
         echo "--- subscribe $seq ${thr}-thr run $i / $SUBSCRIBE_REPS ---"
 
         ros2 launch ov_msckf subscribe.launch.py \
@@ -262,20 +293,25 @@ if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
         sleep 3
         ros2 bag play "$DATASETS_DIR/$seq" --rate 1.0 -d "$BAG_PLAY_DELAY" &>/dev/null
         sleep 5
-        kill $OV_PID 2>/dev/null || true
-        wait $OV_PID 2>/dev/null || true
-        cleanup_stale
+        kill "$OV_PID" 2>/dev/null || true
+        wait "$OV_PID" 2>/dev/null || true
+        kill_stale_subscribe_nodes
 
         save_results "$DIR" "$TAG"
-        ROWS=$(grep -cv '^#' "$DIR/${TAG}_wall.txt" 2>/dev/null || true)
+        if ! run_complete "$DIR" "$TAG"; then
+          echo "  -> WARNING: produced incomplete results (< $MIN_ROWS_FOR_COMPLETE_RUN frames)" >&2
+        fi
+        ROWS=$(grep -cv '^#' "$DIR/${TAG}_wall.txt" 2>/dev/null || echo 0)
         SLAM=$(get_slam_avg "$DIR/${TAG}_feats.txt")
-        echo "  -> ${ROWS:-0} frames, avg SLAM=$SLAM"
+        echo "  -> ${ROWS} frames, avg SLAM=$SLAM"
       done
     done
   done
   echo ""
   fi
 fi
+
+[ "$DRY_RUN" -eq 1 ] && { echo "DRY-RUN complete — no data written."; exit 0; }
 
 # ══════════════════════════════════════════════════════════════════════
 # ANALYSIS
@@ -296,7 +332,7 @@ if [[ "$MODE" == "serial" || "$MODE" == "both" ]]; then
         TAG="$(tag_for "$seq" "$thr" "$CAM_NAME")"
         F="$RESULTS_BASE/serial/$BENCH_TAG/${TAG}_wall.txt"
         [ -f "$F" ] || continue
-        TOTAL=$(ros2 run ov_eval timing_flamegraph "$F" 2>/dev/null | grep "(total)" | grep -oP 'mean_time = \K[0-9.]+')
+        TOTAL=$(ros2 run ov_eval timing_flamegraph "$F" 2>/dev/null | grep "(total)" | grep -oP 'mean_time = \K[0-9.]+' || true)
         TOTAL_MS=$(python3 -c "print(f'{float(\"${TOTAL:-0}\")*1000:.1f}')")
         echo "    ${thr}-thr ${CAM_NAME}: ${TOTAL_MS}ms"
       done
@@ -314,7 +350,7 @@ if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
       for i in $(seq 1 "$SUBSCRIBE_REPS"); do
         F="$RESULTS_BASE/subscribe/$BENCH_TAG/${seq}_${thr}thr_run${i}_wall.txt"
         [ -f "$F" ] || continue
-        T=$(ros2 run ov_eval timing_flamegraph "$F" 2>/dev/null | grep "(total)" | grep -oP 'mean_time = \K[0-9.]+')
+        T=$(ros2 run ov_eval timing_flamegraph "$F" 2>/dev/null | grep "(total)" | grep -oP 'mean_time = \K[0-9.]+' || true)
         T_MS=$(python3 -c "print(f'{float(\"${T:-0}\")*1000:.1f}')")
         VALS="$VALS $T_MS"
       done
@@ -352,6 +388,7 @@ done
 echo ""
 
 # ── ATE ──
+GT_DIR="$WS_DIR/src/open_vins/ov_data/euroc_mav"
 echo "--- ATE position RMSE (meters, posyaw alignment) ---"
 for seq in "${SEQUENCES[@]}"; do
   GT="$GT_DIR/${seq}.txt"
@@ -385,8 +422,8 @@ done
 echo ""
 
 # ── Zombie check ──
-ZOMBIES=$(pgrep -cf "run_subscribe_msckf" 2>/dev/null || true)
-echo "--- Zombie check: ${ZOMBIES:-0} stale processes ---"
+ZOMBIES=$(pgrep -u "$USER" -cf "run_subscribe_msckf" 2>/dev/null || echo 0)
+echo "--- Zombie check (this user only): ${ZOMBIES} stale processes ---"
 echo ""
 echo "================================================================"
 echo "  Done — $(date)"

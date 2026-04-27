@@ -1,11 +1,20 @@
 # Benchmark Analysis: OpenVINS Timing, Accuracy & RPi5 Projections
 
-**Date:** 2026-04-16
-**Data:** `results/timing/x86/{serial,subscribe}/rerun_2026_04_23/`
+**Date:** 2026-04-26
+**Data:** `results/timing/x86/{serial,subscribe}/rerun_2026_04_23/` — see [data-provenance.md](data-provenance.md) for the full provenance row (submodule SHA, chi2_recovery state, OpenCV thread counts).
 **Host:** Dell Latitude 5420, Intel i7-1185G7 (4C/8T, 3.0-4.8 GHz), 16 GB, Ubuntu 22.04
 **Build:** colcon (flags: `-O3 -fsee -fomit-frame-pointer -g3`)
 **Config:** EuRoC default: 200 features, max_slam=50, 11 clones, stereo
 **Paper reference:** Semenova et al. 2024, Table 4 — i7-7500U (2C/4T, 3.5 GHz), Ubuntu 18.04
+
+**Reproduce all data cited in this doc:**
+
+```bash
+bash run_full_benchmark.sh -r 5 --tag rerun_2026_04_23
+```
+
+(Default suite: 3 sequences × {4-thr, 1-thr} × stereo, 1 serial rep + 5
+subscribe reps each. Wall-time on this host: ~12 min serial + ~90 min subscribe.)
 
 ## 1. Measurement methodology
 

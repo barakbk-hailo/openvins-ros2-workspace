@@ -153,6 +153,20 @@ results bit-identical across runs — see [reproducibility note](#real-time-depe
 The trajectory estimates used to produce these tables are committed in
 `results/stereo/` and `results/mono/` so they can be independently verified.
 
+**Reproduce the underlying runs:**
+
+```bash
+bash run_full_benchmark.sh -m serial -c both -r 1 \
+    -s V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium,MH_01_easy,MH_02_easy,MH_03_medium,MH_04_difficult,MH_05_difficult \
+    --tag rerun_2026_04_23_paper
+```
+
+The state-dump `_est.txt` files this writes under
+`~/results/timing/x86/serial/rerun_2026_04_23_paper/` were TUM-converted and
+promoted to `results/{stereo,mono}/estimate_*.txt` (those are the files cited
+on each table below). The TUM conversion is a one-line awk and is documented
+in [data-provenance.md §"File-format conventions"](data-provenance.md#file-format-conventions).
+
 **ATE RMSE — stereo (Table II: `stereo_ov_vio`)**
 
 | Sequence | Ours — deg / m | Paper — deg / m |

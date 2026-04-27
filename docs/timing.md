@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Date** | 2026-03-31 |
+| **Date** | 2026-04-26 (data re-collected against `master-candidate`/`2a50450`; doc-level prose dates from 2026-03-31) |
 | **Host** | Dell Latitude 5420, Intel Core i7-1185G7 (4C/8T, 3.0-4.8 GHz), Intel Iris Xe |
 | **OS** | Ubuntu 22.04, ROS 2 Humble |
 | **Build** | `colcon build --symlink-install` (compiler flags: `-O3 -fsee -fomit-frame-pointer -g3`) |
@@ -314,34 +314,42 @@ and **p99** is the per-frame 99th percentile of the total.
 
 ### Phase 2 findings — impact ranking
 
-1. **100 features** (-4.5 ms, **-40%**): Biggest single win. MSCKF update nearly
+> **Headline percentages reflect v2 wall-time data** (from the table above);
+> per-component deltas in each entry below are inherited from the older
+> `bench_5rep_3clock` sweep collection and are *directionally* correct but not
+> precisely re-derived against the v2 baseline. Re-collect with
+> `bash run_timing_sweep.sh --tag <new_tag>` if you need v2-precise per-stage
+> numbers.
+
+1. **100 features** (-2.85 ms, **-26%** wall): Biggest single win. MSCKF update nearly
    vanishes (1.6 → 0.1 ms — fewer features are lost per frame so fewer MSCKF
    updates happen). SLAM update drops from 4.5 to 2.8 ms (fewer features in the
    state). Tracking drops slightly (less extraction work).
    *Tradeoff:* accuracy may degrade on difficult sequences with fewer visual cues.
 
-2. **No SLAM** (-3.9 ms, **-35%**): Eliminates SLAM update (4.5 ms) and SLAM delayed
-   (0.9 ms) entirely. But MSCKF update nearly doubles from 1.6 to 3.1 ms — features
-   that would have become persistent SLAM landmarks now go through the one-shot
-   MSCKF path instead, each requiring triangulation.
+2. **No SLAM** (-2.75 ms, **-25%** wall): Eliminates SLAM update (4.5 ms) and SLAM
+   delayed (0.9 ms) entirely. But MSCKF update nearly doubles from 1.6 to 3.1 ms —
+   features that would have become persistent SLAM landmarks now go through the
+   one-shot MSCKF path instead, each requiring triangulation.
    *Tradeoff:* no persistent landmarks means worse long-term drift, especially in
    revisited areas.
 
-3. **Downsample** (-1.5 ms, **-13%**): Tracking drops 27% (2.6 → 1.9 ms) — KLT
-   on quarter-pixel images is cheaper. Re-tri & marg also drops (1.5 → 0.6 ms).
-   Other components barely change since the number of features is the same.
-   *Tradeoff:* minimal — features are still detected, just at lower resolution.
-   This is likely the cheapest accuracy tradeoff.
+3. **Downsample** (+3.05 ms, **+28%** wall — *now slower than baseline*): The
+   master-candidate build's `68eee80` PWT-gating fix sped up the baseline path
+   more than the downsample path (downsample was already fast and saturated by
+   non-tracking components). On the older `thread_rewrite` collection this was
+   a net -13% win; v2 inverts that.
+   *Tradeoff:* irrelevant at v2 — no longer a net positive on x86.
 
-4. **1 OpenCV thread** (+1.2 ms, **+11%**): Only tracking is affected (2.6 → 3.7 ms,
-   +42%). SLAM/MSCKF updates don't use OpenCV threading at all.
+4. **1 OpenCV thread** (+1.67 ms, **+15%** wall): Only tracking is affected
+   (2.6 → 3.7 ms, +42%). SLAM/MSCKF updates don't use OpenCV threading at all.
    *Key insight:* OpenCV parallelism gives only moderate benefit for this workload.
    On core-constrained machines, dedicating cores to the ROS 2 executor can pay
    off more than giving them to OpenCV.
 
-5. **300 features** (+3.8 ms, **+34%**): Diminishing returns. 50% more features
-   costs 34% more total time. MSCKF update more than doubles since more features
-   are lost per frame. Tracking grows +35%.
+5. **300 features** (+4.85 ms, **+45%** wall): Diminishing returns. 50% more features
+   costs 45% more total time. MSCKF update more than doubles since more features
+   are lost per frame. Tracking grows ~+35%.
 
 ### Key insight: SLAM update is the bottleneck
 
@@ -394,7 +402,7 @@ frames.
 | 5.0× | 2790 | 122 | 4.2% | 6.38 | ~10 real drops; total ms drops because the heavy init frames are excluded |
 | Serial (reference) | 2776 | 136 | 4.7% | 10.86 | strict ±20 ms stereo sync |
 
-*Source: `results/timing/x86/subscribe/rerun_2026_04_23/V1_01_easy_rate{1.0,2.0,5.0}_wall.txt`; serial reference from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_wall.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`. Re-collected 2026-04-26.*
+*Source: `results/timing/x86/subscribe/rerun_2026_04_23/V1_01_easy_rate{1.0,2.0,5.0}.txt` (wall-clock; rate-suffixed files are written by `run_timing_subscribe.sh` without a `_wall` suffix — the `_cpu`/`_thread` siblings do carry the suffix); serial reference from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_wall.txt`. Provenance: x86, `master-candidate`/`2a50450`, `slam_chi2_recovery: false`. Re-collected 2026-04-26. Reproduce: `bash run_timing_subscribe.sh 1.0 --tag rerun_2026_04_23` (and similarly for `2.0` and `5.0`).*
 
 The ~112-136 baseline "missing" frames at 1× and 2× are **NOT performance-related
 drops**. They come from:
@@ -494,16 +502,19 @@ Total: 11.3ms per frame
 
 ### What helps most (stereo, V1_01_easy)
 
-| Optimization | Savings | Notes |
-|-------------|---------|-------|
-| Reduce features to 100 | -40% | Biggest win. Impacts tracking + all updates. |
-| Disable SLAM (max_slam=0) | -35% | Eliminates largest component. MSCKF takes over. |
-| Switch to mono | -28% | Removes stereo matching + smaller state. |
-| Downsample images | -13% | Cheap win. Tracking + re-tri savings. |
-| Reduce OpenCV threads | +11% | Modest. Not worth worrying about. |
-| Increase features to 300 | +34% | Diminishing returns. Avoid. |
+Wall-time savings vs. the v2 baseline (10.86 ms wall, 4 threads, 200 pts, full
+resolution — `serial/rerun_2026_04_23/V1_01_easy_4thr_wall.txt`).
 
-*Source: derived from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_thread.txt`, `results/timing/x86/serial/thread_rewrite/V1_01_easy_4thr_mono_thread.txt`, and `results/timing/x86/serial/sweep/thread_rewrite/*_thread.txt`*
+| Optimization | Savings (wall) | Notes |
+|-------------|---------------|-------|
+| Reduce features to 100 | **-26%** (8.01 ms) | Biggest win. Impacts tracking + all updates. |
+| Disable SLAM (max_slam=0) | **-25%** (8.11 ms) | Eliminates largest component. MSCKF takes over. |
+| Switch to mono | -28% | Removes stereo matching + smaller state. *Carried over from `thread_rewrite` data; not yet re-collected against v2 baseline.* |
+| Downsample images | **+28%** (13.91 ms) | **Now slower than baseline.** The PWT-gating fix (`68eee80`) sped up the baseline more than it sped up the downsample variant; the downsample tracking gain is no longer enough to recover the difference. |
+| Reduce OpenCV threads | **+15%** (12.53 ms) | Modest cost on x86. Worse on RPi5 — see `rpi5-benchmarking.md`. |
+| Increase features to 300 | **+45%** (15.71 ms) | Diminishing returns. Avoid. |
+
+*Source: sweep variants from `results/timing/x86/serial/sweep/rerun_2026_04_23/{A_downsample,B_num_pts_100,C_num_pts_300,D_no_slam,E_opencv_1thread}.txt`; baseline from `results/timing/x86/serial/rerun_2026_04_23/V1_01_easy_4thr_wall.txt`. Reproduce: `bash run_timing_sweep.sh --tag rerun_2026_04_23` (baseline is from the `run_full_benchmark.sh -m serial -s V1_01_easy --tag rerun_2026_04_23` row). The mono row is from `thread_rewrite/V1_01_easy_4thr_mono_thread.txt` — re-collect with `run_full_benchmark.sh -m serial -c mono -s V1_01_easy --tag <new_tag>` if precise v2 numbers are needed.*
 
 Recommended starting configs for RPi5 are listed in
 [rpi5-benchmarking.md](rpi5-benchmarking.md) — those were validated against
@@ -513,44 +524,48 @@ actual measurements.
 
 ## Raw timing data (x86)
 
-All x86 CSV timing files are committed in `results/timing/x86/`:
+All x86 CSV timing files are committed under `results/timing/x86/`. The
+authoritative index of which directory was produced by which command (with
+hardware, code SHA, and chi2_recovery state) is
+[data-provenance.md](data-provenance.md). At a glance, the active layout is:
 
 ```
 results/timing/x86/
 ├── serial/
-│   ├── stereo/
-│   │   ├── V1_01_easy.txt     (2776 frames)
-│   │   ├── MH_03_medium.txt   (2302 frames)
-│   │   └── V1_03_difficult.txt (1990 frames)
-│   ├── mono/
-│   │   ├── V1_01_easy.txt     (2799 frames)
-│   │   ├── MH_03_medium.txt   (2310 frames)
-│   │   └── V1_03_difficult.txt (2004 frames)
-│   └── sweep/
-│       ├── A_downsample.txt   (2774 frames)
-│       ├── B_num_pts_100.txt  (2776 frames)
-│       ├── C_num_pts_300.txt  (2776 frames)
-│       ├── D_no_slam.txt      (2776 frames)
-│       └── E_opencv_1thread.txt (2776 frames)
+│   ├── rerun_2026_04_23/         — main 3-clock suite (stereo + mono × {4,1}thr)
+│   ├── rerun_2026_04_23_paper/   — 10-EuRoC paper Table II/III repro (stereo + mono)
+│   └── sweep/rerun_2026_04_23/   — 5 sensitivity variants (A_*, B_*, …)
 └── subscribe/
-    ├── V1_01_easy_rate1.0.txt (2800 frames)
-    ├── V1_01_easy_rate2.0.txt (2800 frames)
-    └── V1_01_easy_rate5.0.txt (2799 frames)
+    ├── rerun_2026_04_23/                      — main 5-rep × 3-seq × {4,1}thr suite
+    ├── rerun_2026_04_23/V1_01_easy_rate*.txt  — bag-rate sweep (1.0/2.0/5.0×)
+    └── rerun_2026_04_23_rate2_recovery_{on,off}/ — chi2_recovery A/B (V1_03 @ 2×)
 ```
 
-RPi5 CSVs live under `results/timing/rpi5/` — see
+(Legacy `serial/{stereo,mono}/...` and `subscribe/V1_01_easy_rate*.txt` paths
+were promoted from the 2026-04-23 paper repro into `results/{stereo,mono}/`
+and the rate sweep tag respectively. See `data-provenance.md` "Retired tags"
+for what was deleted and where the equivalent data now lives.)
+
+RPi5 CSVs live under `results/rpi5/` — see
 [rpi5-benchmarking.md](rpi5-benchmarking.md) §"Raw timing data".
 
 ## Scripts
 
-All scripts are in the workspace root. They skip runs whose output already exists
-(safe to re-run) and source ROS 2 internally.
+All scripts are in the workspace root. They skip runs whose output already
+exists *and is non-trivial* (>100 frames) — partial/empty CSVs from a crashed
+run no longer mask a re-run. They source ROS 2 internally and clean up child
+processes on Ctrl-C. Common helpers live in `scripts/bench_lib.sh`.
+
+Always pass `--tag <name>` so output goes to a labelled
+`<results-base>/{serial,subscribe}/<tag>/` directory; otherwise an
+auto-generated `bench_YYYYMMDD_HHMMSS` is used and citations in this doc
+won't match.
 
 | Script | Phase | What it does |
 |--------|-------|-------------|
-| `run_full_benchmark.sh -m serial -c both -r 1` | 1 | Runs serial mode on 3 sequences × {stereo, mono}. |
-| `run_timing_sweep.sh [--tag NAME]` | 2 | Runs 5 config variants on V1_01_easy (serial mode). |
-| `run_timing_subscribe.sh [rate] [--tag NAME]` | 3 | Subscribe mode + bag playback at given rate. |
+| `run_full_benchmark.sh -m serial -c both -r 1 --tag <name>` | 1 | Runs serial mode on 3 sequences × {stereo, mono}. Pass `-s <csv>` to override the sequence list (e.g. all 10 EuRoC for paper repro). `--dry-run` prints the planned cells without executing. |
+| `run_timing_sweep.sh --tag <name>` | 2 | Runs 5 config variants on V1_01_easy (serial mode). |
+| `run_timing_subscribe.sh <rate> --tag <name>` | 3 | Subscribe mode + bag playback at given rate (1.0/2.0/5.0). |
 
 ## Key source files
 

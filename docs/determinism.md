@@ -557,14 +557,14 @@ both global trajectory error (ATE) and local consistency (RPE at 8-40m segments)
 
 #### Stress test — reproducing the failure mode
 
-The default-on argument rests on showing that disabling recovery makes the
-estimator *diverge* under stress — not just differ slightly. Ad-hoc A/B on this
-machine, April 2026: for each (sequence, rate, flag) cell, subscribe mode was
-run 3 times (chi2 relaxation toggled via source edit + rebuild), **except the
-V1_01_easy @ rate=1.0 baseline row, which reuses the 5-run mean from the
-archived `rerun_2026_04_23` suite**. Per-run `slam_feats_in_state` was
-recorded from `traj_features.txt`; final ATE was posyaw-aligned against the
-ov_data ground truth.
+The (now-default-off) argument rests on showing that the prior default-on
+behaviour was masking, not preventing, scheduler-induced SLAM collapse. A/B on
+this machine, April 2026: for each (sequence, rate, flag) cell, subscribe mode
+was run 3 times with `slam_chi2_recovery` flipped via the `--slam-chi2-recovery`
+override (no source edit), **except the V1_01_easy @ rate=1.0 baseline row,
+which reuses the 5-run mean from the archived `rerun_2026_04_23` suite**.
+Per-run `slam_feats_in_state` was recorded from `traj_features.txt`; final ATE
+was posyaw-aligned against the ov_data ground truth.
 
 | Scenario | `slam_chi2_recovery: true` — ATE pos | `slam_chi2_recovery: false` — ATE pos | Verdict |
 |---|---|---|---|
@@ -595,22 +595,26 @@ could be CPU-bound (e.g. low-power SBCs running VIO + perception at the same
 time, or real-time playback of a hard sequence). Only flip it off for strict
 benchmark reproducibility against the pre-`64cfe59` numbers.
 
-*Source: unarchived — raw `_est.txt` / `_feats.txt` files from an A/B on this
-machine, April 2026. Not preserved under `results/` because the failure mode
-only reproduces under stress rates that aren't part of the standard suite.
-The V1_01_easy @ rate=1.0 baseline row (with-recovery column) is sourced from
-`results/timing/x86/subscribe/rerun_2026_04_23/V1_01_easy_*_run{1..5}_est.txt`
-— that one is archived. Reproduce the stress rows by toggling
-`slam_chi2_recovery` in `euroc_mav/estimator_config.yaml` and running 3
-subscribe reps at `--rate 2.0` on V1_03_difficult:*
+*Source:
+- V1_01_easy @ rate=1.0 baseline (with-recovery): mean over `results/timing/x86/subscribe/rerun_2026_04_23/V1_01_easy_*_run{1..5}_est.txt` (5 runs, archived).
+- V1_01_easy @ rate=2.0 row: unarchived. The `rerun_2026_04_23_rate2_recovery_{on,off}/` tags only carry V1_03_difficult; the V1_01_easy @ rate=2 cell remains an ad-hoc A/B preserved only in this table. Re-collect with `bash run_timing_subscribe.sh 2.0 --tag rerun_rate2_v101_recovery_off --slam-chi2-recovery false` (and `_on`) if precise verification is needed.
+- V1_03_difficult @ rate=1.0: 3 runs each in `results/timing/x86/subscribe/rerun_2026_04_23_recovery_{on,off}/V1_03_difficult_4thr_run{1,2,3}_{est,feats}.txt` (archived).
+- V1_03_difficult @ rate=2.0 (the load-bearing row): 3 runs each in `results/timing/x86/subscribe/rerun_2026_04_23_rate2_recovery_{on,off}/V1_03_difficult_4thr_run{1,2,3}_{est,feats}.txt` (archived).
+
+Reproduce the V1_03 rows with the `--slam-chi2-recovery` flag (no source edits
+needed since `run_full_benchmark.sh` overrides the temp YAML in-place):*
 
 ```bash
-# With recovery (default)
-bash run_full_benchmark.sh -m subscribe -s V1_03_difficult -t 4 -r 3 --tag recovery_on
-# Then edit estimator_config.yaml: slam_chi2_recovery: false, rerun:
-bash run_full_benchmark.sh -m subscribe -s V1_03_difficult -t 4 -r 3 --tag recovery_off
-# (rate=2.0 currently requires editing BAG_PLAY_DELAY/--rate in the script,
-#  or using run_timing_subscribe.sh.)
+# rate=1.0 A/B
+bash run_full_benchmark.sh -m subscribe -s V1_03_difficult -t 4 -r 3 \
+    --tag rerun_2026_04_23_recovery_on  --slam-chi2-recovery true
+bash run_full_benchmark.sh -m subscribe -s V1_03_difficult -t 4 -r 3 \
+    --tag rerun_2026_04_23_recovery_off --slam-chi2-recovery false
+
+# rate=2.0 A/B (the failure-mode reproducer): run_full_benchmark.sh hardcodes
+# rate=1.0, so use run_timing_subscribe.sh per-rep, or temporarily edit the
+# `--rate 1.0` token in the subscribe loop. The --slam-chi2-recovery flag
+# works the same way.
 ```
 
 ---

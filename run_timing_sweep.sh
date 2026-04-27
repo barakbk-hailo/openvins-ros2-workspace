@@ -5,46 +5,76 @@
 #
 # Usage:
 #   bash run_timing_sweep.sh [--tag <name>] [--slam-chi2-recovery true|false]
-#
-# --tag routes output under $HOME/results/timing/x86/serial/sweep/<tag>/
-# so reruns don't clobber earlier results.
-# --slam-chi2-recovery overrides the YAML key in each variant's temp config
-# (default: leave estimator_config.yaml's value alone — shipping default is false).
 
-set -eo pipefail
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/bench_lib.sh
+. "$SCRIPT_DIR/scripts/bench_lib.sh"
+
+usage() {
+  cat <<'EOF'
+Phase 2: Config sensitivity sweeps on V1_01_easy (serial mode, stereo).
+Tests which config knobs matter most for RPi5 optimization.
+
+Usage:
+  bash run_timing_sweep.sh [--tag <name>] [--slam-chi2-recovery true|false]
+
+Options:
+  --tag <name>         output goes to $HOME/results/timing/x86/serial/sweep/<tag>/
+  --slam-chi2-recovery <true|false>
+                       override slam_chi2_recovery in each variant's temp config
+  -h, --help           show this help and exit
+
+Variants:
+  A_downsample        — half-resolution input images
+  B_num_pts_100       — 100 features (vs default 200)
+  C_num_pts_300       — 300 features (vs default 200)
+  D_no_slam           — MSCKF-only (max_slam=0)
+  E_opencv_1thread    — single-threaded OpenCV (RPi5 thermal proxy)
+
+Compare against the baseline:
+  ros2 run ov_eval timing_comparison \
+      ~/results/timing/x86/serial/stereo/V1_01_easy.txt \
+      ~/results/timing/x86/serial/sweep/<tag>/*.txt
+EOF
+}
 
 TAG=""
 SLAM_CHI2_RECOVERY=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --tag) TAG="$2"; shift 2 ;;
-    --slam-chi2-recovery) SLAM_CHI2_RECOVERY="$2"; shift 2 ;;
-    -h|--help) sed -n '2,11p' "$0" | sed 's/^# \?//'; exit 0 ;;
-    *) echo "unknown arg: $1" >&2; exit 2 ;;
+    --tag=*)                  TAG="${1#*=}"; shift ;;
+    --tag)                    TAG="${2:-}"; shift 2 ;;
+    --slam-chi2-recovery=*)   SLAM_CHI2_RECOVERY="${1#*=}"; shift ;;
+    --slam-chi2-recovery)     SLAM_CHI2_RECOVERY="${2:-}"; shift 2 ;;
+    -h|--help)                usage; exit 0 ;;
+    *)                        echo "ERROR: unknown arg: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
 
-case "${SLAM_CHI2_RECOVERY:-}" in ""|true|false) ;; *) echo "ERROR: --slam-chi2-recovery must be true or false (got: $SLAM_CHI2_RECOVERY)" >&2; exit 2 ;; esac
+validate_chi2_recovery "$SLAM_CHI2_RECOVERY" || exit 2
+require_dir "datasets" "$DATASETS_DIR" || exit 1
 
-DATASETS_DIR="$HOME/datasets/euroc"
-RESULTS_DIR="$HOME/results/timing/x86/serial/sweep${TAG:+/$TAG}"
-TIMING_TMP="/tmp/traj_timing.txt"
-TIMING_TMP_CPU="/tmp/traj_timing_cpu.txt"
-TIMING_TMP_THREAD="/tmp/traj_timing_thread.txt"
-WS_DIR="$HOME/workspace/catkin_ws_ov"
 SEQ="V1_01_easy"
-CONFIG_DIR="$WS_DIR/src/open_vins/config/euroc_mav"
-BASE_CONFIG="$CONFIG_DIR/estimator_config.yaml"
+require_bag "$SEQ" || exit 1
+
+RESULTS_DIR="$HOME/results/timing/x86/serial/sweep${TAG:+/$TAG}"
 TMP_CONFIG="$CONFIG_DIR/estimator_config_sweep.yaml"
 
-for _distro in jazzy humble; do
-  if [ -f "/opt/ros/$_distro/setup.bash" ]; then source "/opt/ros/$_distro/setup.bash"; break; fi
-done
-source "$WS_DIR/install/setup.bash"
+cleanup() {
+  rm -f "$TMP_CONFIG" 2>/dev/null || true
+  kill_stale_subscribe_nodes  # belt-and-braces; sweep is serial-only but covers Ctrl-C
+}
+trap cleanup EXIT INT TERM
+
+source_ros
 
 mkdir -p "$RESULTS_DIR"
 
-# Helper: create a modified config and run serial node
+# Helper: create a modified config (baseline timing-recording) and run serial node.
+# Each variant's extra sed expressions are applied AFTER the timing-recording flips
+# so they can override anything if needed.
 run_sweep() {
   local NAME="$1"
   shift  # remaining args are sed expressions
@@ -56,37 +86,38 @@ run_sweep() {
   fi
 
   echo "=== $NAME ==="
-  cp "$BASE_CONFIG" "$TMP_CONFIG"
-  sed -i 's/^record_timing_information: false/record_timing_information: true/' "$TMP_CONFIG"
-  sed -i 's/^record_timing_cpu_time: false/record_timing_cpu_time: true/' "$TMP_CONFIG"
-  sed -i 's/^record_timing_thread_time: false/record_timing_thread_time: true/' "$TMP_CONFIG"
+  make_bench_config "$TMP_CONFIG" "$SLAM_CHI2_RECOVERY" || return 1
   for sedexpr in "$@"; do
     sed -i "$sedexpr" "$TMP_CONFIG"
   done
-  if [ -n "${SLAM_CHI2_RECOVERY:-}" ]; then
-    sed -i "s/^slam_chi2_recovery: .*/slam_chi2_recovery: ${SLAM_CHI2_RECOVERY} # overridden via --slam-chi2-recovery/" "$TMP_CONFIG"
-  fi
 
-  rm -f "$TIMING_TMP" "$TIMING_TMP_CPU" "$TIMING_TMP_THREAD"
+  rm -f "$TIMING_WALL_TMP" "$TIMING_CPU_TMP" "$TIMING_THREAD_TMP"
 
   ros2 launch ov_msckf serial.launch.py \
       config_path:="$TMP_CONFIG" \
       path_bag:="$DATASETS_DIR/$SEQ" \
-      max_cameras:=2 use_stereo:=true
+      max_cameras:=2 use_stereo:=true || {
+    echo "  -> launch FAILED for $NAME" >&2
+    return 1
+  }
 
-  if [ -f "$TIMING_TMP" ]; then
-    ROWS=$(grep -cv '^#' "$TIMING_TMP" || true)
-    cp "$TIMING_TMP" "$OUT"
+  if [ -f "$TIMING_WALL_TMP" ]; then
+    local ROWS
+    ROWS=$(grep -cv '^#' "$TIMING_WALL_TMP" || true)
+    cp "$TIMING_WALL_TMP" "$OUT"
     echo "  -> Saved $OUT ($ROWS frames)"
+    if [ "$ROWS" -lt "$MIN_ROWS_FOR_COMPLETE_RUN" ]; then
+      echo "  -> WARNING: only $ROWS frames (< $MIN_ROWS_FOR_COMPLETE_RUN); run may be incomplete" >&2
+    fi
   else
-    echo "  -> WARNING: no timing file produced for $NAME"
+    echo "  -> WARNING: no timing file produced for $NAME" >&2
   fi
-  if [ -f "$TIMING_TMP_CPU" ]; then
-    cp "$TIMING_TMP_CPU" "${OUT%.txt}_cpu.txt"
+  if [ -f "$TIMING_CPU_TMP" ]; then
+    cp "$TIMING_CPU_TMP" "${OUT%.txt}_cpu.txt"
     echo "  -> Saved ${OUT%.txt}_cpu.txt (process CPU time)"
   fi
-  if [ -f "$TIMING_TMP_THREAD" ]; then
-    cp "$TIMING_TMP_THREAD" "${OUT%.txt}_thread.txt"
+  if [ -f "$TIMING_THREAD_TMP" ]; then
+    cp "$TIMING_THREAD_TMP" "${OUT%.txt}_thread.txt"
     echo "  -> Saved ${OUT%.txt}_thread.txt (thread CPU time)"
   fi
 }
