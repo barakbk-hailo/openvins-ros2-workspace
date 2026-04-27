@@ -59,7 +59,7 @@ produces identical output on every run for a given platform.
 
 ```bash
 cd ~/workspace/catkin_ws_ov
-source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash && source install/setup.bash
+. /etc/os-release && source /opt/ros/$([ "$UBUNTU_CODENAME" = "noble" ] && echo jazzy || echo humble)/setup.bash && source install/setup.bash
 
 ros2 launch ov_msckf serial.launch.py \
     config_path:=$PWD/src/open_vins/config/euroc_mav/estimator_config.yaml \
@@ -88,14 +88,14 @@ terminals.
 
 ```bash
 cd ~/workspace/catkin_ws_ov
-source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash && source install/setup.bash
+. /etc/os-release && source /opt/ros/$([ "$UBUNTU_CODENAME" = "noble" ] && echo jazzy || echo humble)/setup.bash && source install/setup.bash
 ros2 launch ov_msckf subscribe.launch.py config:=euroc_mav
 ```
 
 **Terminal 2 — play the bag:**
 
 ```bash
-source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash
+. /etc/os-release && source /opt/ros/$([ "$UBUNTU_CODENAME" = "noble" ] && echo jazzy || echo humble)/setup.bash
 cd ~/datasets/euroc
 ros2 bag play V1_01_easy
 ```
@@ -133,7 +133,7 @@ it is already in the repo.
 Then in Terminal 3:
 
 ```bash
-source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash
+. /etc/os-release && source /opt/ros/$([ "$UBUNTU_CODENAME" = "noble" ] && echo jazzy || echo humble)/setup.bash
 source ~/workspace/catkin_ws_ov/install/setup.bash
 ros2 run rqt_image_view rqt_image_view &
 rviz2 -d ~/workspace/catkin_ws_ov/src/open_vins/ov_msckf/launch/display.rviz

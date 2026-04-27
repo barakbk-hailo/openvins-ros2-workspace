@@ -93,7 +93,7 @@ Summary: 5 packages finished [~5min]
 Auto-detects the installed distro from `/opt/ros/`:
 
 ```bash
-source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash
+. /etc/os-release && source /opt/ros/$([ "$UBUNTU_CODENAME" = "noble" ] && echo jazzy || echo humble)/setup.bash
 source ~/workspace/catkin_ws_ov/install/setup.bash
 ```
 

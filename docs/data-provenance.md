@@ -14,6 +14,8 @@ is given here so individual citations stay short.
 
 ## x86 tags
 
+> **Submodule SHA note:** All rows below cite `master-candidate / 2a50450` because that's the commit the data was actually collected against. The outer repo's `master-candidate` submodule pointer has since advanced to `064c717` via two commits: `f2fe5b9` (ReadMe-only — rewrites the `slam_chi2_recovery` rationale) and `064c717` itself (Dockerfile-only — flips the default-clone branch). Neither touches the filter, YAML defaults, or the build, so reproducing against either tip yields the same numbers.
+
 | Tag (under `results/timing/x86/`) | Submodule | Outer commit | Date | chi2_recovery | OpenCV threads | Notes |
 |---|---|---|---|---|---|---|
 | `serial/rerun_2026_04_23/` | `master-candidate` / `2a50450` | `8424c9e` | 2026-04-26 | `false` (shipping default) | 4 + 1 | Main 3-clock suite — V1_01_easy / MH_03_medium / V2_02_medium × stereo + mono × `4-thr` & `1-thr`, 1 serial rep per config |

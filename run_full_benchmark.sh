@@ -89,6 +89,7 @@ done
 # ── Validate ──
 case "$MODE" in serial|subscribe|both) ;; *) echo "ERROR: --mode must be serial|subscribe|both (got: $MODE)" >&2; exit 2 ;; esac
 case "$CAMERAS" in stereo|mono|both) ;; *) echo "ERROR: --cameras must be stereo|mono|both (got: $CAMERAS)" >&2; exit 2 ;; esac
+case "${SLAM_CHI2_RECOVERY:-}" in ""|true|false) ;; *) echo "ERROR: --slam-chi2-recovery must be true or false (got: $SLAM_CHI2_RECOVERY)" >&2; exit 2 ;; esac
 # Subscribe mode only runs stereo. Fail fast on pure mono+subscribe; warn on both+subscribe.
 if [[ "$MODE" == "subscribe" && "$CAMERAS" == "mono" ]]; then
   echo "ERROR: --cameras mono --mode subscribe is not supported (mono+subscribe is untested)." >&2

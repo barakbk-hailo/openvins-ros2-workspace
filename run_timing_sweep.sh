@@ -24,6 +24,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+case "${SLAM_CHI2_RECOVERY:-}" in ""|true|false) ;; *) echo "ERROR: --slam-chi2-recovery must be true or false (got: $SLAM_CHI2_RECOVERY)" >&2; exit 2 ;; esac
+
 DATASETS_DIR="$HOME/datasets/euroc"
 RESULTS_DIR="$HOME/results/timing/x86/serial/sweep${TAG:+/$TAG}"
 TIMING_TMP="/tmp/traj_timing.txt"

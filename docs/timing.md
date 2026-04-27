@@ -145,7 +145,7 @@ results directory.
 Results are analyzed with the `ov_eval` package (built as part of the workspace):
 
 ```bash
-source /opt/ros/$(ls /opt/ros/ | grep -E '^(jazzy|humble)$' | head -n1)/setup.bash && source ~/workspace/catkin_ws_ov/install/setup.bash
+. /etc/os-release && source /opt/ros/$([ "$UBUNTU_CODENAME" = "noble" ] && echo jazzy || echo humble)/setup.bash && source ~/workspace/catkin_ws_ov/install/setup.bash
 
 # Per-run stats: mean, std, p99, max for each component
 ros2 run ov_eval timing_flamegraph <file.txt>
