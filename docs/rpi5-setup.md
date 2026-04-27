@@ -43,7 +43,7 @@ and builds it inside the image, so the resulting `openvins-humble:latest`
 ships a pre-compiled `/opt/ros_ws/install/` ready to run.
 
 ```bash
-git clone git@github.com:barakbk-hailo/openvins-ros2-workspace.git ~/workspace/catkin_ws_ov
+git clone git@github.com:NadavHHailo/openvins-ros2-workspace.git ~/workspace/catkin_ws_ov
 cd ~/workspace/catkin_ws_ov
 git submodule update --init --recursive
 
@@ -221,7 +221,7 @@ source ~/ros2_jazzy/install/setup.bash
 Then clone and build OpenVINS against this ROS 2:
 ```bash
 mkdir -p ~/workspace/catkin_ws_ov/src && cd ~/workspace/catkin_ws_ov/src
-git clone https://github.com/barakbk-hailo/open_vins/
+git clone https://github.com/NadavHHailo/open_vins/
 cd ~/workspace/catkin_ws_ov
 source ~/ros2_jazzy/install/setup.bash
 colcon build --symlink-install

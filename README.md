@@ -1,8 +1,8 @@
 # OpenVINS ROS 2 Workspace
 
-This repo ([barakbk-hailo/openvins-ros2-workspace](https://github.com/barakbk-hailo/openvins-ros2-workspace))
+This repo ([NadavHHailo/openvins-ros2-workspace](https://github.com/NadavHHailo/openvins-ros2-workspace))
 is a deployment workspace for our fork of OpenVINS
-([barakbk-hailo/open_vins](https://github.com/barakbk-hailo/open_vins)) running with ROS 2 Humble
+([NadavHHailo/open_vins](https://github.com/NadavHHailo/open_vins)) running with ROS 2 Humble
 on Ubuntu 22.04 or ROS 2 Jazzy on Ubuntu 24.04. No GPU required — OpenVINS is a CPU-based MSCKF/EKF
 algorithm using OpenCV and Eigen.
 
@@ -20,7 +20,7 @@ Our fork adds:
 ## Quick install
 
 ```bash
-git clone --recursive git@github.com:barakbk-hailo/openvins-ros2-workspace.git ~/workspace/catkin_ws_ov
+git clone --recursive git@github.com:NadavHHailo/openvins-ros2-workspace.git ~/workspace/catkin_ws_ov
 cd ~/workspace/catkin_ws_ov
 bash install.sh
 ```

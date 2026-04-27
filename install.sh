@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-shot setup for the OpenVINS ROS 2 workspace.
 # Run from the repo root after cloning:
-#   git clone --recursive git@github.com:barakbk-hailo/openvins-ros2-workspace.git ~/workspace/catkin_ws_ov
+#   git clone --recursive git@github.com:NadavHHailo/openvins-ros2-workspace.git ~/workspace/catkin_ws_ov
 #   cd ~/workspace/catkin_ws_ov && bash install.sh
 set -euo pipefail
 

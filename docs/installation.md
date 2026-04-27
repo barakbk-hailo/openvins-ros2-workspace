@@ -26,7 +26,7 @@
 Clone this repo (with the `open_vins` submodule), then run the install script:
 
 ```bash
-git clone --recursive git@github.com:barakbk-hailo/openvins-ros2-workspace.git ~/workspace/catkin_ws_ov
+git clone --recursive git@github.com:NadavHHailo/openvins-ros2-workspace.git ~/workspace/catkin_ws_ov
 cd ~/workspace/catkin_ws_ov
 bash install.sh
 ```
@@ -36,7 +36,7 @@ bash install.sh
 ### 0. Clone this workspace repo (with submodule)
 
 ```bash
-git clone --recursive git@github.com:barakbk-hailo/openvins-ros2-workspace.git ~/workspace/catkin_ws_ov
+git clone --recursive git@github.com:NadavHHailo/openvins-ros2-workspace.git ~/workspace/catkin_ws_ov
 ```
 
 If you already cloned without `--recursive`:

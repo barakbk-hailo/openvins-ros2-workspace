@@ -859,7 +859,7 @@ measurable benefit and may introduce its own noise.
 - **For live deployment: use subscribe mode with `setMaxIntervalDuration(0.02)`
   enabled.** This is committed on the fork branch `sync-max-interval-20ms` (commit
   `e57e88d`) and brings RPi5 position variance to within 3× of serial — acceptable
-  for most VIO applications. The `barakbk-hailo/open_vins` fork exposes this as a
+  for most VIO applications. The `NadavHHailo/open_vins` fork exposes this as a
   default.
 - **Use the `openvins-humble-maxinterval` image** (built from `sync-max-interval-20ms`).
   This is the only intervention with a reproducible, measurable effect.
