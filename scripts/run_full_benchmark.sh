@@ -91,9 +91,10 @@ Examples:
 
 Output naming:
   Serial:    <SEQ>_<N>thr[_mono]_{wall,cpu,thread,feats,est}.txt
-  Subscribe: <SEQ>_<N>thr[_rate<R>]_run<R>_{wall,cpu,thread,feats,est}.txt
-             (the _rate<R> segment is inserted only when R != 1.0, so existing
-              rate=1.0 citations like <SEQ>_<N>thr_run<R>_*.txt are unchanged.)
+  Subscribe: <SEQ>_<N>thr[_rate<R>]_run<i>_{wall,cpu,thread,feats,est}.txt
+             (N = threads, R = bag-play rate, i = rep index 1..reps. The
+              _rate<R> segment is inserted only when R != 1.0, so existing
+              rate=1.0 citations like <SEQ>_<N>thr_run<i>_*.txt are unchanged.)
 
 Stale OpenVINS subscribe nodes (this user only) are TERM-then-KILL'd on
 script start and after each subscribe rep.
@@ -308,7 +309,7 @@ if [[ "$MODE" == "serial" || "$MODE" == "both" ]]; then
         # see the same /tmp filesystem as the launch (matters in --docker mode,
         # where /tmp is the container's /tmp, not the host's).
         if ! docker_wrap "
-          rm -f $TIMING_WALL_TMP $TIMING_CPU_TMP $TIMING_THREAD_TMP $FEATS_TMP $EST_TMP $STD_TMP
+          rm -f '$TIMING_WALL_TMP' '$TIMING_CPU_TMP' '$TIMING_THREAD_TMP' '$FEATS_TMP' '$EST_TMP' '$STD_TMP'
           ros2 launch ov_msckf serial.launch.py \\
               config_path:='$CFG' \\
               path_bag:='$DATASETS_DIR/$seq' \\
@@ -316,11 +317,11 @@ if [[ "$MODE" == "serial" || "$MODE" == "both" ]]; then
               save_total_state:=true \\
               filepath_est:='$EST_TMP' \\
               filepath_std:='$STD_TMP' 2>&1 | tail -1
-          [ -f $TIMING_WALL_TMP ]   && cp $TIMING_WALL_TMP   '$DIR/${TAG}_wall.txt'
-          [ -f $TIMING_CPU_TMP ]    && cp $TIMING_CPU_TMP    '$DIR/${TAG}_cpu.txt'
-          [ -f $TIMING_THREAD_TMP ] && cp $TIMING_THREAD_TMP '$DIR/${TAG}_thread.txt'
-          [ -f $FEATS_TMP ]         && cp $FEATS_TMP         '$DIR/${TAG}_feats.txt'
-          [ -f $EST_TMP ]           && cp $EST_TMP           '$DIR/${TAG}_est.txt'
+          [ -f '$TIMING_WALL_TMP' ]   && cp '$TIMING_WALL_TMP'   '$DIR/${TAG}_wall.txt'
+          [ -f '$TIMING_CPU_TMP' ]    && cp '$TIMING_CPU_TMP'    '$DIR/${TAG}_cpu.txt'
+          [ -f '$TIMING_THREAD_TMP' ] && cp '$TIMING_THREAD_TMP' '$DIR/${TAG}_thread.txt'
+          [ -f '$FEATS_TMP' ]         && cp '$FEATS_TMP'         '$DIR/${TAG}_feats.txt'
+          [ -f '$EST_TMP' ]           && cp '$EST_TMP'           '$DIR/${TAG}_est.txt'
           true
         "; then
           echo "  -> launch FAILED" >&2
@@ -376,7 +377,7 @@ if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
           # context so /tmp is consistent (host's in native mode, container's
           # in --docker mode; cps in the same shell see the same FS).
           docker_wrap "
-            rm -f $TIMING_WALL_TMP $TIMING_CPU_TMP $TIMING_THREAD_TMP $FEATS_TMP $EST_TMP $STD_TMP
+            rm -f '$TIMING_WALL_TMP' '$TIMING_CPU_TMP' '$TIMING_THREAD_TMP' '$FEATS_TMP' '$EST_TMP' '$STD_TMP'
             ros2 launch ov_msckf subscribe.launch.py \\
                 config_path:='$CFG' \\
                 max_cameras:=2 use_stereo:=true \\
@@ -389,11 +390,11 @@ if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
             sleep 5
             kill \$OV_PID 2>/dev/null || true
             wait \$OV_PID 2>/dev/null || true
-            [ -f $TIMING_WALL_TMP ]   && cp $TIMING_WALL_TMP   '$DIR/${TAG}_wall.txt'
-            [ -f $TIMING_CPU_TMP ]    && cp $TIMING_CPU_TMP    '$DIR/${TAG}_cpu.txt'
-            [ -f $TIMING_THREAD_TMP ] && cp $TIMING_THREAD_TMP '$DIR/${TAG}_thread.txt'
-            [ -f $FEATS_TMP ]         && cp $FEATS_TMP         '$DIR/${TAG}_feats.txt'
-            [ -f $EST_TMP ]           && cp $EST_TMP           '$DIR/${TAG}_est.txt'
+            [ -f '$TIMING_WALL_TMP' ]   && cp '$TIMING_WALL_TMP'   '$DIR/${TAG}_wall.txt'
+            [ -f '$TIMING_CPU_TMP' ]    && cp '$TIMING_CPU_TMP'    '$DIR/${TAG}_cpu.txt'
+            [ -f '$TIMING_THREAD_TMP' ] && cp '$TIMING_THREAD_TMP' '$DIR/${TAG}_thread.txt'
+            [ -f '$FEATS_TMP' ]         && cp '$FEATS_TMP'         '$DIR/${TAG}_feats.txt'
+            [ -f '$EST_TMP' ]           && cp '$EST_TMP'           '$DIR/${TAG}_est.txt'
             true
           " || echo "  -> WARNING: subscribe rep returned nonzero (container/launch error?)" >&2
           # In native mode, also reap host-side strays. In --docker mode the
@@ -419,98 +420,145 @@ fi
 # ══════════════════════════════════════════════════════════════════════
 # ANALYSIS
 # ══════════════════════════════════════════════════════════════════════
+
+# Mean of the trailing "total" column (in ms) from an OpenVINS timing CSV.
+# Reads the file directly: timing CSVs have header `# timestamp,...,total`
+# and 8 numeric columns per data row. This avoids `ros2 run ov_eval
+# timing_flamegraph`, which is a Qt/matplotlib GUI tool that aborts in
+# headless environments. Echoes empty on missing/empty file.
+total_ms() {
+  local f="$1"
+  [ -f "$f" ] || return 0
+  awk -F, '!/^#/ && NF >= 2 { sum += $NF; n++ }
+           END { if (n > 0) printf "%.1f", (sum/n)*1000 }' "$f"
+}
+
+# Format a whitespace-separated series of numbers as "mean±std".
+# Single value collapses std to 0.0; empty input yields "--".
+mean_std() {
+  awk '{
+    n = NF
+    if (n == 0) { printf "--"; exit }
+    s = 0; for (i=1;i<=n;i++) s += $i
+    m = s/n
+    ss = 0; for (i=1;i<=n;i++) ss += ($i-m)*($i-m)
+    sd = (n>1) ? sqrt(ss/(n-1)) : 0
+    printf "%.1f±%.1f", m, sd
+  }' <<<"$*"
+}
+
+# Print where output files for this run landed. Indented for nesting in summary.
+print_save_locations() {
+  if [[ "$MODE" == "serial" || "$MODE" == "both" ]]; then
+    echo "  Serial:    $RESULTS_BASE/serial/$BENCH_TAG/"
+  fi
+  if [[ ( "$MODE" == "subscribe" || "$MODE" == "both" ) && "$CAMERAS" != "mono" ]]; then
+    echo "  Subscribe: $RESULTS_BASE/subscribe/$BENCH_TAG/"
+  fi
+}
+
 echo "================================================================"
 echo "  RESULTS SUMMARY ($BENCH_TAG)"
 echo "================================================================"
 echo ""
+echo "Saved results:"
+print_save_locations
+echo ""
 
-# ── Timing ──
+# ── Serial timing table (3-clock totals) ──
 if [[ "$MODE" == "serial" || "$MODE" == "both" ]]; then
-  echo "--- Per-component timing (serial, mean total in ms) ---"
+  echo "--- Serial timing (mean total per clock, ms) ---"
+  printf "  %-14s %-3s %-6s %7s %7s %7s\n" "sequence" "thr" "cam" "wall" "cpu" "thread"
   for seq in "${SEQUENCES[@]}"; do
-    echo "  $seq:"
     for thr in "${THREADS[@]}"; do
       for cam_spec in "${CAM_CONFIGS[@]}"; do
         IFS=':' read -r CAM_NAME _ _ <<< "$cam_spec"
         TAG="$(tag_for "$seq" "$thr" "$CAM_NAME")"
-        F="$RESULTS_BASE/serial/$BENCH_TAG/${TAG}_wall.txt"
-        [ -f "$F" ] || continue
-        TOTAL=$(ros2 run ov_eval timing_flamegraph "$F" 2>/dev/null | grep "(total)" | grep -oP 'mean_time = \K[0-9.]+' || true)
-        TOTAL_MS=$(python3 -c "print(f'{float(\"${TOTAL:-0}\")*1000:.1f}')")
-        echo "    ${thr}-thr ${CAM_NAME}: ${TOTAL_MS}ms"
+        DIR="$RESULTS_BASE/serial/$BENCH_TAG"
+        WALL=$(total_ms "$DIR/${TAG}_wall.txt")
+        [ -z "$WALL" ] && continue
+        CPU=$(total_ms "$DIR/${TAG}_cpu.txt")
+        THRMS=$(total_ms "$DIR/${TAG}_thread.txt")
+        printf "  %-14s %-3s %-6s %7s %7s %7s\n" \
+          "$seq" "$thr" "$CAM_NAME" "$WALL" "${CPU:-—}" "${THRMS:-—}"
       done
     done
   done
   echo ""
 fi
 
-if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
-  echo "--- Subscribe timing consistency (mean total in ms) ---"
+# ── Subscribe timing table (mean ± std across reps, 3 clocks) ──
+if [[ ( "$MODE" == "subscribe" || "$MODE" == "both" ) && "$CAMERAS" != "mono" ]]; then
+  echo "--- Subscribe timing (mean ± std across $SUBSCRIBE_REPS reps, ms) ---"
+  printf "  %-14s %-3s %-5s %12s %12s %12s\n" "sequence" "thr" "rate" "wall" "cpu" "thread"
   for seq in "${SEQUENCES[@]}"; do
-    echo "  $seq:"
     for thr in "${THREADS[@]}"; do
       for rate in "${RATES[@]}"; do
         if [ "$rate" = "1.0" ]; then rate_suffix=""; else rate_suffix="_rate${rate}"; fi
-        VALS=""
+        WALL_VALS="" CPU_VALS="" THR_VALS=""
+        DIR="$RESULTS_BASE/subscribe/$BENCH_TAG"
         for i in $(seq 1 "$SUBSCRIBE_REPS"); do
-          F="$RESULTS_BASE/subscribe/$BENCH_TAG/${seq}_${thr}thr${rate_suffix}_run${i}_wall.txt"
-          [ -f "$F" ] || continue
-          T=$(ros2 run ov_eval timing_flamegraph "$F" 2>/dev/null | grep "(total)" | grep -oP 'mean_time = \K[0-9.]+' || true)
-          T_MS=$(python3 -c "print(f'{float(\"${T:-0}\")*1000:.1f}')")
-          VALS="$VALS $T_MS"
+          BASE="$DIR/${seq}_${thr}thr${rate_suffix}_run${i}"
+          [ -f "${BASE}_wall.txt" ] || continue
+          W=$(total_ms "${BASE}_wall.txt")
+          C=$(total_ms "${BASE}_cpu.txt")
+          T=$(total_ms "${BASE}_thread.txt")
+          [ -n "$W" ] && WALL_VALS+=" $W"
+          [ -n "$C" ] && CPU_VALS+=" $C"
+          [ -n "$T" ] && THR_VALS+=" $T"
         done
-        if [ "$rate" = "1.0" ]; then
-          echo "    ${thr}-thr:$VALS ms"
-        else
-          echo "    ${thr}-thr rate=${rate}:$VALS ms"
-        fi
+        [ -z "${WALL_VALS// }" ] && continue
+        printf "  %-14s %-3s %-5s %12s %12s %12s\n" \
+          "$seq" "$thr" "$rate" \
+          "$(mean_std "$WALL_VALS")" \
+          "$(mean_std "$CPU_VALS")" \
+          "$(mean_std "$THR_VALS")"
       done
     done
   done
   echo ""
 fi
 
-# ── SLAM health ──
+# ── SLAM feature health table ──
 echo "--- SLAM feature health (avg features in state) ---"
+printf "  %-14s %-12s %-3s %-5s %14s\n" "sequence" "mode" "thr" "rate" "avg_features"
 for seq in "${SEQUENCES[@]}"; do
-  echo "  $seq:"
   if [[ "$MODE" == "serial" || "$MODE" == "both" ]]; then
     for thr in "${THREADS[@]}"; do
       for cam_spec in "${CAM_CONFIGS[@]}"; do
         IFS=':' read -r CAM_NAME _ _ <<< "$cam_spec"
         TAG="$(tag_for "$seq" "$thr" "$CAM_NAME")"
         SLAM=$(get_slam_avg "$RESULTS_BASE/serial/$BENCH_TAG/${TAG}_feats.txt")
-        echo "    serial ${thr}-thr ${CAM_NAME}: $SLAM"
+        if [ "$SLAM" = "?" ]; then continue; fi
+        printf "  %-14s %-14s %-3s %-5s %14s\n" "$seq" "serial/$CAM_NAME" "$thr" "—" "$SLAM"
       done
     done
   fi
-  if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
+  if [[ ( "$MODE" == "subscribe" || "$MODE" == "both" ) && "$CAMERAS" != "mono" ]]; then
     for thr in "${THREADS[@]}"; do
       for rate in "${RATES[@]}"; do
         if [ "$rate" = "1.0" ]; then rate_suffix=""; else rate_suffix="_rate${rate}"; fi
         VALS=""
         for i in $(seq 1 "$SUBSCRIBE_REPS"); do
-          SLAM=$(get_slam_avg "$RESULTS_BASE/subscribe/$BENCH_TAG/${seq}_${thr}thr${rate_suffix}_run${i}_feats.txt")
-          VALS="$VALS $SLAM"
+          S=$(get_slam_avg "$RESULTS_BASE/subscribe/$BENCH_TAG/${seq}_${thr}thr${rate_suffix}_run${i}_feats.txt")
+          [ "$S" = "?" ] && continue
+          VALS+=" $S"
         done
-        if [ "$rate" = "1.0" ]; then
-          echo "    subscribe ${thr}-thr:$VALS"
-        else
-          echo "    subscribe ${thr}-thr rate=${rate}:$VALS"
-        fi
+        [ -z "${VALS// }" ] && continue
+        printf "  %-14s %-14s %-3s %-5s %14s\n" "$seq" "subscribe" "$thr" "$rate" "$(mean_std "$VALS")"
       done
     done
   fi
 done
 echo ""
 
-# ── ATE ──
+# ── ATE table ──
 GT_DIR="$WS_DIR/src/open_vins/ov_data/euroc_mav"
-echo "--- ATE position RMSE (meters, posyaw alignment) ---"
+echo "--- ATE position RMSE (m, posyaw alignment) ---"
+printf "  %-14s %-12s %-3s %-5s %14s\n" "sequence" "mode" "thr" "rate" "rmse_pos"
 for seq in "${SEQUENCES[@]}"; do
   GT="$GT_DIR/${seq}.txt"
   [ -f "$GT" ] || continue
-  echo "  $seq:"
   if [[ "$MODE" == "serial" || "$MODE" == "both" ]]; then
     for thr in "${THREADS[@]}"; do
       for cam_spec in "${CAM_CONFIGS[@]}"; do
@@ -518,12 +566,12 @@ for seq in "${SEQUENCES[@]}"; do
         TAG="$(tag_for "$seq" "$thr" "$CAM_NAME")"
         F="$RESULTS_BASE/serial/$BENCH_TAG/${TAG}_est.txt"
         [ -f "$F" ] || continue
-        ATE=$(ros2 run ov_eval error_singlerun posyaw "$GT" "$F" 2>/dev/null | grep "rmse_.*pos" | head -1 | grep -oP 'rmse_pos = \K[0-9.]+' || true)
-        echo "    serial ${thr}-thr ${CAM_NAME}: ${ATE:-FAILED}"
+        ATE=$(QT_QPA_PLATFORM=offscreen timeout 30 ros2 run ov_eval error_singlerun posyaw "$GT" "$F" 2>/dev/null | grep "rmse_.*pos" | head -1 | grep -oP 'rmse_pos = \K[0-9.]+' || true)
+        printf "  %-14s %-14s %-3s %-5s %14s\n" "$seq" "serial/$CAM_NAME" "$thr" "—" "${ATE:-FAIL}"
       done
     done
   fi
-  if [[ "$MODE" == "subscribe" || "$MODE" == "both" ]]; then
+  if [[ ( "$MODE" == "subscribe" || "$MODE" == "both" ) && "$CAMERAS" != "mono" ]]; then
     for thr in "${THREADS[@]}"; do
       for rate in "${RATES[@]}"; do
         if [ "$rate" = "1.0" ]; then rate_suffix=""; else rate_suffix="_rate${rate}"; fi
@@ -531,14 +579,11 @@ for seq in "${SEQUENCES[@]}"; do
         for i in $(seq 1 "$SUBSCRIBE_REPS"); do
           F="$RESULTS_BASE/subscribe/$BENCH_TAG/${seq}_${thr}thr${rate_suffix}_run${i}_est.txt"
           [ -f "$F" ] || continue
-          ATE=$(ros2 run ov_eval error_singlerun posyaw "$GT" "$F" 2>/dev/null | grep "rmse_.*pos" | head -1 | grep -oP 'rmse_pos = \K[0-9.]+' || true)
-          VALS="$VALS ${ATE:-FAIL}"
+          ATE=$(QT_QPA_PLATFORM=offscreen timeout 30 ros2 run ov_eval error_singlerun posyaw "$GT" "$F" 2>/dev/null | grep "rmse_.*pos" | head -1 | grep -oP 'rmse_pos = \K[0-9.]+' || true)
+          [ -n "$ATE" ] && VALS+=" $ATE"
         done
-        if [ "$rate" = "1.0" ]; then
-          echo "    subscribe ${thr}-thr:$VALS"
-        else
-          echo "    subscribe ${thr}-thr rate=${rate}:$VALS"
-        fi
+        [ -z "${VALS// }" ] && continue
+        printf "  %-14s %-14s %-3s %-5s %14s\n" "$seq" "subscribe" "$thr" "$rate" "$(mean_std "$VALS")"
       done
     done
   fi
@@ -546,8 +591,11 @@ done
 echo ""
 
 # ── Zombie check ──
-ZOMBIES=$(pgrep -u "$USER" -cf "run_subscribe_msckf" 2>/dev/null || echo 0)
+ZOMBIES=$( { pgrep -u "$USER" -f "run_subscribe_msckf" 2>/dev/null || :; } | wc -l)
 echo "--- Zombie check (this user only): ${ZOMBIES} stale processes ---"
+echo ""
+echo "Saved results:"
+print_save_locations
 echo ""
 echo "================================================================"
 echo "  Done — $(date)"
