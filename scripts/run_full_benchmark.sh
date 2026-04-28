@@ -638,6 +638,24 @@ done
 echo ""
 
 # ── ATE table ──
+# error_singlerun expects TUM (timestamp tx ty tz qx qy qz qw); the OpenVINS
+# state-dump _est.txt is (timestamp qx qy qz qw px py pz vx vy vz ...). Feed
+# the raw _est.txt and the tool reads quaternion components as positions,
+# producing meaningless numbers. ate_for_est converts on the fly.
+# MPLBACKEND=Agg suppresses matplotlibcpp::show() which otherwise blocks
+# indefinitely on headless hosts even with QT_QPA_PLATFORM=offscreen.
+ate_for_est() { # <gt> <est_file>  → echoes rmse_pos (m) or empty on failure
+  local gt="$1" est="$2"
+  [ -f "$est" ] || return 0
+  local tum
+  tum=$(mktemp --suffix=.tum.txt)
+  awk '!/^#/ && NF>=8 {print $1, $6, $7, $8, $2, $3, $4, $5}' "$est" > "$tum"
+  MPLBACKEND=Agg QT_QPA_PLATFORM=offscreen timeout 15 \
+    ros2 run ov_eval error_singlerun posyaw "$gt" "$tum" 2>/dev/null \
+    | grep "rmse_.*pos" | head -1 | grep -oP 'rmse_pos = \K[0-9.]+' || true
+  rm -f "$tum"
+}
+
 GT_DIR="$WS_DIR/src/open_vins/ov_data/euroc_mav"
 echo "--- ATE position RMSE (m, posyaw alignment) ---"
 printf "  %-14s %-12s %-3s %-5s %14s\n" "sequence" "mode" "thr" "rate" "rmse_pos"
@@ -651,7 +669,7 @@ for seq in "${SEQUENCES[@]}"; do
         TAG="$(tag_for "$seq" "$thr" "$CAM_NAME")"
         F="$RESULTS_BASE/$BENCH_TAG/serial/${TAG}_est.txt"
         [ -f "$F" ] || continue
-        ATE=$(QT_QPA_PLATFORM=offscreen timeout 30 ros2 run ov_eval error_singlerun posyaw "$GT" "$F" 2>/dev/null | grep "rmse_.*pos" | head -1 | grep -oP 'rmse_pos = \K[0-9.]+' || true)
+        ATE=$(ate_for_est "$GT" "$F")
         printf "  %-14s %-14s %-3s %-5s %14s\n" "$seq" "serial/$CAM_NAME" "$thr" "—" "${ATE:-FAIL}"
       done
     done
@@ -664,7 +682,7 @@ for seq in "${SEQUENCES[@]}"; do
         for i in $(seq 1 "$SUBSCRIBE_REPS"); do
           F="$RESULTS_BASE/$BENCH_TAG/subscribe/${seq}_${thr}thr${rate_suffix}_run${i}_est.txt"
           [ -f "$F" ] || continue
-          ATE=$(QT_QPA_PLATFORM=offscreen timeout 30 ros2 run ov_eval error_singlerun posyaw "$GT" "$F" 2>/dev/null | grep "rmse_.*pos" | head -1 | grep -oP 'rmse_pos = \K[0-9.]+' || true)
+          ATE=$(ate_for_est "$GT" "$F")
           [ -n "$ATE" ] && VALS+=" $ATE"
         done
         [ -z "${VALS// }" ] && continue

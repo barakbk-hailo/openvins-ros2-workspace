@@ -353,18 +353,19 @@ a worst case of 26.0 on MH_03 (partial SLAM dip).
 
 **Cross-run variability summary:**
 
-| Sequence | Serial ATE pos | Subscribe ATE pos range (10 runs) | Max deviation from serial | Subscribe ATE pos std |
-|----------|---------------|-----------------------------------|---------------------------|----------------------|
-| V1_01_easy | 0.040m | 0.040 – 0.069m | **29mm** | **11mm** |
-| MH_03_medium | 0.121m | 0.101 – 0.160m | **39mm** | **17mm** |
-| V2_02_medium | 0.049m | 0.048 – 0.070m | **21mm** | **7mm** |
+| Sequence | Serial ATE pos | Subscribe ATE pos mean (5 runs) | Subscribe ATE pos rep-range | Subscribe ATE pos std |
+|----------|---------------|---------------------------------|----------------------------|----------------------|
+| V1_01_easy | 0.038m | 0.053m | **29mm** | **13mm** |
+| MH_03_medium | 0.115m | 0.115m | **26mm** | **11mm** |
+| V2_02_medium | 0.051m | 0.065m | **17mm** | **7mm** |
 
-*Source: derived from the Position RMSE table above — same TUM-converted `*_est.txt` files under `results/x86/native_humble/rerun_2026_04_27_main/{serial,subscribe}/`.*
+*Source: derived from the Position RMSE table above — same TUM-converted `*_est.txt` files under `results/x86/native_humble/rerun_2026_04_27_main/{serial,subscribe}/`. Re-collected 2026-04-27/28 against post-PWT submodule (worker hot-loop revert at `a7781f4`).*
 
-Subscribe ATE position is 2-30 mm higher than serial on average, with run-to-run
-spread of 7–17 mm std. This is the dominant observable difference between the
-two modes — small in absolute terms, but not bit-close: the run-to-run spread
-exceeds the per-frame numerical precision of the filter.
+Subscribe ATE position is essentially equal to serial for MH_03_medium, ~14 mm
+higher for V1_01_easy, and ~14 mm higher for V2_02_medium. Run-to-run std is
+7–13 mm (rep-range 17–29 mm across 5 reps). This is the dominant observable
+difference between the two modes — small in absolute terms, but not bit-close:
+the run-to-run spread exceeds the per-frame numerical precision of the filter.
 
 #### RPE — Relative Pose Error (median position, meters)
 

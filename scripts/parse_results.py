@@ -80,7 +80,11 @@ def _run_ros2(cmd, timeout=15):
         return subprocess.CompletedProcess(cmd, returncode=127, stdout="", stderr="")
     sourced = " && ".join(f"source {shlex.quote(p)}" for p in setup)
     quoted = " ".join(shlex.quote(c) for c in cmd)
-    bash = (f"{sourced} && export QT_QPA_PLATFORM=offscreen && "
+    # MPLBACKEND=Agg is the load-bearing flag — error_singlerun calls
+    # matplotlibcpp::show() at the end, which under any GUI backend (even
+    # QT_QPA_PLATFORM=offscreen) blocks indefinitely on headless hosts.
+    # With Agg, show() returns immediately and the tool completes in <1 s.
+    bash = (f"{sourced} && export QT_QPA_PLATFORM=offscreen MPLBACKEND=Agg && "
             f"exec timeout --preserve-status {timeout} {quoted}")
     return subprocess.run(
         ["bash", "-c", bash],
@@ -219,6 +223,31 @@ def have_ov_eval():
         return False
 
 
+def _est_to_tum(est_path):
+    """Convert an OpenVINS state-dump `_est.txt` to a TUM-format temp file.
+
+    State-dump columns: `timestamp qx qy qz qw px py pz vx vy vz bgx …`
+    TUM columns:        `timestamp tx ty tz qx qy qz qw`
+
+    error_singlerun expects TUM; feeding state-dump directly reads quaternion
+    components as if they were position, producing wildly inflated ATE
+    (e.g. 1.94 m → 0.04 m for V1_01_easy). See data-provenance.md §"File-format
+    conventions". Returns the temp-file path; caller is responsible for cleanup.
+    """
+    import tempfile
+    fd, tum_path = tempfile.mkstemp(suffix=".tum.txt", prefix="ov_tum_")
+    with os.fdopen(fd, "w") as out, open(est_path) as src:
+        out.write("# timestamp tx ty tz qx qy qz qw\n")
+        for line in src:
+            if line.startswith("#"):
+                continue
+            f = line.split()
+            if len(f) < 8:
+                continue
+            out.write(f"{f[0]} {f[5]} {f[6]} {f[7]} {f[1]} {f[2]} {f[3]} {f[4]}\n")
+    return tum_path
+
+
 def run_ate_rpe(gt, traj):
     """Run `ros2 run ov_eval error_singlerun posyaw` and parse both ATE and
     per-segment RPE. Returns dict {ate_ori, ate_pos, rpe: {seg_len: dict}} or
@@ -227,15 +256,28 @@ def run_ate_rpe(gt, traj):
     than blocking forever at matplotlibcpp::show()."""
     print(f"  → error_singlerun: {Path(traj).name} ...",
           file=sys.stderr, end="", flush=True)
+    # Convert state-dump → TUM before feeding the GUI tool. Without this the
+    # tool reads qx/qy/qz as position, producing inflated rmse_pos values that
+    # bear no relation to true trajectory error.
+    tum_path = None
     try:
+        tum_path = _est_to_tum(traj)
+        # 15s is plenty once MPLBACKEND=Agg is set in _run_ros2; real ATE/RPE
+        # on a 2000-pose EuRoC trajectory completes in <1 s.
         result = _run_ros2(
-            ["ros2", "run", "ov_eval", "error_singlerun", "posyaw", gt, traj],
+            ["ros2", "run", "ov_eval", "error_singlerun", "posyaw", gt, tum_path],
             timeout=15,
         )
         print(" done", file=sys.stderr, flush=True)
     except (FileNotFoundError, subprocess.TimeoutExpired) as e:
         print(f" FAILED ({e})", file=sys.stderr, flush=True)
         return None
+    finally:
+        if tum_path and os.path.exists(tum_path):
+            try:
+                os.remove(tum_path)
+            except OSError:
+                pass
 
     out = {"ate_ori": None, "ate_pos": None, "rpe": {}}
     for line in result.stdout.splitlines():
