@@ -421,17 +421,18 @@ reproducible with two `run_full_benchmark.sh` invocations differing only in
 ```bash
 # Without RT flags (baseline)
 bash scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy -t 4 -r 10 \
-    --docker openvins-humble:latest --tag rerun_pwt_baseline
+    --docker openvins-humble:latest --tag rerun_2026_04_26_pwt_baseline
 
 # With RT flags
 bash scripts/run_full_benchmark.sh -m subscribe -s V1_01_easy -t 4 -r 10 \
     --docker openvins-humble:latest \
     --docker-flags '--cap-add=SYS_NICE --ulimit rtprio=99 --ulimit memlock=-1 --cpuset-cpus=0-3' \
-    --tag rerun_pwt_rtflags
+    --tag rerun_2026_04_26_pwt_rtflags
 
-# Compare with the post-hoc analyzer:
-python3 scripts/parse_results.py ~/results/rpi5/docker_humble/subscribe/rerun_pwt_baseline --ate
-python3 scripts/parse_results.py ~/results/rpi5/docker_humble/subscribe/rerun_pwt_rtflags --ate
+# Compare with the post-hoc analyzer (PWT tags use legacy {serial,sub}_run<N>_*
+# layout at the tag root — no serial/ or subscribe/ subdir):
+python3 scripts/parse_results.py ~/results/rpi5/docker_humble/rerun_2026_04_26_pwt_baseline --ate
+python3 scripts/parse_results.py ~/results/rpi5/docker_humble/rerun_2026_04_26_pwt_rtflags --ate
 ```
 
 The two halves are sequential (one tag, then the other) to minimise
