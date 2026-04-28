@@ -447,23 +447,23 @@ fi
 # Frame-level stats from the trailing "total" column of an OpenVINS timing
 # CSV: prints "mean std p99" (ms, space-separated). Empty on missing/empty
 # file. Reads the CSV directly — avoids `ros2 run ov_eval timing_flamegraph`,
-# which is a Qt/matplotlib GUI tool that aborts on headless hosts. Requires
-# GNU awk (asort).
+# which is a Qt/matplotlib GUI tool that aborts on headless hosts. Pipes
+# through `sort -n` so the awk block works on both mawk (Ubuntu default) and
+# gawk without needing the gawk-only `asort()`.
 frame_stats() {
   local f="$1"
   [ -f "$f" ] || return 0
-  awk -F, '
-    !/^#/ && NF >= 2 { v[++n] = $NF }
+  awk -F, '!/^#/ && NF >= 2 { print $NF }' "$f" | sort -n | awk '
+    { v[++n] = $1 }
     END {
       if (n == 0) exit
       s = 0; for (i=1;i<=n;i++) s += v[i]
       m = s/n
       ss = 0; for (i=1;i<=n;i++) ss += (v[i]-m)*(v[i]-m)
       sd = (n>1) ? sqrt(ss/(n-1)) : 0
-      asort(v)
       idx = int(0.99 * n + 0.5); if (idx < 1) idx = 1; if (idx > n) idx = n
       printf "%.1f %.1f %.1f", m*1000, sd*1000, v[idx]*1000
-    }' "$f"
+    }'
 }
 
 # Format a frame_stats triple ("mean std p99") as "mean±std (p99: X)".
