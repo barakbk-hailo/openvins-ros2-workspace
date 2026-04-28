@@ -124,7 +124,7 @@ Frames processed: V1_01=2799, MH_03=2310, V1_03=2004.
 | Mono | MH_03_medium | 7.7 | 15.8 | 2.1× |
 | Mono | V1_03_difficult | 6.9 | 15.0 | 2.2× |
 
-*Source: derived from `results/{x86/native_humble,rpi5/docker_humble}/rerun_2026_04_27_paper/serial/*.txt`*
+*Source: x86 from `results/x86/native_humble/rerun_2026_04_27_paper/serial/*.txt`; RPi5 from `results/rpi5/docker_humble/rerun_2026_04_26_paper/serial/*.txt` and (for stereo MH_03_medium) `results/rpi5/docker_humble/serial/stereo/MH_03_medium_bagstart5.txt`.*
 
 **Actual slowdown: 2.1-2.3×** — significantly better than the 3.5× projection.
 The Cortex-A76 cores are more capable than estimated, especially for the
@@ -141,7 +141,7 @@ matrix-heavy EKF updates.
 | slam delayed | 1.8× | Triangulation + state augmentation |
 | re-tri & marg | **3.4×** | Cache-bound: 2 MB L2 (RPi5) vs 12 MB L3 (x86) |
 
-*Source: derived from `results/{x86/native_humble,rpi5/docker_humble}/rerun_2026_04_27_paper/serial/*.txt` (averaged across sequences)*
+*Source: x86 from `results/x86/native_humble/rerun_2026_04_27_paper/serial/*.txt`; RPi5 from `results/rpi5/docker_humble/rerun_2026_04_26_paper/serial/*.txt` (averaged across sequences).*
 
 The re-triangulation & marginalization component scales worst (3.4×). This
 step iterates over all active features and the full covariance matrix, making
@@ -185,7 +185,7 @@ All runs are stereo, serial mode, default config (200 features, max_slam=50).
 | MH_03_medium (bag_start=5) | 1.164 | 1.031 | 0.089 | 0.116 |
 | V1_03_difficult | 2.861 | 2.818 | 0.058 | 0.063 |
 
-*Source: x86 from `results/x86/native_humble/rerun_2026_04_27_paper/serial/{V1_01_easy,MH_03_medium,MH_03_medium_bagstart5,V1_03_difficult}_4thr_est.txt`; RPi5 from `results/rpi5/docker_humble/rerun_2026_04_26_paper/serial/{V1_01_easy,MH_03_medium_diverged,MH_03_medium_bagstart5,V1_03_difficult}_4thr_est.txt`. Provenance: x86 = Latitude 5420 / `master-candidate`/`2a50450` / `slam_chi2_recovery: false`; RPi5 = openhd@192.168.200.81 / Docker `openvins-humble:latest` rebuilt 2026-04-26 / same submodule + config.*
+*Source: x86 from `results/x86/native_humble/rerun_2026_04_27_paper/serial/{V1_01_easy,MH_03_medium,MH_03_medium_bagstart5,V1_03_difficult}_4thr_est.txt`; RPi5 from `results/rpi5/docker_humble/rerun_2026_04_26_paper/serial/{V1_01_easy,MH_03_medium_diverged,MH_03_medium_bagstart5,V1_03_difficult}_4thr_pose.txt`. Provenance: x86 = Latitude 5420 / `master-candidate`/`2a50450` / `slam_chi2_recovery: false`; RPi5 = openhd@192.168.200.81 / Docker `openvins-humble:latest` rebuilt 2026-04-26 / same submodule + config.*
 
 ### Absolute Trajectory Error — full 5 Vicon × stereo+mono paper-repro
 
@@ -199,7 +199,7 @@ Cross-platform comparison of all 5 Vicon-room sequences from the paper Table II 
 | V2_01_easy | 1.250 / 0.063 | 1.097 / 0.067 | 1.314 / 0.163 | 0.942 / 0.126 |
 | V2_02_medium | 1.212 / 0.051 | 1.166 / 0.048 | 1.477 / 0.078 | 1.797 / 0.072 |
 
-*Source: x86 from `results/x86/native_humble/rerun_2026_04_27_paper/serial/{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}_4thr{,_mono}_est.txt` (re-collected 2026-04-27 against post-PWT submodule); RPi5 from `results/rpi5/docker_humble/rerun_2026_04_26_paper/serial/{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}_4thr{,_mono}_est.txt`. Provenance: same as table above. RPi5 paper-repro collected 2026-04-26 via the orchestrator inside Docker `openvins-humble:latest`.*
+*Source: x86 from `results/x86/native_humble/rerun_2026_04_27_paper/serial/{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}_4thr{,_mono}_est.txt` (re-collected 2026-04-27 against post-PWT submodule); RPi5 from `results/rpi5/docker_humble/rerun_2026_04_26_paper/serial/{V1_01_easy,V1_02_medium,V1_03_difficult,V2_01_easy,V2_02_medium}_4thr{,_mono}_pose.txt`. Provenance: same as table above. RPi5 paper-repro collected 2026-04-26 via the orchestrator inside Docker `openvins-humble:latest`.*
 
 **Cross-platform stereo position drift (RPi5 vs x86):** V1_01 +6 mm, V1_02 +9 mm, V1_03 +5 mm, V2_01 +4 mm, V2_02 −3 mm. RPi5 is consistently within ±10 mm of x86 on stereo position, with mixed signs — confirms the NEON-vs-SSE/AVX numerical drift caveat above is real but bounded.
 
@@ -213,7 +213,7 @@ Cross-platform comparison of all 5 Vicon-room sequences from the paper Table II 
 | seg 32 | 0.565 / 0.051 | 0.702 / 0.067 | 0.709 / 0.140 | 0.604 / 0.158 | — | 1.116 / 0.135 |
 | seg 40 | 0.600 / 0.038 | 0.495 / 0.068 | 0.761 / 0.138 | 0.678 / 0.184 | — | 1.100 / 0.132 |
 
-*Source: x86 from `results/x86/native_humble/rerun_2026_04_27_paper/serial/{V1_01_easy,MH_03_medium_bagstart5,V1_03_difficult}_4thr_est.txt`; RPi5 from `results/rpi5/docker_humble/rerun_2026_04_26_paper/serial/{V1_01_easy,MH_03_medium_bagstart5,V1_03_difficult}_4thr_est.txt`*
+*Source: x86 from `results/x86/native_humble/rerun_2026_04_27_paper/serial/{V1_01_easy,MH_03_medium_bagstart5,V1_03_difficult}_4thr_est.txt`; RPi5 from `results/rpi5/docker_humble/rerun_2026_04_26_paper/serial/{V1_01_easy,MH_03_medium_bagstart5,V1_03_difficult}_4thr_pose.txt`*
 
 ### Accuracy findings
 
@@ -275,7 +275,7 @@ serial mode) on RPi5.
 | D: No SLAM | 7.4 (-35%) | 19.1 (**-21%**) | -35% | **-21%** | 2.6× |
 | E: 1 OpenCV thread | 12.3 (+9%) | 28.6 (**+18%**) | +9% | **+18%** | 2.3× |
 
-*Source: derived from `results/{x86/native_humble,rpi5/docker_humble}/rerun_2026_04_27_sweep/serial/*.txt` + `results/{x86/native_humble,rpi5/docker_humble}/rerun_2026_04_27_paper/serial/V1_01_easy.txt`*
+*Source: x86 sweep from `results/x86/native_humble/rerun_2026_04_27_sweep/serial/*.txt` + baseline `results/x86/native_humble/rerun_2026_04_27_main/serial/V1_01_easy_4thr_wall.txt`; RPi5 sweep from `results/rpi5/docker_humble/serial/sweep/*.txt` + baseline `results/rpi5/docker_humble/serial/stereo/V1_01_easy.txt`. (RPi5 sweep predates the orchestrator's tag layout.)*
 
 Key differences vs x86:
 
@@ -392,7 +392,7 @@ downsample or mono is needed.
 | Subscribe overhead vs serial | **1.85×** (pre-fix) | **1.00×** | — |
 | Frames at 5× | 2799 | 1369 | 2.0× drop |
 
-*Source: `results/{x86/native_humble,rpi5/docker_humble}/rerun_2026_04_27_rate_sweep/subscribe/V1_01_easy_rate{1.0,5.0}.txt` + `results/{x86/native_humble,rpi5/docker_humble}/rerun_2026_04_27_paper/serial/V1_01_easy.txt`*
+*Source: x86 from `results/x86/native_humble/rerun_2026_04_27_rate_sweep/subscribe/V1_01_easy_4thr[_rate<R>]_run<N>_wall.txt` + serial baseline `results/x86/native_humble/rerun_2026_04_27_main/serial/V1_01_easy_4thr_wall.txt`; RPi5 from `results/rpi5/docker_humble/subscribe/V1_01_easy_rate{1.0,2.0,5.0}.txt` + serial baseline `results/rpi5/docker_humble/serial/stereo/V1_01_easy.txt`. (RPi5 rate sweep predates the orchestrator's tag layout.)*
 
 The subscribe overhead disappearing on RPi5 means the **serial timing numbers
 are directly representative of realtime performance** — a major simplification

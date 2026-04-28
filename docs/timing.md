@@ -432,7 +432,7 @@ and **p99** is the per-frame 99th percentile of the total.
 | **total (mean ± std)** | **11.3 ± 3.4** | **12.0 ± 3.9** | **12.9 ± 4.4** | **8.0 ± 3.8** |
 | **total p99** | **22.7** | **25.7** | **28.0** | **23.1** |
 
-*Source: `results/x86/native_humble/subscribe/thread_rewrite/V1_01_easy_rate{1.0,2.0,5.0}_thread.txt`; serial column from `results/x86/native_humble/rerun_2026_04_27_main/serial/V1_01_easy_4thr_thread.txt`*
+*Source: subscribe columns from `results/x86/native_humble/rerun_2026_04_27_rate_sweep/subscribe/V1_01_easy_4thr[_rate{2.0,5.0}]_run<N>_thread.txt` (5 reps each, mean of per-rep frame-mean — note the `_rate1.0` segment is omitted by the orchestrator's filename convention); serial column from `results/x86/native_humble/rerun_2026_04_27_main/serial/V1_01_easy_4thr_thread.txt`*
 
 ### Phase 3 findings
 
