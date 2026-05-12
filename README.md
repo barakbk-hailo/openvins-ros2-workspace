@@ -74,4 +74,5 @@ Follow the flow top-to-bottom — each doc builds on the previous ones.
 | [Benchmark Analysis](docs/benchmark-analysis.md) | 3-clock timing, paper comparison, accuracy and consistency under subscribe mode (x86) |
 | [RPi5 Setup](docs/rpi5-setup.md) | Build on RPi5 (Docker or native) + run the EuRoC benchmark; live-sensor deployment is WIP |
 | [RPi5 Benchmarking](docs/rpi5-benchmarking.md) | Phase 4 RPi5 timing, accuracy vs x86 (NEON/AVX determinism caveat), config sweeps, subscribe mode, WIP list |
+| [Cross-Platform](docs/cross-platform/cross-platform.md) | Side-by-side comparison across 4 platforms (x86 Ubuntu 22/24, RPi5 Ubuntu/Trixie) from a single benchmark command — performance, accuracy, OS-version isolation |
 | [Data Provenance](docs/data-provenance.md) | Canonical lookup: each `results/` tag → (platform, submodule commit, config, threads, dates). Cross-reference for every `*Source: ...*` citation in the docs above. |
