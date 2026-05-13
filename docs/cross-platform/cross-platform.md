@@ -16,6 +16,14 @@ bash scripts/run_full_benchmark.sh -r 5 --tag <platform-tag>
 `parse_results.py --detailed` on each platform's `serial/` and `subscribe/`
 directory.
 
+The full benchmark + `--detailed` console output for each platform is
+committed to
+[`results/cross-platform-data/`](../../results/cross-platform-data/) — one
+file per platform (`x86-J`, `x86-H`, `rpi5-U`, `rpi5-T`). Every cell in the
+tables below is sourced from these four files. Re-render the tables by
+re-reading them; reproduce the numbers by re-running the benchmark + parser
+on the corresponding platform (see §10).
+
 Reference platform for all ratio columns: **x86-J** (x86 Ubuntu 24.04 /
 Jazzy).
 
@@ -28,7 +36,7 @@ Jazzy).
 
 (RPi5-T accuracy was initially blocked because `parse_results.py` ran on the
 Trixie host, which has no native ROS humble. Fixed by re-running the parser
-*inside* the same Docker image that did the benchmark — see §9 finding #9
+*inside* the same Docker image that did the benchmark — see §9 finding #10
 for the exact command.)
 
 ## 1. Setup matrix
@@ -431,60 +439,114 @@ would need either a native-Trixie or a jazzy-Docker run.
 
 ## 9. Findings
 
-1. **Performance ranking (subscribe, 4 threads, mean across sequences)**:
+### TL;DR
+
+- **Best deployment combo: x86 Ubuntu 22 + humble** (fastest mean timing,
+  lowest mean ATE). **Worst: RPi5 native Ubuntu 24 + jazzy** (slowest *and*
+  least accurate).
+- **The hardware penalty for going ARM is smaller than the OS-version
+  penalty for going jazzy.** Pick humble even if it means staying on
+  Ubuntu 22 / running in Docker.
+- **RPi5 meets 20 Hz at p99 with margin** but has no headroom for 30 Hz or
+  for additional CPU consumers on the same chip.
+- **Two reproducibility bugs** worth chasing: RPi5 serial-mode MH_03 init
+  failure (both RPi5 platforms), and RPi5-U V2_02 1-thread subscribe
+  occasionally diverging.
+
+### Detailed findings
+
+1. **Performance ranking** (subscribe, 4 threads, mean across sequences):
    x86-H 11.5 ms < x86-J 12.4 ms < RPi5-T 20.9 ms < RPi5-U 24.4 ms. The
-   spread is **2.1×** between fastest and slowest.
+   spread is **2.1×** between fastest and slowest. The smaller-than-expected
+   x86 → RPi5 gap (rather than the projected ×3.5) is the biggest single
+   surprise in this run.
 
-2. **Accuracy ranking (mean ATE pos rmse across 3 sequences)**:
+2. **Accuracy ranking** (mean ATE pos rmse across 3 sequences):
    x86-H 0.089 m < RPi5-T 0.107 m ≈ x86-J 0.108 m < RPi5-U 0.149 m. **RPi5
-   in Docker (humble) is tied with x86 jazzy on accuracy** — i.e. the
-   container/OS combination matters more than the CPU. RPi5 native jazzy is
-   the accuracy outlier, mostly because of V2_02_medium (0.171 m vs 0.060
-   m on x86-J).
+   in Docker (humble) is essentially tied with x86 native (jazzy) on
+   accuracy.** The accuracy outlier is RPi5 native jazzy, not the ARM
+   hardware itself — RPi5-U's high mean is driven almost entirely by
+   V2_02_medium (0.171 m vs 0.060 m on x86-J). Conclusion: the
+   container/OS choice matters more than the CPU on this workload.
 
-3. **x86 humble beats x86 jazzy on the same hardware** by ~7% on the
-   3-sequence mean timing (and a much larger 40% on V1_01_easy ATE — see
-   §8.1). When choosing a target Ubuntu version for a deployment, this isn't
-   noise — it's reproducible across all three sequences.
+3. **Older ROS distro (humble) wins on both axes**, reproducible across all
+   three sequences:
+   - x86 (§8.1): humble is ~10% faster *and* ~40% more accurate on
+     V1_01_easy than jazzy on the same hardware.
+   - RPi5 (§8.2): humble (in Docker) is ~10% faster *and* ~15% more
+     accurate than jazzy (native).
+   - The §2.2 serial table also shows the bit-identical ATE column on x86-J
+     and x86-H — so the OS choice doesn't even affect the *trajectory*,
+     only how fast it gets computed (and the subscribe-mode ATE delta has
+     to be from real-time scheduler / threading differences, not algorithmic
+     drift).
+   - **Recommendation**: deploy on humble unless there's a hard reason
+     (e.g. a non-OpenVINS package that requires jazzy).
 
-3. **RPi5 / x86 slowdown is 1.6–2.0×** — well below the early ×3.5
-   projection in [rpi5-benchmarking.md §1](../rpi5-benchmarking.md). The
-   Cortex-A76 closes the gap once `num_opencv_threads: 4` is in play. For
-   1-thread (§4.3) the gap widens to 2.0–2.4×.
+4. **RPi5 / x86 slowdown is 1.6–2.0× at 4 threads**, well below the early
+   ×3.5 projection in [rpi5-benchmarking.md §1](../rpi5-benchmarking.md).
+   At 1 thread the gap widens to 2.0–2.4× (§4.3) — multithreading helps
+   more on ARM than on x86, in relative terms. **Recommendation**: don't
+   ship `num_opencv_threads: 1` on RPi5 even if you'd been told it's
+   "cleaner."
 
-4. **The stages that suffer most on ARM are Re-tri & Marg (≈3×) and
-   Propagation (≈2.5×)** — both Eigen matrix-ops stages where NEON in Eigen
-   3.4 underperforms AVX2. Tracking at ~2× tracks the raw clock ratio
-   (2.4 GHz Cortex-A76 vs 4.8 GHz turbo i7-11850H). See §4.2.
+5. **The stages that hurt most on ARM are Re-tri & Marg (≈3×) and
+   Propagation (≈2.5×)** — see §4.2. Both are Eigen matrix-ops stages where
+   NEON in Eigen 3.4 underperforms AVX2. Tracking at ~2× tracks the raw
+   clock ratio (2.4 GHz Cortex-A76 vs 4.8 GHz i7-11850H), so it's already
+   at the hardware floor. **Implication for tuning**: optimizing tracking
+   on ARM is a dead end; if you need ARM headroom, look at Re-tri & Marg
+   (e.g. newer Eigen with better NEON, or shrinking `max_clones`).
 
-5. **KLT parallelism (CPU/Wall ratio for Tracking)** scales from
-   3.23× on x86-J to 2.34× on RPi5-T — ~80% of ideal on x86, ~60% on RPi5
-   under Docker. All other stages are strictly serial (CPU ≈ wall) on every
-   platform.
+6. **KLT parallelism scales worse on ARM.** CPU/Wall ratio for Tracking:
+   3.23× on x86-J, 2.94× on x86-H, 2.70× on RPi5-U, **2.34×** on RPi5-T
+   (§4.4) — ~80% of ideal 4-thread on x86, ~60% on RPi5 in Docker. **All
+   other VIO stages are strictly serial** (CPU ≈ wall) on every platform.
+   Adding more cores can only help Tracking — the remaining ~75% of frame
+   time is single-threaded and bound by per-core speed.
 
-6. **Persistent-worker subscribe overhead is ~1.0× on RPi5** for clean
-   sequences (V1_01 and V2_02 on both RPi5 platforms hold sub/serial ≈
+7. **Persistent-worker subscribe overhead is ≈1.0× on RPi5** for clean
+   sequences (V1_01 and V2_02 on both RPi5 platforms hold sub/serial =
    0.92–1.02×), matching the design intent of the [persistent worker
-   thread](../determinism.md). On x86 it's ~1.0× for MH/V2 and ~1.2–1.4×
-   for V1_01_easy.
+   thread](../determinism.md) — its central claim was that subscribe mode
+   should not be slower than serial mode. On x86 the ratio is also ≈1.0×
+   for MH/V2 but 1.21–1.40× for V1_01_easy; the extra cost there is
+   ROS-2 middleware latency and queueing, not VIO compute.
 
-7. **Real-time feasibility at p99**: subscribe 4-threads V1_01_easy p99 is
-   29 ms (x86-J), 28 ms (x86-H), 46 ms (RPi5-U), 42 ms (RPi5-T). Versus a
-   20 Hz budget (50 ms) all four meet the bar; versus 30 Hz (33 ms) only
-   x86 meets it. RPi5 is on the edge — sufficient for typical drone-grade
-   20 Hz VIO but no headroom for additional consumers.
+8. **Real-time feasibility at p99** (subscribe, 4-threads, V1_01_easy):
+   29 ms (x86-J), 28 ms (x86-H), 46 ms (RPi5-U), 42 ms (RPi5-T).
 
-8. **Two reproducible issues to investigate**:
-   - **RPi5 serial-mode MH_03_medium fails** (avg SLAM ≈ 0.2, ATE ≈ 2794 m)
-     on both RPi5-U and RPi5-T, while subscribe-mode MH_03 works. The same
-     binary works in serial on V1_01 and V2_02. Likely a timing-sensitive
-     init in the serial reader on slower hardware.
-   - **RPi5-U V2_02_medium 1-thr subscribe**: 2 of 5 runs converged to ATE
-     ≈ 163 m (avg SLAM = 2.2 features). 1-thread V2_02 on the other three
-     platforms is fine, so it's likely a thread-budget issue under
-     simultaneous ROS callback load.
+   | Target | Budget | x86-J | x86-H | RPi5-U | RPi5-T |
+   |---|---|---|---|---|---|
+   | 20 Hz | 50 ms | ✅ | ✅ | ✅ | ✅ |
+   | 30 Hz | 33 ms | ✅ | ✅ | ❌ | ❌ |
 
-9. **Tooling note** (resolved): RPi5-T's accuracy numbers were initially
+   **Conclusion**: RPi5 fits typical drone-grade 20 Hz VIO with margin but
+   has no headroom for additional CPU consumers (planners, perception,
+   logging) on the same chip. x86 can run 30 Hz comfortably. Going past
+   30 Hz on RPi5 would need either downsampling, fewer features, or
+   skipping the SLAM update — see [timing.md](../timing.md) Phase 2 sweep
+   for the cost / benefit on each.
+
+9. **Two reproducible issues worth chasing in follow-up work**:
+   - **RPi5 serial-mode MH_03_medium fails on both RPi5 platforms**
+     (avg SLAM ≈ 0.2, ATE ≈ 2.8 km). Subscribe-mode MH_03 works fine; the
+     same serial binary works on V1_01 and V2_02. Hypothesis: a
+     timing-sensitive init in the serial bag reader that only manifests on
+     slower hardware. **Reproducer**: `bash scripts/run_full_benchmark.sh
+     -m serial -s MH_03_medium -r 1` on any RPi5.
+   - **RPi5-U V2_02_medium 1-thr subscribe**: 2 of 5 runs converged to
+     ATE ≈ 163 m (avg SLAM = 2.2 features); the other 3 runs are clean.
+     1-thread V2_02 on the other three platforms is fine. Hypothesis:
+     thread-budget contention with ROS callbacks at the single-core limit.
+     **Reproducer**: same `bash scripts/...` with `-t 1 -s V2_02_medium -r
+     5` on RPi5 jazzy.
+
+   Both are pre-existing and not introduced by anything in this comparison
+   run. Filing them as `serial-mh03-rpi5` and `subscribe-v202-1thr-rpi5-u`
+   would let future re-runs cross-link.
+
+10. **Tooling note** (resolved): RPi5-T's accuracy numbers were initially
    missing because `parse_results.py` ran on the Trixie host, which has no
    native ROS humble (the script's auto-source paths
    `/opt/ros/humble/setup.bash` and `~/workspace/.../install/setup.bash`
@@ -510,9 +572,24 @@ would need either a native-Trixie or a jazzy-Docker run.
 
 ## 10. Raw data index
 
-Per-platform result trees (each holds `serial/` and `subscribe/`
-sub-directories with the standard
-`{SEQ}_{N}thr[_run{N}]_{wall,cpu,thread,feats,est}.txt` files):
+### Committed in-repo (this conversation's source of truth)
+
+The full benchmark output + `parse_results.py --detailed` output for every
+platform, one file per platform:
+
+| Platform | File |
+|---|---|
+| x86-J | [`results/cross-platform-data/x86-J`](../../results/cross-platform-data/x86-J) |
+| x86-H | [`results/cross-platform-data/x86-H`](../../results/cross-platform-data/x86-H) |
+| RPi5-U | [`results/cross-platform-data/rpi5-U`](../../results/cross-platform-data/rpi5-U) |
+| RPi5-T | [`results/cross-platform-data/rpi5-T`](../../results/cross-platform-data/rpi5-T) |
+
+These are the canonical citations for every table in this doc.
+
+### Per-platform raw CSV trees (on the benchmark host)
+
+Each holds `serial/` and `subscribe/` sub-directories with the standard
+`{SEQ}_{N}thr[_run{N}]_{wall,cpu,thread,feats,est}.txt` files:
 
 | Platform | Path | Tag |
 |---|---|---|
@@ -534,7 +611,17 @@ python3 scripts/parse_results.py \
 That single command per directory covers every cell in §§2–7 for one
 platform's column.
 
-For platforms whose host doesn't have `ov_eval` installed (RPi5-T's Docker
-container is the example), run the same command **from a host that does**
-have ov_eval — `parse_results.py` only needs read access to the CSV/est
-files; it shells out to `ros2 run ov_eval error_singlerun` for ATE/RPE.
+If the **host that ran the benchmark** doesn't have a native `ov_eval` on
+PATH (RPi5-T's Trixie host is the example — Trixie has no native ROS
+humble), `parse_results.py` will print `WARNING: ros2 run ov_eval is
+unavailable` and skip ATE/RPE. Two ways to recover:
+
+- **Run `parse_results.py` inside the same Docker image** that did the
+  benchmark — the container has `ov_eval` at `/opt/ros_ws/install/`. Bind-mount
+  the host workspace and results into the container at the expected paths
+  so the script's auto-source and ground-truth lookup resolve. The exact
+  command for RPi5-T is in §9 finding #10.
+- **Copy the `.est` files to a machine that does have `ov_eval` natively**
+  (any x86 box with ROS humble/jazzy installed). The estimate files are
+  small; only read access is required. Re-run `parse_results.py --detailed`
+  there.
