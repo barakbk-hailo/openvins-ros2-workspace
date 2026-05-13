@@ -1,0 +1,427 @@
+hailo@rpi:~/workspace/catkin_ws_ov$ bash scripts/run_full_benchmark.sh -r 5 --tag run_for_benchmark_analysis_13_05__rpi5__U
+================================================================
+  OpenVINS Benchmark
+  Arch:      aarch64  →  rpi5
+  Env:       native_jazzy
+  Results:   /home/hailo/results/rpi5/native_jazzy/run_for_benchmark_analysis_13_05__rpi5__U/{serial,subscribe}/
+  Mode:      both
+  Sequences: V1_01_easy MH_03_medium V2_02_medium
+  Threads:   4 1
+  Rates:     1.0
+  Cameras:   stereo
+  Sub reps:  5
+  Tag:       run_for_benchmark_analysis_13_05__rpi5__U
+  Docker:    (native — no --docker)
+  Date:      Wed May 13 11:59:01 IDT 2026
+================================================================
+
+==================== SERIAL MODE ====================
+--- serial V1_01_easy 4-thr stereo ---
+[INFO] [launch]: process[ros2_serial_msckf-1] was required: shutting down launched system
+  -> 2776 frames, avg SLAM=46.2
+--- serial V1_01_easy 1-thr stereo ---
+[INFO] [launch]: process[ros2_serial_msckf-1] was required: shutting down launched system
+  -> 2776 frames, avg SLAM=46.2
+--- serial MH_03_medium 4-thr stereo ---
+[INFO] [launch]: process[ros2_serial_msckf-1] was required: shutting down launched system
+  -> 2302 frames, avg SLAM=0.2
+--- serial MH_03_medium 1-thr stereo ---
+[INFO] [launch]: process[ros2_serial_msckf-1] was required: shutting down launched system
+  -> 2302 frames, avg SLAM=0.2
+--- serial V2_02_medium 4-thr stereo ---
+[INFO] [launch]: process[ros2_serial_msckf-1] was required: shutting down launched system
+  -> 2260 frames, avg SLAM=39.1
+--- serial V2_02_medium 1-thr stereo ---
+[INFO] [launch]: process[ros2_serial_msckf-1] was required: shutting down launched system
+  -> 2260 frames, avg SLAM=39.1
+
+==================== SUBSCRIBE MODE ====================
+--- subscribe V1_01_easy 4-thr rate=1.0 run 1 / 5 ---
+  -> 2800 frames, avg SLAM=46.0
+--- subscribe V1_01_easy 4-thr rate=1.0 run 2 / 5 ---
+  -> 2800 frames, avg SLAM=45.9
+--- subscribe V1_01_easy 4-thr rate=1.0 run 3 / 5 ---
+  -> 2800 frames, avg SLAM=45.9
+--- subscribe V1_01_easy 4-thr rate=1.0 run 4 / 5 ---
+  -> 2800 frames, avg SLAM=45.7
+--- subscribe V1_01_easy 4-thr rate=1.0 run 5 / 5 ---
+  -> 2800 frames, avg SLAM=45.7
+--- subscribe V1_01_easy 1-thr rate=1.0 run 1 / 5 ---
+  -> 2800 frames, avg SLAM=46.1
+--- subscribe V1_01_easy 1-thr rate=1.0 run 2 / 5 ---
+  -> 2800 frames, avg SLAM=46.2
+--- subscribe V1_01_easy 1-thr rate=1.0 run 3 / 5 ---
+  -> 2800 frames, avg SLAM=46.2
+--- subscribe V1_01_easy 1-thr rate=1.0 run 4 / 5 ---
+  -> 2800 frames, avg SLAM=46.0
+--- subscribe V1_01_easy 1-thr rate=1.0 run 5 / 5 ---
+  -> 2800 frames, avg SLAM=46.0
+--- subscribe MH_03_medium 4-thr rate=1.0 run 1 / 5 ---
+  -> 2311 frames, avg SLAM=40.1
+--- subscribe MH_03_medium 4-thr rate=1.0 run 2 / 5 ---
+  -> 2311 frames, avg SLAM=40.7
+--- subscribe MH_03_medium 4-thr rate=1.0 run 3 / 5 ---
+  -> 2311 frames, avg SLAM=38.8
+--- subscribe MH_03_medium 4-thr rate=1.0 run 4 / 5 ---
+  -> 2311 frames, avg SLAM=37.1
+--- subscribe MH_03_medium 4-thr rate=1.0 run 5 / 5 ---
+  -> 2311 frames, avg SLAM=38.6
+--- subscribe MH_03_medium 1-thr rate=1.0 run 1 / 5 ---
+  -> 206 frames, avg SLAM=11.8
+--- subscribe MH_03_medium 1-thr rate=1.0 run 2 / 5 ---
+  -> 2311 frames, avg SLAM=40.2
+--- subscribe MH_03_medium 1-thr rate=1.0 run 3 / 5 ---
+  -> 2311 frames, avg SLAM=41.3
+--- subscribe MH_03_medium 1-thr rate=1.0 run 4 / 5 ---
+  -> 2311 frames, avg SLAM=40.6
+--- subscribe MH_03_medium 1-thr rate=1.0 run 5 / 5 ---
+  -> 2311 frames, avg SLAM=40.7
+--- subscribe V2_02_medium 4-thr rate=1.0 run 1 / 5 ---
+  -> 2267 frames, avg SLAM=34.5
+--- subscribe V2_02_medium 4-thr rate=1.0 run 2 / 5 ---
+  -> 2267 frames, avg SLAM=35.3
+--- subscribe V2_02_medium 4-thr rate=1.0 run 3 / 5 ---
+  -> 2267 frames, avg SLAM=35.3
+--- subscribe V2_02_medium 4-thr rate=1.0 run 4 / 5 ---
+  -> 2267 frames, avg SLAM=35.4
+--- subscribe V2_02_medium 4-thr rate=1.0 run 5 / 5 ---
+  -> 2267 frames, avg SLAM=33.2
+--- subscribe V2_02_medium 1-thr rate=1.0 run 1 / 5 ---
+  -> 2267 frames, avg SLAM=33.6
+--- subscribe V2_02_medium 1-thr rate=1.0 run 2 / 5 ---
+  -> 2267 frames, avg SLAM=34.4
+--- subscribe V2_02_medium 1-thr rate=1.0 run 3 / 5 ---
+  -> 2267 frames, avg SLAM=2.2
+--- subscribe V2_02_medium 1-thr rate=1.0 run 4 / 5 ---
+  -> 2267 frames, avg SLAM=2.2
+--- subscribe V2_02_medium 1-thr rate=1.0 run 5 / 5 ---
+  -> 2267 frames, avg SLAM=34.0
+
+================================================================
+  RESULTS SUMMARY (run_for_benchmark_analysis_13_05__rpi5__U)
+================================================================
+
+Saved results:
+  Serial:    /home/hailo/results/rpi5/native_jazzy/run_for_benchmark_analysis_13_05__rpi5__U/serial/
+  Subscribe: /home/hailo/results/rpi5/native_jazzy/run_for_benchmark_analysis_13_05__rpi5__U/subscribe/
+
+--- Serial timing — frame-level total (ms) ---
+  sequence       thr cam     wall (mean±std, p99)   cpu (mean±std, p99) thread (mean±std, p99)
+  V1_01_easy     4   stereo  27.6±6.3 (p99: 49.4)  45.4±6.6 (p99: 68.3)  27.5±6.2 (p99: 49.3)
+  V1_01_easy     1   stereo  29.9±6.2 (p99: 51.1)  29.9±6.2 (p99: 51.1)  29.8±6.2 (p99: 51.0)
+  MH_03_medium   4   stereo  15.4±1.4 (p99: 20.3)  33.0±3.0 (p99: 41.7)  15.3±1.4 (p99: 20.2)
+  MH_03_medium   1   stereo  17.8±1.7 (p99: 23.2)  17.8±1.7 (p99: 23.2)  17.8±1.7 (p99: 23.2)
+  V2_02_medium   4   stereo  23.3±4.9 (p99: 38.9)  39.5±5.0 (p99: 55.1)  23.3±4.9 (p99: 38.9)
+  V2_02_medium   1   stereo  28.2±5.0 (p99: 44.1)  28.2±5.0 (p99: 44.0)  28.2±5.0 (p99: 44.0)
+
+--- Subscribe timing — frame-level total (ms; rep marked per row) ---
+  sequence       thr rate    rep  wall (mean±std, p99)   cpu (mean±std, p99) thread (mean±std, p99)
+  V1_01_easy     4   1.0       1  25.7±6.1 (p99: 46.6)  41.5±7.0 (p99: 64.7)  25.7±6.1 (p99: 46.5)
+  V1_01_easy     1   1.0       1  28.1±6.5 (p99: 50.5)  30.5±7.8 (p99: 59.6)  28.1±6.5 (p99: 50.4)
+  MH_03_medium   4   1.0       1  24.9±6.1 (p99: 46.1)  44.3±6.8 (p99: 66.9)  24.8±6.1 (p99: 46.0)
+  MH_03_medium   1   1.0       1  19.5±1.7 (p99: 24.5)  23.2±1.9 (p99: 28.7)  19.5±1.7 (p99: 24.5)
+  V2_02_medium   4   1.0       1  22.8±5.4 (p99: 39.1)  40.4±7.0 (p99: 59.0)  22.8±5.4 (p99: 39.0)
+  V2_02_medium   1   1.0       1  27.0±5.6 (p99: 45.0)  29.9±7.2 (p99: 51.4)  27.0±5.6 (p99: 45.0)
+
+--- Subscribe timing — across 5 reps (mean±std of per-rep frame-mean / frame-p99, ms) ---
+  sequence       thr rate                    wall                    cpu                 thread
+  V1_01_easy     4   1.0    25.3±0.3 / 46.2±0.8  40.7±0.5 / 64.3±0.9  25.3±0.3 / 46.2±0.8
+  V1_01_easy     1   1.0    27.9±0.1 / 49.8±1.2  30.2±0.2 / 56.7±2.6  27.9±0.2 / 49.8±1.1
+  MH_03_medium   4   1.0    24.5±1.2 / 46.6±1.6  43.7±2.3 / 68.0±2.8  24.5±1.2 / 46.5±1.6
+  MH_03_medium   1   1.0   27.0±4.5 / 46.8±12.8 30.3±4.4 / 53.6±14.5 27.0±4.4 / 46.8±12.7
+  V2_02_medium   4   1.0    23.4±0.4 / 41.0±1.1  41.9±0.9 / 63.1±2.4  23.4±0.4 / 40.9±1.1
+  V2_02_medium   1   1.0    23.7±4.4 / 39.5±7.4  25.7±5.6 / 44.7±9.0  23.7±4.4 / 39.4±7.5
+
+--- SLAM feature health (avg features in state) ---
+  sequence       mode         thr rate    avg_features
+  V1_01_easy     serial/stereo  4   —             46.2
+  V1_01_easy     serial/stereo  1   —             46.2
+  V1_01_easy     subscribe      4   1.0        45.8±0.1
+  V1_01_easy     subscribe      1   1.0        46.1±0.1
+  MH_03_medium   serial/stereo  4   —              0.2
+  MH_03_medium   serial/stereo  1   —              0.2
+  MH_03_medium   subscribe      4   1.0        39.1±1.4
+  MH_03_medium   subscribe      1   1.0       34.9±12.9
+  V2_02_medium   serial/stereo  4   —             39.1
+  V2_02_medium   serial/stereo  1   —             39.1
+  V2_02_medium   subscribe      4   1.0        34.7±0.9
+  V2_02_medium   subscribe      1   1.0       21.3±17.4
+
+--- ATE position RMSE (m, posyaw alignment) ---
+  sequence       mode         thr rate        rmse_pos
+  V1_01_easy     serial/stereo  4   —            0.049
+  V1_01_easy     serial/stereo  1   —            0.049
+  V1_01_easy     subscribe      4   1.0         0.1±0.0
+  V1_01_easy     subscribe      1   1.0         0.1±0.0
+  MH_03_medium   serial/stereo  4   —         2793.986
+  MH_03_medium   serial/stereo  1   —         2793.986
+  MH_03_medium   subscribe      4   1.0         0.2±0.0
+  MH_03_medium   subscribe      1   1.0         0.2±0.1
+  V2_02_medium   serial/stereo  4   —            0.048
+  V2_02_medium   serial/stereo  1   —            0.048
+  V2_02_medium   subscribe      4   1.0         0.2±0.1
+  V2_02_medium   subscribe      1   1.0     163.0±223.6
+
+--- Zombie check (this user only): 0 stale processes ---
+
+Saved results:
+  Serial:    /home/hailo/results/rpi5/native_jazzy/run_for_benchmark_analysis_13_05__rpi5__U/serial/
+  Subscribe: /home/hailo/results/rpi5/native_jazzy/run_for_benchmark_analysis_13_05__rpi5__U/subscribe/
+
+Detailed analysis (per-component breakdown + ATE + RPE per segment):
+  python3 /home/hailo/workspace/catkin_ws_ov/scripts/parse_results.py /home/hailo/results/rpi5/native_jazzy/run_for_benchmark_analysis_13_05__rpi5__U/serial --detailed
+  python3 /home/hailo/workspace/catkin_ws_ov/scripts/parse_results.py /home/hailo/results/rpi5/native_jazzy/run_for_benchmark_analysis_13_05__rpi5__U/subscribe --detailed
+  (parse_results.py auto-sources ROS — no need to source first.)
+
+================================================================
+  Done — Wed May 13 13:22:26 IDT 2026
+================================================================
+
+hailo@rpi:~/workspace/catkin_ws_ov$ python3 /home/hailo/workspace/catkin_ws_ov/scripts/parse_results.py /home/hailo/results/rpi5/native_jazzy/run_for_benchmark_analysis_13_05__rpi5__U/serial --detailed
+
+=== /home/hailo/results/rpi5/native_jazzy/run_for_benchmark_analysis_13_05__rpi5__U/serial (6 runs across 6 cells) ===
+
+  serial    MH_03_medium 1thr  (1 run, 2302 frames pooled)
+    Component      wall (mean±std, p99)     cpu (mean±std, p99)      thread (mean±std, p99)
+     tracking       11.5±1.4 (p99: 16.2)     11.5±1.4 (p99: 16.2)     11.4±1.4 (p99: 16.2)
+     propagation    0.2±0.0 (p99: 0.3)       0.2±0.0 (p99: 0.3)       0.2±0.0 (p99: 0.3)
+     msckf update   0.2±0.2 (p99: 0.8)       0.2±0.2 (p99: 0.8)       0.2±0.2 (p99: 0.8)
+     slam update    0.0±0.0 (p99: 0.2)       0.0±0.0 (p99: 0.2)       0.0±0.0 (p99: 0.2)
+     slam delayed   0.6±0.8 (p99: 4.1)       0.6±0.8 (p99: 4.1)       0.6±0.8 (p99: 4.1)
+     re-tri & marg  5.3±0.3 (p99: 6.1)       5.3±0.3 (p99: 6.1)       5.3±0.3 (p99: 6.1)
+  ** total          17.8±1.7 (p99: 23.2)     17.8±1.7 (p99: 23.2)     17.8±1.7 (p99: 23.2)
+  → error_singlerun: MH_03_medium_1thr_est.txt ... done
+    ATE:   pos rmse mean=2793.9860 m (std=0.00000, range 0.0 mm); ori rmse mean=44.949°
+    RPE:   per-segment median, across 1 run
+           seg   8s: pos 401.251±0.000 m, ori 2.18±0.00°  (n=1)
+           seg  16s: pos 853.874±0.000 m, ori 3.99±0.00°  (n=1)
+           seg  24s: pos 1312.202±0.000 m, ori 5.67±0.00°  (n=1)
+           seg  32s: pos 1767.135±0.000 m, ori 7.54±0.00°  (n=1)
+           seg  40s: pos 2064.075±0.000 m, ori 9.66±0.00°  (n=1)
+
+  serial    MH_03_medium 4thr  (1 run, 2302 frames pooled)
+    Component      wall (mean±std, p99)     cpu (mean±std, p99)      thread (mean±std, p99)
+     tracking       8.6±1.0 (p99: 11.6)      24.1±2.8 (p99: 31.9)     8.6±1.0 (p99: 11.5)
+     propagation    0.3±0.0 (p99: 0.3)       0.3±0.0 (p99: 0.3)       0.3±0.0 (p99: 0.3)
+     msckf update   0.2±0.2 (p99: 0.9)       0.2±0.2 (p99: 0.9)       0.2±0.2 (p99: 0.9)
+     slam update    0.0±0.0 (p99: 0.2)       0.0±0.0 (p99: 0.2)       0.0±0.0 (p99: 0.2)
+     slam delayed   0.6±0.8 (p99: 4.1)       0.6±0.8 (p99: 4.1)       0.6±0.8 (p99: 4.1)
+     re-tri & marg  5.7±0.4 (p99: 7.3)       7.8±0.5 (p99: 9.5)       5.7±0.4 (p99: 7.3)
+  ** total          15.4±1.4 (p99: 20.3)     33.0±3.0 (p99: 41.7)     15.3±1.4 (p99: 20.2)
+  → error_singlerun: MH_03_medium_4thr_est.txt ... done
+    ATE:   pos rmse mean=2793.9860 m (std=0.00000, range 0.0 mm); ori rmse mean=44.949°
+    RPE:   per-segment median, across 1 run
+           seg   8s: pos 401.251±0.000 m, ori 2.18±0.00°  (n=1)
+           seg  16s: pos 853.874±0.000 m, ori 3.99±0.00°  (n=1)
+           seg  24s: pos 1312.202±0.000 m, ori 5.67±0.00°  (n=1)
+           seg  32s: pos 1767.135±0.000 m, ori 7.54±0.00°  (n=1)
+           seg  40s: pos 2064.075±0.000 m, ori 9.66±0.00°  (n=1)
+
+  serial    V1_01_easy 1thr  (1 run, 2776 frames pooled)
+    Component      wall (mean±std, p99)     cpu (mean±std, p99)      thread (mean±std, p99)
+     tracking       11.7±1.2 (p99: 15.8)     11.7±1.2 (p99: 15.8)     11.6±1.2 (p99: 15.7)
+     propagation    0.5±0.1 (p99: 0.7)       0.5±0.1 (p99: 0.7)       0.5±0.1 (p99: 0.6)
+     msckf update   2.9±4.7 (p99: 20.8)      2.9±4.7 (p99: 20.9)      2.9±4.7 (p99: 20.8)
+     slam update    7.2±1.5 (p99: 9.7)       7.2±1.5 (p99: 9.7)       7.2±1.5 (p99: 9.7)
+     slam delayed   1.7±3.0 (p99: 13.7)      1.7±3.0 (p99: 13.6)      1.7±2.9 (p99: 13.6)
+     re-tri & marg  5.9±0.4 (p99: 7.4)       5.9±0.4 (p99: 7.3)       5.9±0.4 (p99: 7.3)
+  ** total          29.9±6.2 (p99: 51.2)     29.9±6.2 (p99: 51.1)     29.8±6.2 (p99: 51.1)
+  → error_singlerun: V1_01_easy_1thr_est.txt ... done
+    ATE:   pos rmse mean=0.0490 m (std=0.00000, range 0.0 mm); ori rmse mean=0.773°
+    RPE:   per-segment median, across 1 run
+           seg   8s: pos 0.055±0.000 m, ori 0.58±0.00°  (n=1)
+           seg  16s: pos 0.055±0.000 m, ori 0.47±0.00°  (n=1)
+           seg  24s: pos 0.055±0.000 m, ori 0.64±0.00°  (n=1)
+           seg  32s: pos 0.071±0.000 m, ori 0.71±0.00°  (n=1)
+           seg  40s: pos 0.069±0.000 m, ori 0.46±0.00°  (n=1)
+
+  serial    V1_01_easy 4thr  (1 run, 2776 frames pooled)
+    Component      wall (mean±std, p99)     cpu (mean±std, p99)      thread (mean±std, p99)
+     tracking       8.5±0.8 (p99: 10.9)      23.9±2.2 (p99: 30.3)     8.4±0.8 (p99: 10.8)
+     propagation    0.6±0.1 (p99: 0.8)       0.6±0.1 (p99: 0.8)       0.6±0.1 (p99: 0.8)
+     msckf update   3.1±4.7 (p99: 21.5)      3.1±4.7 (p99: 21.5)      3.1±4.7 (p99: 21.5)
+     slam update    7.2±1.5 (p99: 9.9)       7.2±1.5 (p99: 9.8)       7.2±1.5 (p99: 9.8)
+     slam delayed   1.7±3.0 (p99: 14.0)      1.7±3.0 (p99: 14.0)      1.7±3.0 (p99: 14.0)
+     re-tri & marg  6.4±0.4 (p99: 7.4)       8.8±0.6 (p99: 10.2)      6.4±0.4 (p99: 7.3)
+  ** total          27.6±6.3 (p99: 49.5)     45.4±6.6 (p99: 68.5)     27.5±6.2 (p99: 49.4)
+  → error_singlerun: V1_01_easy_4thr_est.txt ... done
+    ATE:   pos rmse mean=0.0490 m (std=0.00000, range 0.0 mm); ori rmse mean=0.773°
+    RPE:   per-segment median, across 1 run
+           seg   8s: pos 0.055±0.000 m, ori 0.58±0.00°  (n=1)
+           seg  16s: pos 0.055±0.000 m, ori 0.47±0.00°  (n=1)
+           seg  24s: pos 0.055±0.000 m, ori 0.64±0.00°  (n=1)
+           seg  32s: pos 0.071±0.000 m, ori 0.71±0.00°  (n=1)
+           seg  40s: pos 0.069±0.000 m, ori 0.46±0.00°  (n=1)
+
+  serial    V2_02_medium 1thr  (1 run, 2260 frames pooled)
+    Component      wall (mean±std, p99)     cpu (mean±std, p99)      thread (mean±std, p99)
+     tracking       12.3±1.5 (p99: 17.4)     12.3±1.5 (p99: 17.4)     12.3±1.5 (p99: 17.4)
+     propagation    0.5±0.1 (p99: 0.6)       0.5±0.1 (p99: 0.6)       0.4±0.1 (p99: 0.6)
+     msckf update   2.1±2.7 (p99: 12.5)      2.1±2.7 (p99: 12.5)      2.1±2.7 (p99: 12.5)
+     slam update    4.8±2.1 (p99: 9.0)       4.8±2.1 (p99: 9.0)       4.8±2.1 (p99: 9.0)
+     slam delayed   2.7±3.2 (p99: 14.1)      2.7±3.2 (p99: 14.1)      2.7±3.2 (p99: 14.1)
+     re-tri & marg  5.9±0.5 (p99: 7.8)       5.9±0.5 (p99: 7.8)       5.9±0.5 (p99: 7.8)
+  ** total          28.2±5.0 (p99: 44.1)     28.2±5.0 (p99: 44.1)     28.2±5.0 (p99: 44.0)
+  → error_singlerun: V2_02_medium_1thr_est.txt ... done
+    ATE:   pos rmse mean=0.0480 m (std=0.00000, range 0.0 mm); ori rmse mean=1.166°
+    RPE:   per-segment median, across 1 run
+           seg   8s: pos 0.043±0.000 m, ori 1.18±0.00°  (n=1)
+           seg  16s: pos 0.062±0.000 m, ori 1.15±0.00°  (n=1)
+           seg  24s: pos 0.060±0.000 m, ori 1.31±0.00°  (n=1)
+           seg  32s: pos 0.056±0.000 m, ori 1.40±0.00°  (n=1)
+           seg  40s: pos 0.056±0.000 m, ori 1.24±0.00°  (n=1)
+
+  serial    V2_02_medium 4thr  (1 run, 2260 frames pooled)
+    Component      wall (mean±std, p99)     cpu (mean±std, p99)      thread (mean±std, p99)
+     tracking       7.9±0.9 (p99: 11.0)      22.2±2.3 (p99: 28.9)     7.9±0.9 (p99: 10.9)
+     propagation    0.5±0.1 (p99: 0.6)       0.5±0.1 (p99: 0.6)       0.5±0.1 (p99: 0.6)
+     msckf update   2.1±2.7 (p99: 12.5)      2.1±2.6 (p99: 12.5)      2.1±2.6 (p99: 12.5)
+     slam update    4.8±2.1 (p99: 9.0)       4.8±2.1 (p99: 9.0)       4.7±2.1 (p99: 9.0)
+     slam delayed   2.7±3.3 (p99: 14.6)      2.7±3.3 (p99: 14.6)      2.7±3.3 (p99: 14.6)
+     re-tri & marg  5.4±0.2 (p99: 5.9)       7.3±0.4 (p99: 8.1)       5.4±0.2 (p99: 5.9)
+  ** total          23.3±4.9 (p99: 39.1)     39.5±5.0 (p99: 55.1)     23.3±4.9 (p99: 39.0)
+  → error_singlerun: V2_02_medium_4thr_est.txt ... done
+    ATE:   pos rmse mean=0.0480 m (std=0.00000, range 0.0 mm); ori rmse mean=1.166°
+    RPE:   per-segment median, across 1 run
+           seg   8s: pos 0.043±0.000 m, ori 1.18±0.00°  (n=1)
+           seg  16s: pos 0.062±0.000 m, ori 1.15±0.00°  (n=1)
+           seg  24s: pos 0.060±0.000 m, ori 1.31±0.00°  (n=1)
+           seg  32s: pos 0.056±0.000 m, ori 1.40±0.00°  (n=1)
+           seg  40s: pos 0.056±0.000 m, ori 1.24±0.00°  (n=1)
+
+hailo@rpi:~/workspace/catkin_ws_ov$ python3 /home/hailo/workspace/catkin_ws_ov/scripts/parse_results.py /home/hailo/results/rpi5/native_jazzy/run_for_benchmark_analysis_13_05__rpi5__U/subscribe --detailed
+
+=== /home/hailo/results/rpi5/native_jazzy/run_for_benchmark_analysis_13_05__rpi5__U/subscribe (30 runs across 6 cells) ===
+
+  subscribe MH_03_medium 1thr  (5 runs, 9450 frames pooled)
+    Component      wall (mean±std, p99)     cpu (mean±std, p99)      thread (mean±std, p99)
+     tracking       12.1±1.4 (p99: 16.6)     13.4±2.3 (p99: 19.7)     12.0±1.4 (p99: 16.6)
+     propagation    0.5±0.1 (p99: 0.9)       0.6±0.5 (p99: 2.5)       0.5±0.1 (p99: 0.9)
+     msckf update   2.2±3.5 (p99: 17.2)      2.7±4.1 (p99: 19.3)      2.2±3.5 (p99: 17.2)
+     slam update    5.7±2.2 (p99: 9.4)       6.4±2.8 (p99: 12.5)      5.7±2.2 (p99: 9.3)
+     slam delayed   2.4±3.9 (p99: 18.0)      2.5±4.1 (p99: 19.3)      2.4±3.9 (p99: 18.0)
+     re-tri & marg  5.9±0.8 (p99: 8.4)       6.3±1.5 (p99: 12.7)      5.9±0.8 (p99: 8.4)
+  ** total          28.7±6.8 (p99: 52.4)     31.9±7.6 (p99: 60.0)     28.7±6.7 (p99: 52.3)
+  → error_singlerun: MH_03_medium_1thr_run1_est.txt ... done
+  → error_singlerun: MH_03_medium_1thr_run2_est.txt ... done
+  → error_singlerun: MH_03_medium_1thr_run3_est.txt ... done
+  → error_singlerun: MH_03_medium_1thr_run4_est.txt ... done
+  → error_singlerun: MH_03_medium_1thr_run5_est.txt ... done
+    ATE:   pos rmse mean=0.1528 m (std=0.05010, range 133.0 mm); ori rmse mean=1.197°
+    RPE:   per-segment median, across 5 runs
+           seg   8s: pos 0.120±0.070 m, ori 0.34±0.20°  (n=5)
+           seg  16s: pos 0.125±0.071 m, ori 0.46±0.27°  (n=5)
+           seg  24s: pos 0.130±0.074 m, ori 0.59±0.34°  (n=5)
+           seg  32s: pos 0.177±0.102 m, ori 0.69±0.42°  (n=5)
+           seg  40s: pos 0.197±0.117 m, ori 0.77±0.47°  (n=5)
+
+  subscribe MH_03_medium 4thr  (5 runs, 11555 frames pooled)
+    Component      wall (mean±std, p99)     cpu (mean±std, p99)      thread (mean±std, p99)
+     tracking       8.1±0.8 (p99: 10.9)      22.5±2.3 (p99: 29.6)     8.1±0.8 (p99: 10.8)
+     propagation    0.5±0.1 (p99: 0.8)       0.5±0.3 (p99: 2.0)       0.5±0.1 (p99: 0.8)
+     msckf update   2.1±3.5 (p99: 17.5)      2.6±4.3 (p99: 20.2)      2.1±3.5 (p99: 17.5)
+     slam update    5.5±2.4 (p99: 9.4)       6.9±3.3 (p99: 13.1)      5.5±2.4 (p99: 9.4)
+     slam delayed   2.4±3.9 (p99: 18.0)      2.6±4.2 (p99: 18.7)      2.4±3.9 (p99: 18.0)
+     re-tri & marg  5.9±0.5 (p99: 7.8)       8.5±1.7 (p99: 14.7)      5.9±0.5 (p99: 7.8)
+  ** total          24.5±6.5 (p99: 46.5)     43.7±7.4 (p99: 68.6)     24.5±6.4 (p99: 46.4)
+  → error_singlerun: MH_03_medium_4thr_run1_est.txt ... done
+  → error_singlerun: MH_03_medium_4thr_run2_est.txt ... done
+  → error_singlerun: MH_03_medium_4thr_run3_est.txt ... done
+  → error_singlerun: MH_03_medium_4thr_run4_est.txt ... done
+  → error_singlerun: MH_03_medium_4thr_run5_est.txt ... done
+    ATE:   pos rmse mean=0.2088 m (std=0.02753, range 58.0 mm); ori rmse mean=1.325°
+    RPE:   per-segment median, across 5 runs
+           seg   8s: pos 0.162±0.022 m, ori 0.52±0.05°  (n=5)
+           seg  16s: pos 0.189±0.012 m, ori 0.73±0.05°  (n=5)
+           seg  24s: pos 0.204±0.018 m, ori 0.82±0.06°  (n=5)
+           seg  32s: pos 0.236±0.041 m, ori 0.95±0.12°  (n=5)
+           seg  40s: pos 0.278±0.032 m, ori 1.06±0.20°  (n=5)
+
+  subscribe V1_01_easy 1thr  (5 runs, 14000 frames pooled)
+    Component      wall (mean±std, p99)     cpu (mean±std, p99)      thread (mean±std, p99)
+     tracking       10.6±1.1 (p99: 14.5)     12.4±1.4 (p99: 17.0)     10.6±1.1 (p99: 14.5)
+     propagation    0.4±0.1 (p99: 0.7)       0.4±0.1 (p99: 0.7)       0.4±0.1 (p99: 0.7)
+     msckf update   2.8±4.4 (p99: 19.9)      2.8±4.4 (p99: 20.0)      2.8±4.4 (p99: 19.9)
+     slam update    7.0±1.5 (p99: 9.7)       7.1±1.7 (p99: 10.7)      7.0±1.5 (p99: 9.7)
+     slam delayed   1.7±3.2 (p99: 15.0)      1.8±3.5 (p99: 16.4)      1.7±3.2 (p99: 15.0)
+     re-tri & marg  5.3±0.4 (p99: 6.7)       5.5±1.1 (p99: 10.2)      5.3±0.4 (p99: 6.7)
+  ** total          27.9±6.3 (p99: 49.8)     30.2±7.4 (p99: 56.0)     27.9±6.3 (p99: 49.8)
+  → error_singlerun: V1_01_easy_1thr_run1_est.txt ... done
+  → error_singlerun: V1_01_easy_1thr_run2_est.txt ... done
+  → error_singlerun: V1_01_easy_1thr_run3_est.txt ... done
+  → error_singlerun: V1_01_easy_1thr_run4_est.txt ... done
+  → error_singlerun: V1_01_easy_1thr_run5_est.txt ... done
+    ATE:   pos rmse mean=0.0706 m (std=0.00615, range 15.0 mm); ori rmse mean=0.773°
+    RPE:   per-segment median, across 5 runs
+           seg   8s: pos 0.083±0.009 m, ori 0.64±0.04°  (n=5)
+           seg  16s: pos 0.077±0.014 m, ori 0.59±0.07°  (n=5)
+           seg  24s: pos 0.096±0.017 m, ori 0.74±0.11°  (n=5)
+           seg  32s: pos 0.098±0.025 m, ori 0.70±0.13°  (n=5)
+           seg  40s: pos 0.106±0.031 m, ori 0.83±0.27°  (n=5)
+
+  subscribe V1_01_easy 4thr  (5 runs, 14000 frames pooled)
+    Component      wall (mean±std, p99)     cpu (mean±std, p99)      thread (mean±std, p99)
+     tracking       7.7±0.8 (p99: 10.1)      20.8±1.9 (p99: 26.6)     7.6±0.8 (p99: 10.1)
+     propagation    0.5±0.1 (p99: 0.6)       0.5±0.1 (p99: 0.7)       0.5±0.1 (p99: 0.6)
+     msckf update   2.9±4.4 (p99: 19.4)      2.9±4.4 (p99: 19.6)      2.9±4.4 (p99: 19.4)
+     slam update    7.0±1.6 (p99: 9.6)       7.1±1.7 (p99: 10.3)      7.0±1.6 (p99: 9.6)
+     slam delayed   1.8±3.1 (p99: 14.0)      1.8±3.3 (p99: 14.8)      1.8±3.1 (p99: 14.0)
+     re-tri & marg  5.5±0.4 (p99: 6.8)       7.7±1.0 (p99: 11.6)      5.5±0.4 (p99: 6.8)
+  ** total          25.3±6.2 (p99: 46.5)     40.7±7.1 (p99: 64.5)     25.3±6.2 (p99: 46.4)
+  → error_singlerun: V1_01_easy_4thr_run1_est.txt ... done
+  → error_singlerun: V1_01_easy_4thr_run2_est.txt ... done
+  → error_singlerun: V1_01_easy_4thr_run3_est.txt ... done
+  → error_singlerun: V1_01_easy_4thr_run4_est.txt ... done
+  → error_singlerun: V1_01_easy_4thr_run5_est.txt ... done
+    ATE:   pos rmse mean=0.0676 m (std=0.00844, range 21.0 mm); ori rmse mean=0.685°
+    RPE:   per-segment median, across 5 runs
+           seg   8s: pos 0.082±0.016 m, ori 0.64±0.08°  (n=5)
+           seg  16s: pos 0.080±0.008 m, ori 0.64±0.16°  (n=5)
+           seg  24s: pos 0.086±0.021 m, ori 0.60±0.10°  (n=5)
+           seg  32s: pos 0.083±0.013 m, ori 0.64±0.08°  (n=5)
+           seg  40s: pos 0.089±0.010 m, ori 0.53±0.11°  (n=5)
+
+  subscribe V2_02_medium 1thr  (5 runs, 11335 frames pooled)
+    Component      wall (mean±std, p99)     cpu (mean±std, p99)      thread (mean±std, p99)
+     tracking       12.0±1.5 (p99: 17.1)     12.3±1.6 (p99: 17.6)     12.0±1.5 (p99: 17.1)
+     propagation    0.3±0.1 (p99: 0.6)       0.3±0.1 (p99: 0.6)       0.3±0.1 (p99: 0.6)
+     msckf update   1.2±1.9 (p99: 9.5)       1.3±2.1 (p99: 10.2)      1.2±1.9 (p99: 9.4)
+     slam update    2.4±2.6 (p99: 8.7)       2.5±2.9 (p99: 11.0)      2.4±2.6 (p99: 8.7)
+     slam delayed   2.1±3.2 (p99: 15.2)      2.4±3.9 (p99: 18.3)      2.1±3.2 (p99: 15.2)
+     re-tri & marg  5.7±0.8 (p99: 8.3)       6.8±2.5 (p99: 14.8)      5.7±0.8 (p99: 8.3)
+  ** total          23.7±6.2 (p99: 43.3)     25.7±7.9 (p99: 49.3)     23.7±6.2 (p99: 43.2)
+  → error_singlerun: V2_02_medium_1thr_run1_est.txt ... done
+  → error_singlerun: V2_02_medium_1thr_run2_est.txt ... done
+  → error_singlerun: V2_02_medium_1thr_run3_est.txt ... done
+  → error_singlerun: V2_02_medium_1thr_run4_est.txt ... done
+  → error_singlerun: V2_02_medium_1thr_run5_est.txt ... done
+    ATE:   pos rmse mean=162.9584 m (std=223.57479, range 430580.0 mm); ori rmse mean=41.357°
+    RPE:   per-segment median, across 5 runs
+           seg   8s: pos 48.826±68.258 m, ori 1.57±0.60°  (n=5)
+           seg  16s: pos 99.362±137.785 m, ori 2.09±1.51°  (n=5)
+           seg  24s: pos 144.882±198.206 m, ori 2.79±2.29°  (n=5)
+           seg  32s: pos 183.721±255.057 m, ori 3.50±3.23°  (n=5)
+           seg  40s: pos 232.291±328.464 m, ori 3.99±4.03°  (n=5)
+
+  subscribe V2_02_medium 4thr  (5 runs, 11335 frames pooled)
+    Component      wall (mean±std, p99)     cpu (mean±std, p99)      thread (mean±std, p99)
+     tracking       8.5±0.9 (p99: 11.5)      23.5±2.2 (p99: 29.7)     8.5±0.9 (p99: 11.4)
+     propagation    0.4±0.1 (p99: 0.6)       0.4±0.1 (p99: 0.6)       0.4±0.1 (p99: 0.6)
+     msckf update   1.9±2.4 (p99: 11.8)      1.9±2.5 (p99: 12.3)      1.9±2.4 (p99: 11.8)
+     slam update    3.9±2.3 (p99: 8.4)       4.0±2.4 (p99: 10.3)      3.9±2.3 (p99: 8.4)
+     slam delayed   2.9±3.6 (p99: 16.8)      3.2±4.2 (p99: 20.1)      2.9±3.6 (p99: 16.8)
+     re-tri & marg  5.8±0.6 (p99: 8.1)       8.9±2.2 (p99: 16.4)      5.8±0.6 (p99: 8.1)
+  ** total          23.4±5.6 (p99: 41.2)     41.9±7.2 (p99: 63.3)     23.4±5.6 (p99: 41.2)
+  → error_singlerun: V2_02_medium_4thr_run1_est.txt ... done
+  → error_singlerun: V2_02_medium_4thr_run2_est.txt ... done
+  → error_singlerun: V2_02_medium_4thr_run3_est.txt ... done
+  → error_singlerun: V2_02_medium_4thr_run4_est.txt ... done
+  → error_singlerun: V2_02_medium_4thr_run5_est.txt ... done
+    ATE:   pos rmse mean=0.1710 m (std=0.06977, range 181.0 mm); ori rmse mean=1.504°
+    RPE:   per-segment median, across 5 runs
+           seg   8s: pos 0.089±0.013 m, ori 1.19±0.05°  (n=5)
+           seg  16s: pos 0.142±0.041 m, ori 1.38±0.17°  (n=5)
+           seg  24s: pos 0.169±0.062 m, ori 1.72±0.27°  (n=5)
+           seg  32s: pos 0.229±0.088 m, ori 1.96±0.37°  (n=5)
+           seg  40s: pos 0.275±0.127 m, ori 2.12±0.72°  (n=5)
+
